@@ -1,0 +1,474 @@
+// Prisma schema — Urb TecTrack production database
+// Money: BIGINT paise | Weights: Decimal(12,3) kg
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  factory
+  client
+}
+
+enum FileKind {
+  bom
+  weighPhoto
+  pickPhoto
+  invoice
+  eway
+  certificate
+  serials
+  processing
+  report
+  logo
+  planting
+}
+
+model Client {
+  id        String   @id @db.VarChar(4)
+  name      String
+  city      String?
+  contact   String?
+  phone     String?
+  email     String?
+  logoFileId String? @map("logo_file_id")
+  active    Boolean  @default(true)
+  payTermsDays Int   @default(30) @map("pay_terms_days")
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+
+  sites        Site[]
+  users        User[]
+  submissions  Submission[]
+
+  @@map("clients")
+}
+
+model Site {
+  id          String   @id @default(cuid())
+  clientId    String   @map("client_id") @db.VarChar(4)
+  code        String   @db.VarChar(16)
+  name        String
+  address     String?
+  gstin       String?
+  contactName String?  @map("contact_name")
+  contactPhone String? @map("contact_phone")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  client      Client   @relation(fields: [clientId], references: [id])
+  submissions Submission[]
+
+  @@unique([clientId, code])
+  @@map("sites")
+}
+
+model FactorySite {
+  id          String   @id @db.VarChar(16)
+  name        String
+  address     String?
+  gstin       String?
+  kspcbConsent String? @map("kspcb_consent")
+  cpcbEpr     String?  @map("cpcb_epr")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  categories  CategoryMaster[]
+  mrns        Mrn[]
+  mrnCounters MrnCounter[]
+  recycling   Recycling[]
+
+  @@map("factory_sites")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         UserRole
+  clientId     String?  @map("client_id") @db.VarChar(4)
+  factoryIds   String[] @default([]) @map("factory_ids")
+  siteIds      String[] @default([]) @map("site_ids")
+  passwordHash String   @map("password_hash")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  client       Client?  @relation(fields: [clientId], references: [id])
+  sessions     Session[]
+  notifications Notification[]
+  auditLogs    AuditLog[] @relation("AuditActor")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model CategoryMaster {
+  id           Int      @id @default(autoincrement())
+  factoryId    String   @map("factory_id") @db.VarChar(16)
+  entryId      String   @map("entry_id") @db.VarChar(32)
+  description  String
+  groupCode    String   @map("group_code") @db.VarChar(8)
+  activity     String   @default("Recycling")
+  capacityTpa  Decimal  @map("capacity_tpa") @db.Decimal(10, 2)
+  authRef      String?  @map("auth_ref")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String?  @map("created_by")
+
+  factory      FactorySite @relation(fields: [factoryId], references: [id])
+  recyclingCategories RecyclingCategory[]
+
+  @@unique([factoryId, entryId])
+  @@map("category_master")
+}
+
+model Submission {
+  id           String    @id @db.VarChar(16)
+  clientId     String    @map("client_id") @db.VarChar(4)
+  siteId       String    @map("site_id")
+  ref          String?
+  requestDate  DateTime  @map("request_date") @db.Date
+  location     String?
+  approxQty    Int       @default(0) @map("approx_qty")
+  approxWeight Decimal   @default(0) @map("approx_weight") @db.Decimal(12, 3)
+  bomFileId    String?   @map("bom_file_id")
+  notes        String?
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String? @map("acknowledged_by")
+  rejectNote   String?   @map("reject_note")
+  rejectAt     DateTime? @map("reject_at")
+  closedAt     DateTime? @map("closed_at")
+
+  client       Client    @relation(fields: [clientId], references: [id])
+  site         Site      @relation(fields: [siteId], references: [id])
+  vehicles     Vehicle[]
+  invoices     Invoice[]
+
+  @@map("submissions")
+}
+
+model Vehicle {
+  id           String   @id @default(cuid())
+  submissionId String   @map("submission_id") @db.VarChar(16)
+  registration String
+  vehicleType  String   @map("vehicle_type")
+  logisticsPartner String? @map("logistics_partner")
+  driverName   String   @map("driver_name")
+  driverPhone  String   @map("driver_phone")
+  expectedAt   DateTime? @map("expected_at") @db.Date
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  team         VehicleTeamMember[]
+  weighment    Weighment?
+
+  @@map("vehicles")
+}
+
+model VehicleTeamMember {
+  id        String @id @default(cuid())
+  vehicleId String @map("vehicle_id")
+  name      String
+  role      String
+  phone     String
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_team")
+}
+
+model Weighment {
+  id           String   @id @default(cuid())
+  vehicleId    String   @unique @map("vehicle_id")
+  manual       Boolean  @default(false)
+  grossKg      Decimal? @map("gross_kg") @db.Decimal(12, 3)
+  tareKg       Decimal? @map("tare_kg") @db.Decimal(12, 3)
+  netKg        Decimal  @map("net_kg") @db.Decimal(12, 3)
+  slipNumber   String?  @map("slip_number")
+  method       String?
+  reason       String?
+  weighedAt    DateTime @map("weighed_at") @db.Date
+  slipPhotoIds String[] @default([]) @map("slip_photo_ids")
+  pickupPhotoIds String[] @default([]) @map("pickup_photo_ids")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("weighments")
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  submissionId  String    @map("submission_id") @db.VarChar(16)
+  invoiceNo     String    @map("invoice_no")
+  invoiceDate   DateTime  @map("invoice_date") @db.Date
+  taxablePaise  BigInt    @map("taxable_paise")
+  taxRatePct    Decimal   @map("tax_rate_pct") @db.Decimal(5, 2)
+  taxPaise      BigInt    @map("tax_paise")
+  totalPaise    BigInt    @map("total_paise")
+  billingWeight Decimal   @map("billing_weight") @db.Decimal(12, 3)
+  vehicleNetKg  Decimal?  @map("vehicle_net_kg") @db.Decimal(12, 3)
+  deviationKg   Decimal   @default(0) @map("deviation_kg") @db.Decimal(12, 3)
+  deviationNote String?   @map("deviation_note")
+  billingMode   String    @default("urbeno") @map("billing_mode")
+  ewayBillNo    String    @map("eway_bill_no")
+  ewayBillDate  DateTime  @map("eway_bill_date") @db.Date
+  invoiceFileId String?   @map("invoice_file_id")
+  ewayFileId    String?   @map("eway_file_id")
+  vehicleIds    String[]  @default([]) @map("vehicle_ids")
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  closedAt      DateTime? @map("closed_at")
+  closedBy      String?   @map("closed_by")
+  closeRating   Int?      @map("close_rating")
+  closeNote     String?   @map("close_note")
+  forceClosed   Boolean   @default(false) @map("force_closed")
+
+  submission    Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  payments      Payment[]
+  mrn           Mrn?
+  recycling     Recycling?
+  certificates  Certificate[]
+
+  @@unique([submissionId, invoiceNo])
+  @@map("invoices")
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  invoiceId   String   @map("invoice_id")
+  utr         String
+  amountPaise BigInt   @map("amount_paise")
+  paidAt      DateTime @map("paid_at") @db.Date
+  mode        String
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model MrnCounter {
+  factoryId  String @map("factory_id") @db.VarChar(16)
+  fy         String @db.VarChar(4)
+  lastValue  Int    @default(0) @map("last_value")
+
+  factory    FactorySite @relation(fields: [factoryId], references: [id])
+
+  @@id([factoryId, fy])
+  @@map("mrn_counters")
+}
+
+model Mrn {
+  id           String   @id @default(cuid())
+  invoiceId    String   @unique @map("invoice_id")
+  mrnNo        String   @unique @map("mrn_no")
+  factoryId    String   @map("factory_id") @db.VarChar(16)
+  receivedAt   DateTime @map("received_at") @db.Date
+  receivedBy   String   @map("received_by")
+  driverSign   String?  @map("driver_sign")
+  managerSign  String?  @map("manager_sign")
+  securitySign String?  @map("security_sign")
+  materials    Json     @default("[]")
+  condition    String   @default("Good")
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  factory      FactorySite @relation(fields: [factoryId], references: [id])
+
+  @@map("mrns")
+}
+
+model Recycling {
+  id           String   @id @default(cuid())
+  invoiceId    String   @unique @map("invoice_id")
+  form6No      String   @map("form6_no")
+  processedAt  DateTime @map("processed_at") @db.Date
+  factoryId    String   @map("factory_id") @db.VarChar(16)
+  divertedPct  Decimal  @default(0) @map("diverted_pct") @db.Decimal(5, 2)
+  recoveryFe   Decimal  @default(0) @map("recovery_fe") @db.Decimal(12, 3)
+  recoveryNfe  Decimal  @default(0) @map("recovery_nfe") @db.Decimal(12, 3)
+  recoveryPl   Decimal  @default(0) @map("recovery_pl") @db.Decimal(12, 3)
+  recoveryPcb  Decimal  @default(0) @map("recovery_pcb") @db.Decimal(12, 3)
+  serialFileId String?  @map("serial_file_id")
+  photoIds     String[] @default([]) @map("photo_ids")
+  reportIds    String[] @default([]) @map("report_ids")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  factory      FactorySite @relation(fields: [factoryId], references: [id])
+  categories   RecyclingCategory[]
+  serials      Serial[]
+
+  @@map("recycling")
+}
+
+model RecyclingCategory {
+  id           String  @id @default(cuid())
+  recyclingId  String  @map("recycling_id")
+  categoryId   Int     @map("category_id")
+  entryId      String  @map("entry_id")
+  groupCode    String  @map("group_code")
+  weightKg     Decimal @map("weight_kg") @db.Decimal(12, 3)
+  recoveryFe   Decimal @map("recovery_fe") @db.Decimal(12, 3)
+  recoveryNfe  Decimal @map("recovery_nfe") @db.Decimal(12, 3)
+  recoveryPl   Decimal @map("recovery_pl") @db.Decimal(12, 3)
+  recoveryPcb  Decimal @map("recovery_pcb") @db.Decimal(12, 3)
+  overrideReason String? @map("override_reason")
+
+  recycling    Recycling      @relation(fields: [recyclingId], references: [id], onDelete: Cascade)
+  category     CategoryMaster @relation(fields: [categoryId], references: [id])
+
+  @@map("recycling_categories")
+}
+
+model Serial {
+  id           String    @id @default(cuid())
+  recyclingId  String    @map("recycling_id")
+  serialNo     String    @map("serial_no")
+  assetTag     String?   @map("asset_tag")
+  make         String?
+  model        String?
+  destroyedAt  DateTime? @map("destroyed_at")
+  destroyStd   String?   @map("destroy_std")
+  destroyMethod String?  @map("destroy_method")
+  destroyOp    String?   @map("destroy_op")
+  dcodNo       String?   @map("dcod_no")
+
+  recycling    Recycling @relation(fields: [recyclingId], references: [id], onDelete: Cascade)
+
+  @@map("serials")
+}
+
+model Certificate {
+  id          String   @id @default(cuid())
+  invoiceId   String   @map("invoice_id")
+  certNo      String   @unique @map("cert_no")
+  certDate    DateTime @map("cert_date") @db.Date
+  department  String?
+  fileId      String   @map("file_id")
+  note        String?
+  uploadedBy  String   @map("uploaded_by")
+  uploadedAt  DateTime @default(now()) @map("uploaded_at")
+  mailedAt    DateTime? @map("mailed_at")
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("certificates")
+}
+
+model StoredFile {
+  id          String   @id @default(cuid())
+  name        String
+  mimeType    String   @map("mime_type")
+  sizeBytes   Int      @map("size_bytes")
+  kind        FileKind
+  storageKey  String   @map("storage_key")
+  uploadedBy  String?  @map("uploaded_by")
+  context     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("files")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  ts         DateTime @default(now())
+  actorEmail String   @map("actor_email")
+  actorId    String?  @map("actor_id")
+  action     String
+  entity     String
+  entityId   String?  @map("entity_id")
+  details    Json     @default("{}")
+
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([ts])
+  @@index([entity, entityId])
+  @@map("audit_log")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  kind      String
+  text      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  key       String?  @unique
+  name      String
+  subject   String
+  body      String
+  editable  Boolean  @default(true)
+  variables String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("email_templates")
+}
+
+model LookupMaster {
+  id        String   @id @default(cuid())
+  category  String
+  data      Json
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([category, id])
+  @@index([category])
+  @@map("lookup_masters")
+}
+
+model TreePlanting {
+  id          String   @id @default(cuid())
+  clientId    String?  @map("client_id") @db.VarChar(4)
+  trees       Int
+  plantedAt   DateTime @map("planted_at") @db.Date
+  location    String?
+  photoIds    String[] @default([]) @map("photo_ids")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("tree_plantings")
+}
+
+model IdSequence {
+  key       String @id
+  prefix    String
+  pad       Int    @default(5)
+  nextValue Int    @default(1) @map("next_value")
+
+  @@map("id_sequences")
+}
