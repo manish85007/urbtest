@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { SessionUser } from '../api';
+import { authApi, type SessionUser } from '../api';
 
 interface ProfilePageProps {
   user: SessionUser;
@@ -12,6 +13,25 @@ const ROLE_LABEL: Record<SessionUser['role'], string> = {
 };
 
 export function ProfilePage({ user }: ProfilePageProps) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg('');
+    setError('');
+    try {
+      await authApi.changePassword(current, next);
+      setMsg('Password updated.');
+      setCurrent('');
+      setNext('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password change failed');
+    }
+  }
+
   return (
     <div>
       <h1 className="h1">My profile</h1>
@@ -41,15 +61,28 @@ export function ProfilePage({ user }: ProfilePageProps) {
       </section>
 
       <section className="card">
-        <h2>Session</h2>
-        <p className="muted">Signed in with HttpOnly session cookie (8-hour idle timeout).</p>
+        <h2>Change password</h2>
+        <form className="sub-form" onSubmit={changePassword}>
+          <label>
+            Current password
+            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+          </label>
+          <label>
+            New password
+            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={4} />
+          </label>
+          {msg ? <p className="ok-msg">{msg}</p> : null}
+          {error ? <p className="error">{error}</p> : null}
+          <button type="submit" className="btn primary">
+            Update password
+          </button>
+        </form>
       </section>
 
       <section className="card">
         <h2>Support</h2>
         <p className="muted">
-          Urbeno operations: <a href="mailto:admin@urbeno.in">admin@urbeno.in</a> ·{' '}
-          <a href="tel:+919845010001">+91 98450 10001</a>
+          Urbeno operations: <a href="mailto:admin@urbeno.in">admin@urbeno.in</a>
         </p>
         <p className="muted">
           Policies: <Link to="/legal/terms">Terms</Link> · <Link to="/legal/privacy">Privacy</Link>

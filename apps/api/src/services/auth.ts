@@ -82,3 +82,28 @@ export async function getSessionUser(token: string | undefined): Promise<Session
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
 }
+
+export async function changePassword(actor: SessionUser, current: string, next: string) {
+  if (next.length < 4) throw new Error('New password must be at least 4 characters.');
+
+  const user = await prisma.user.findUnique({ where: { id: actor.id } });
+  if (!user) throw new Error('User not found.');
+
+  const valid = await bcrypt.compare(current, user.passwordHash);
+  if (!valid) throw new Error('Current password is incorrect.');
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(next) },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'auth.password_change',
+    entity: 'user',
+    entityId: actor.email,
+  });
+
+  return { ok: true };
+}

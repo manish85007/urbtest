@@ -83,6 +83,15 @@ pnpm test
 
 Shared and API unit tests cover fiscal year boundaries, stage derivation, money/payments, file limits, and legal compliance. Set `DATABASE_URL` to run the full lifecycle integration test.
 
+### End-to-end (Playwright)
+
+```bash
+pnpm exec playwright install chromium --filter @urb-tectrack/web
+pnpm e2e
+```
+
+See [docs/E2E-TESTING.md](docs/E2E-TESTING.md) for the full manual UAT walkthrough and automated suite details.
+
 For CI, staging, and production, apply migrations non-interactively:
 
 ```bash

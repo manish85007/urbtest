@@ -4,6 +4,7 @@ import { dataApi, lifecycleApi, type SessionUser, type SubmissionDetail } from '
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
+import { useLookups } from '../hooks/useLookups';
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const { id } = useParams<{ id: string }>();
@@ -85,10 +86,31 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         </div>
       </div>
 
+      {sub.rejectNote ? (
+        <section className="card alert-warn">
+          <h2>Changes requested by Urbeno</h2>
+          <p>{sub.rejectNote}</p>
+        </section>
+      ) : null}
+
       {sub.notes ? (
         <section className="card">
           <h2>Notes</h2>
           <p>{sub.notes}</p>
+        </section>
+      ) : null}
+
+      {user.role === 'client' && stage === 1 && sub.rejectNote ? (
+        <section className="card">
+          <h2>Update request</h2>
+          <p className="muted">Revise details and resubmit for Urbeno review.</p>
+          <EditRequestForm
+            sub={sub}
+            disabled={busy}
+            onSave={(body) =>
+              act(() => lifecycleApi.updateSubmission(sub.id, body), 'Request updated and sent back to Urbeno.')
+            }
+          />
         </section>
       ) : null}
 
@@ -195,6 +217,58 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   );
 }
 
+function EditRequestForm({
+  sub,
+  disabled,
+  onSave,
+}: {
+  sub: SubmissionDetail;
+  disabled: boolean;
+  onSave: (body: { location?: string; approxQty?: number; approxWeight?: number; notes?: string }) => void;
+}) {
+  const [location, setLocation] = useState(sub.location ?? '');
+  const [approxQty, setApproxQty] = useState(String(sub.approxQty));
+  const [approxWeight, setApproxWeight] = useState(String(sub.approxWeight));
+  const [notes, setNotes] = useState(sub.notes ?? '');
+
+  return (
+    <form
+      className="sub-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({
+          location,
+          approxQty: Number(approxQty),
+          approxWeight: Number(approxWeight),
+          notes,
+        });
+      }}
+    >
+      <label>
+        Pickup location
+        <input value={location} onChange={(e) => setLocation(e.target.value)} />
+      </label>
+      <div className="fr2">
+        <label>
+          Approx. quantity
+          <input type="number" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />
+        </label>
+        <label>
+          Approx. weight (kg)
+          <input type="number" step="0.001" value={approxWeight} onChange={(e) => setApproxWeight(e.target.value)} />
+        </label>
+      </div>
+      <label>
+        Notes
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+      </label>
+      <button type="submit" className="btn primary" disabled={disabled}>
+        Save and resubmit
+      </button>
+    </form>
+  );
+}
+
 function RejectForm({
   disabled,
   onReject,
@@ -253,7 +327,10 @@ function AssignVehicleForm({
     team: Array<{ name: string; role: string; phone: string }>;
   }) => void;
 }) {
+  const vehicleTypes = useLookups('vehicleType');
+  const teamRoles = useLookups('teamRole');
   const [registration, setRegistration] = useState('');
+  const [vehicleType, setVehicleType] = useState('VT2');
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
 
@@ -264,10 +341,10 @@ function AssignVehicleForm({
         e.preventDefault();
         onAssign({
           registration,
-          vehicleType: 'VT2',
+          vehicleType,
           driverName,
           driverPhone,
-          team: [{ name: driverName, role: 'TR1', phone: driverPhone }],
+          team: [{ name: driverName, role: teamRoles[0]?.id ?? 'TR1', phone: driverPhone }],
         });
       }}
     >
@@ -278,14 +355,26 @@ function AssignVehicleForm({
           <input value={registration} onChange={(e) => setRegistration(e.target.value)} required />
         </label>
         <label>
+          Vehicle type
+          <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)}>
+            {vehicleTypes.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="fr2">
+        <label>
           Driver name
           <input value={driverName} onChange={(e) => setDriverName(e.target.value)} required />
         </label>
+        <label>
+          Driver phone
+          <input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} required />
+        </label>
       </div>
-      <label>
-        Driver phone
-        <input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} required />
-      </label>
       <button type="submit" className="btn primary" disabled={disabled}>
         Assign vehicle
       </button>

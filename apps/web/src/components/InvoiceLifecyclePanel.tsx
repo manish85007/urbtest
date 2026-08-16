@@ -7,6 +7,7 @@ import {
   type SessionUser,
 } from '../api';
 import { FileUpload } from './FileUpload';
+import { useLookups } from '../hooks/useLookups';
 
 interface InvoiceLifecyclePanelProps {
   invoice: InvoiceDetail;
@@ -282,15 +283,17 @@ function PaymentForm({
   onSubmit: (body: { utr: string; amount: number; paidAt: string; mode: string }) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  const paymentModes = useLookups('paymentMode');
   const [utr, setUtr] = useState('');
   const [amount, setAmount] = useState(String(amountDue));
+  const [mode, setMode] = useState('PM1');
 
   return (
     <form
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ utr, amount: Number(amount), paidAt: today, mode: 'PM1' });
+        onSubmit({ utr, amount: Number(amount), paidAt: today, mode });
       }}
     >
       <h3>Record payment</h3>
@@ -304,6 +307,16 @@ function PaymentForm({
           <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </label>
       </div>
+      <label>
+        Payment mode
+        <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          {paymentModes.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <button type="submit" className="btn primary" disabled={disabled}>
         Record payment
       </button>

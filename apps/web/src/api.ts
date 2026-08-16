@@ -1,10 +1,14 @@
 const base = import.meta.env.VITE_API_URL ?? '/api';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
   const res = await fetch(`${base}${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     ...init,
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
@@ -151,6 +155,8 @@ export interface SubmissionDetail {
   approxQty: number;
   approxWeight: string;
   notes: string | null;
+  rejectNote?: string | null;
+  rejectAt?: string | null;
   createdBy: string;
   acknowledgedAt: string | null;
   derivedStage: number;
@@ -254,6 +260,11 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ keys }),
     }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api<{ ok: boolean }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 };
 
 export const legalApi = {
@@ -297,6 +308,76 @@ export const dataApi = {
   heroes: () => api<HeroesReport>('/reports/heroes'),
   register: (type: RegisterType) =>
     api<Record<string, unknown>[]>(`/reports/register/${type}`),
+  lookups: (category: string) =>
+    api<Array<{ id: string; category: string; label: string; active: boolean }>>(
+      `/lookups/${category}`,
+    ),
+  users: () =>
+    api<
+      Array<{
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        clientId: string | null;
+        factoryIds: string[];
+        active: boolean;
+      }>
+    >('/users'),
+  createClient: (body: {
+    id: string;
+    name: string;
+    city?: string;
+    contact?: string;
+    phone?: string;
+    email?: string;
+  }) => api<{ id: string; name: string }>('/clients', { method: 'POST', body: JSON.stringify(body) }),
+  createSite: (
+    clientId: string,
+    body: {
+      code: string;
+      name: string;
+      address?: string;
+      gstin?: string;
+      contactName?: string;
+      contactPhone?: string;
+    },
+  ) =>
+    api<{ id: string; code: string; name: string }>(`/clients/${clientId}/sites`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  createUser: (body: {
+    email: string;
+    name: string;
+    role: 'admin' | 'factory' | 'client';
+    password?: string;
+    clientId?: string | null;
+    factoryIds?: string[];
+    siteIds?: string[];
+  }) => api<{ id: string; email: string }>('/users', { method: 'POST', body: JSON.stringify(body) }),
+  upsertLookup: (body: { category: string; id: string; label: string }) =>
+    api<unknown>('/lookups', { method: 'POST', body: JSON.stringify(body) }),
+  recordPlanting: (body: {
+    trees: number;
+    plantedAt: string;
+    location?: string;
+    note?: string;
+    clientId?: string;
+  }) =>
+    api<{ id: string }>('/reports/heroes/plantings', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+};
+
+export const adminApi = {
+  runEmailQueue: () => api<{ processed: number; sent: number; failed: number }>('/admin/jobs/email-queue', { method: 'POST' }),
+  runReminders: () =>
+    api<{ reminders: unknown; email: { processed: number; sent: number; failed: number } }>(
+      '/admin/jobs/reminders',
+      { method: 'POST' },
+    ),
 };
 
 export const emailsApi = {
@@ -350,6 +431,21 @@ export const lifecycleApi = {
     api<SubmissionDetail>(`/submissions/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
+    }),
+
+  updateSubmission: (
+    id: string,
+    body: {
+      location?: string;
+      approxQty?: number;
+      approxWeight?: number;
+      notes?: string;
+      ref?: string;
+    },
+  ) =>
+    api<SubmissionDetail>(`/submissions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
     }),
 
   addVehicle: (

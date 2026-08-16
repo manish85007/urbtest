@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { signIn, signOut } from '../services/auth.js';
+import { signIn, signOut, changePassword } from '../services/auth.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
 
 const loginSchema = z.object({
@@ -9,10 +9,12 @@ const loginSchema = z.object({
 });
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_MAX_PER_IP = 30;
+const LOGIN_MAX_PER_IP =
+  process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 30 : 1000;
 const ipLoginCounts = new Map<string, { count: number; resetAt: number }>();
 
 function checkLoginRateLimit(ip: string) {
+  if (process.env.E2E_TEST === 'true' || process.env.NODE_ENV === 'test') return;
   const now = Date.now();
   const rec = ipLoginCounts.get(ip) ?? { count: 0, resetAt: now + LOGIN_WINDOW_MS };
   if (now > rec.resetAt) {
@@ -56,5 +58,19 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get('/auth/me', { preHandler: requireAuth }, async (request) => {
     return { user: request.user };
+  });
+
+  app.post('/auth/change-password', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z
+      .object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(4),
+      })
+      .parse(request.body);
+    try {
+      return await changePassword(request.user!, body.currentPassword, body.newPassword);
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Password change failed');
+    }
   });
 }

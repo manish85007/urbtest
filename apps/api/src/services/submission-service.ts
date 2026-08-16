@@ -175,3 +175,66 @@ export async function rejectSubmission(actor: SessionUser, submissionId: string,
 
   return withDerivedStages(updated);
 }
+
+export interface UpdateSubmissionInput {
+  location?: string;
+  approxQty?: number;
+  approxWeight?: number;
+  notes?: string;
+  ref?: string;
+}
+
+export async function updateSubmission(
+  actor: SessionUser,
+  submissionId: string,
+  input: UpdateSubmissionInput,
+) {
+  const sub = await loadSubmissionForActor(submissionId, actor);
+  const stage = deriveSubmissionStage(sub);
+
+  if (stage !== 1) {
+    throw new AppError('Only a new request can be edited.');
+  }
+  if (actor.role === 'client') {
+    if (actor.clientId !== sub.clientId) {
+      throw new AppError('You can only edit your own requests.');
+    }
+    if (!sub.rejectNote) {
+      throw new AppError('This request has not been sent back for changes.');
+    }
+  } else {
+    requireStaff(actor);
+  }
+
+  const updated = await prisma.submission.update({
+    where: { id: submissionId },
+    data: {
+      location: input.location !== undefined ? input.location.trim() || null : undefined,
+      approxQty: input.approxQty,
+      approxWeight: input.approxWeight,
+      notes: input.notes !== undefined ? input.notes.trim() || null : undefined,
+      ref: input.ref !== undefined ? input.ref.trim() || null : undefined,
+      rejectNote: actor.role === 'client' ? null : undefined,
+      rejectAt: actor.role === 'client' ? null : undefined,
+    },
+    include: submissionInclude,
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'sub.update',
+    entity: 'submission',
+    entityId: submissionId,
+  });
+
+  if (actor.role === 'client') {
+    await notifyAdmins(
+      'sub.resubmit',
+      `Request ${updated.id} updated by client after changes were requested`,
+      updated.id,
+    );
+  }
+
+  return withDerivedStages(updated);
+}

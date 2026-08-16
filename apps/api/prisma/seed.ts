@@ -6,6 +6,7 @@ import { PrismaClient, UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { seedLookups } from '../src/services/lookups.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 for (const envPath of [resolve(here, '../.env'), resolve(here, '../../../.env')]) {
@@ -383,8 +384,23 @@ async function main() {
     create: { key: 'sub', prefix: 'REQ-', pad: 5, nextValue: 49 },
   });
 
+  await seedLookups();
+
+  await prisma.treePlanting.upsert({
+    where: { id: 'seed-plant-1' },
+    update: {},
+    create: {
+      id: 'seed-plant-1',
+      clientId: 'TCPL',
+      trees: 5,
+      plantedAt: new Date('2026-06-15'),
+      location: 'Embassy Tech Village campus',
+      note: 'Demo planting record',
+    },
+  });
+
   console.log(
-    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, 3 demo requests`,
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, 3 demo requests, lookups`,
   );
 }
 

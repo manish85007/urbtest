@@ -6,6 +6,7 @@ import {
   acknowledgeSubmission,
   createSubmission,
   rejectSubmission,
+  updateSubmission,
 } from '../services/submission-service.js';
 import { addVehicle, recordWeighment } from '../services/vehicle-service.js';
 import {
@@ -108,6 +109,24 @@ export async function lifecycleRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ reason: z.string().min(1) }).parse(request.body);
       return await rejectSubmission(request.user!, id, body.reason);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.patch('/submissions/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z
+        .object({
+          location: z.string().optional(),
+          approxQty: z.number().int().nonnegative().optional(),
+          approxWeight: z.number().nonnegative().optional(),
+          notes: z.string().optional(),
+          ref: z.string().optional(),
+        })
+        .parse(request.body);
+      return await updateSubmission(request.user!, id, body);
     } catch (err) {
       return handleServiceError(err, reply);
     }
