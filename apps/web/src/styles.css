@@ -425,3 +425,30 @@ select {
   font-size: 0.55rem;
   opacity: 0.85;
 }
+
+.inv-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--bg);
+}
+
+.inv-panel-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.dim {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.muted.sm,
+.ok-msg.sm {
+  font-size: 0.82rem;
+  margin: 0.2rem 0;
+}

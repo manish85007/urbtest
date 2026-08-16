@@ -53,4 +53,25 @@ export async function mastersRoutes(app: FastifyInstance) {
     }
     return all;
   });
+
+  app.get('/factories/:factoryId/categories', { preHandler: requireAuth }, async (request, reply) => {
+    const { factoryId } = request.params as { factoryId: string };
+    const actor = request.user!;
+
+    if (actor.role === 'factory' && !actor.factoryIds.includes(factoryId)) {
+      return reply.forbidden('Access denied.');
+    }
+
+    return prisma.categoryMaster.findMany({
+      where: { factoryId, active: true },
+      orderBy: [{ groupCode: 'asc' }, { entryId: 'asc' }],
+      select: {
+        id: true,
+        entryId: true,
+        description: true,
+        groupCode: true,
+        capacityTpa: true,
+      },
+    });
+  });
 }

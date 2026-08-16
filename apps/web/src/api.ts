@@ -34,9 +34,18 @@ export interface SiteSummary {
   address: string | null;
 }
 
+export interface CategorySummary {
+  id: number;
+  entryId: string;
+  description: string;
+  groupCode: string;
+  capacityTpa: string;
+}
+
 export interface FactorySummary {
   id: string;
   name: string;
+  city: string | null;
 }
 
 export interface SubmissionSummary {
@@ -72,7 +81,7 @@ export interface InvoiceDetail {
   totalPaise: string;
   derivedStage: number;
   closedAt: string | null;
-  mrn: { mrnNo: string } | null;
+  mrn: { mrnNo: string; factoryId: string } | null;
   recycling: { form6No: string } | null;
   certificates: Array<{ certNo: string }>;
   payments: Array<{ amountPaise: string }>;
@@ -117,6 +126,8 @@ export const dataApi = {
   clients: () => api<ClientSummary[]>('/clients'),
   sites: (clientId: string) => api<SiteSummary[]>(`/clients/${clientId}/sites`),
   factories: () => api<FactorySummary[]>('/factories'),
+  categories: (factoryId: string) =>
+    api<CategorySummary[]>(`/factories/${factoryId}/categories`),
 };
 
 export const lifecycleApi = {
@@ -196,5 +207,49 @@ export const lifecycleApi = {
     api<unknown>(`/invoices/${invoiceId}/payments`, {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+
+  createMrn: (
+    invoiceId: string,
+    body: {
+      factoryId: string;
+      receivedAt: string;
+      driverSign?: string;
+      managerSign?: string;
+      securitySign?: string;
+      note?: string;
+    },
+  ) =>
+    api<{ mrnNo: string }>(`/invoices/${invoiceId}/mrn`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createRecycling: (
+    invoiceId: string,
+    body: {
+      processedAt: string;
+      factoryId?: string;
+      categories: Array<{ entryId: string; groupCode: string; weightKg: number }>;
+    },
+  ) =>
+    api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  uploadCertificate: (
+    invoiceId: string,
+    body: { certNo: string; certDate: string; fileId: string; department?: string },
+  ) =>
+    api<{ certNo: string }>(`/invoices/${invoiceId}/certificates`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  closeInvoice: (invoiceId: string, body?: { rating?: number; note?: string; forced?: boolean }) =>
+    api<unknown>(`/invoices/${invoiceId}/close`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
     }),
 };

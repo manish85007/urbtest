@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { stageLabel } from '@urb-tectrack/shared';
 import { dataApi, lifecycleApi, type SessionUser, type SubmissionDetail } from '../api';
 import { StageBadge, StageProgress } from '../components/StageProgress';
+import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const { id } = useParams<{ id: string }>();
@@ -154,50 +154,36 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         </section>
       ) : null}
 
-      {isStaff && stage >= 5 ? (
+      {sub.invoices.length > 0 ? (
         <section className="card">
-          <h2>Invoices</h2>
-          {sub.invoices.length === 0 ? (
-            <>
-              <p className="muted">All vehicles weighed — ready to raise an invoice.</p>
-              {sub.vehicles.every((v) => v.weighment) ? (
-                <InvoiceForm
-                  vehicles={sub.vehicles}
-                  disabled={busy}
-                  onCreate={(body) =>
-                    act(
-                      () => lifecycleApi.createInvoice(sub.id, body),
-                      'Invoice created.',
-                    )
-                  }
-                />
-              ) : null}
-            </>
-          ) : (
-            <ul className="list">
-              {sub.invoices.map((inv) => (
-                <li key={inv.id}>
-                  <strong>{inv.invoiceNo}</strong> — {inv.billingWeight} kg —{' '}
-                  {stageLabel(inv.derivedStage)}
-                  {inv.payments.length === 0 ? (
-                    <span className="badge warn"> Unpaid</span>
-                  ) : (
-                    <span className="badge"> Payment recorded</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <h2>Invoices &amp; lifecycle</h2>
+          {sub.invoices.map((inv) => (
+            <InvoiceLifecyclePanel
+              key={inv.id}
+              invoice={inv}
+              user={user}
+              disabled={busy}
+              onAction={act}
+            />
+          ))}
         </section>
       ) : null}
 
-      <section className="card">
-        <h2>Lifecycle reference</h2>
-        <p className="muted">
-          Current stage: <strong>{stageLabel(stage)}</strong>. Factory stages (MRN, recycling) and
-          certificate upload are available via API — UI for stages 6–9 follows in the next milestone.
-        </p>
-      </section>
+      {isStaff && stage >= 5 && sub.invoices.length === 0 ? (
+        <section className="card">
+          <h2>Raise invoice</h2>
+          <p className="muted">All vehicles weighed — ready to bill.</p>
+          {sub.vehicles.every((v) => v.weighment) ? (
+            <InvoiceForm
+              vehicles={sub.vehicles}
+              disabled={busy}
+              onCreate={(body) =>
+                act(() => lifecycleApi.createInvoice(sub.id, body), 'Invoice created.')
+              }
+            />
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }
