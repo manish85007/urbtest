@@ -11,15 +11,15 @@ export * from './sustainability.js';
 export * from './category-capacity.js';
 
 export const STAGES = [
-  { n: 1, k: 'req', l: 'Request', ic: '📝', by: 'Client' },
-  { n: 2, k: 'ack', l: 'Acknowledge', ic: '✅', by: 'Admin' },
-  { n: 3, k: 'veh', l: 'Assign Vehicle', ic: '🚚', by: 'Admin' },
-  { n: 4, k: 'load', l: 'Load & Weigh', ic: '⚖️', by: 'Admin' },
-  { n: 5, k: 'bill', l: 'Billing', ic: '🧾', by: 'Admin' },
-  { n: 6, k: 'mrn', l: 'MRN', ic: '📋', by: 'Factory' },
-  { n: 7, k: 'recy', l: 'Recycling', ic: '♻️', by: 'Factory' },
-  { n: 8, k: 'cod', l: 'CoD Upload', ic: '🏅', by: 'Admin' },
-  { n: 9, k: 'done', l: 'Closed', ic: '🎉', by: 'Client' },
+  { n: 1, k: 'req', l: 'Request', ic: '📝', by: 'Client', d: 'Pickup request raised' },
+  { n: 2, k: 'ack', l: 'Acknowledge', ic: '✅', by: 'Admin', d: 'Urbeno accepts the request' },
+  { n: 3, k: 'veh', l: 'Assign Vehicle', ic: '🚚', by: 'Admin', d: 'Vehicles + teams assigned' },
+  { n: 4, k: 'load', l: 'Load & Weigh', ic: '⚖️', by: 'Admin', d: 'Per-vehicle weighment + photos' },
+  { n: 5, k: 'bill', l: 'Billing', ic: '🧾', by: 'Admin', d: 'Invoices + e-way bills raised' },
+  { n: 6, k: 'mrn', l: 'MRN', ic: '📋', by: 'Factory', d: 'Goods received at factory' },
+  { n: 7, k: 'recy', l: 'Recycling', ic: '♻️', by: 'Factory', d: 'Processed + Form 6 issued' },
+  { n: 8, k: 'cod', l: 'CoD Upload', ic: '🏅', by: 'Admin', d: 'Certificate uploaded + emailed' },
+  { n: 9, k: 'done', l: 'Closed', ic: '🎉', by: 'Client', d: 'Requestor acknowledged closure' },
 ] as const;
 
 export const CATEGORY_GROUPS = {

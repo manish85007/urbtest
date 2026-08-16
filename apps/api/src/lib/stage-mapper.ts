@@ -15,7 +15,12 @@ export function deriveSubmissionStage(sub: SubmissionFull): number {
   });
 }
 
-export function deriveInvoiceStage(inv: SubmissionFull['invoices'][number]): number {
+export function deriveInvoiceStage(inv: {
+  closedAt: Date | string | null;
+  certificates: unknown[];
+  recycling: unknown | null;
+  mrn: unknown | null;
+}): number {
   return invStage({
     closedAt: inv.closedAt,
     hasCertificate: inv.certificates.length > 0,

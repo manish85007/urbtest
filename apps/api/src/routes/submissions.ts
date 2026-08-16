@@ -29,6 +29,7 @@ export async function submissionRoutes(app: FastifyInstance) {
         siteName: sub.site.name,
         requestDate: sub.requestDate,
         approxWeight: sub.approxWeight,
+        location: sub.location,
         ref: sub.ref,
         stage,
         invoiceCount: sub.invoices.length,

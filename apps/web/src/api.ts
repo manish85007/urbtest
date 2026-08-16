@@ -260,6 +260,7 @@ export interface SubmissionSummary {
   siteName: string;
   requestDate: string;
   approxWeight: string;
+  location?: string | null;
   ref?: string | null;
   stage: number;
   invoiceCount: number;
@@ -287,19 +288,29 @@ export interface SerialRow {
   model: string | null;
   dcodNo: string | null;
   destroyStd: string | null;
+  destroyOp?: string | null;
 }
 
 export interface VehicleDetail {
   id: string;
   registration: string;
   vehicleType: string;
+  logisticsPartner?: string | null;
   driverName: string;
   driverPhone: string;
+  expectedAt?: string | null;
   team: Array<{ name: string; role: string; phone: string }>;
   weighment: {
     netKg: string;
+    grossKg?: string | null;
+    tareKg?: string | null;
     manual: boolean;
     slipNumber: string | null;
+    method?: string | null;
+    reason?: string | null;
+    weighedAt?: string;
+    slipPhotoIds?: string[];
+    pickupPhotoIds?: string[];
   } | null;
 }
 
@@ -307,26 +318,78 @@ export interface InvoiceDetail {
   id: string;
   invoiceNo: string;
   invoiceDate?: string;
+  taxablePaise?: string;
+  taxPaise?: string;
+  taxRatePct?: string;
   billingWeight: string;
+  vehicleNetKg?: string | null;
+  deviationKg?: string;
+  deviationNote?: string | null;
+  billingMode?: string;
   totalPaise: string;
   ewayBillNo?: string;
+  ewayBillDate?: string;
+  invoiceFileId?: string | null;
+  ewayFileId?: string | null;
+  vehicleIds?: string[];
   derivedStage: number;
   closedAt: string | null;
-  mrn: { mrnNo: string; factoryId: string; receivedAt?: string } | null;
+  closedBy?: string | null;
+  closeRating?: number | null;
+  closeNote?: string | null;
+  forceClosed?: boolean;
+  mrn: {
+    mrnNo: string;
+    factoryId: string;
+    receivedAt?: string;
+    receivedBy?: string;
+    driverSign?: string | null;
+    managerSign?: string | null;
+    securitySign?: string | null;
+    condition?: string | null;
+    materials?: Array<{ n?: string; q?: number; w?: number }>;
+    factory?: { id: string; name: string };
+  } | null;
   recycling: {
     form6No: string;
     processedAt?: string;
+    factoryId?: string;
+    factory?: { id: string; name: string };
+    recoveryFe?: string;
+    recoveryNfe?: string;
+    recoveryPl?: string;
+    recoveryPcb?: string;
+    photoIds?: string[];
+    reportIds?: string[];
+    categories?: Array<{
+      entryId: string;
+      groupCode: string;
+      weightKg: string;
+      recoveryFe?: string;
+      recoveryNfe?: string;
+      recoveryPl?: string;
+      recoveryPcb?: string;
+      category?: { description?: string };
+    }>;
     serials?: SerialRow[];
     serialFileId?: string | null;
   } | null;
   certificates: Array<{
+    id?: string;
     certNo: string;
     certDate?: string;
     department?: string | null;
+    note?: string | null;
     fileId?: string;
     mailedAt?: string | null;
   }>;
-  payments: Array<{ amountPaise: string }>;
+  payments: Array<{
+    id?: string;
+    amountPaise: string;
+    utr?: string;
+    paidAt?: string;
+    mode?: string;
+  }>;
 }
 
 export interface SubmissionDetail {
@@ -343,10 +406,20 @@ export interface SubmissionDetail {
   rejectNote?: string | null;
   rejectAt?: string | null;
   createdBy: string;
+  createdAt?: string;
   acknowledgedAt: string | null;
+  acknowledgedBy?: string | null;
   derivedStage: number;
-  client: { id: string; name: string };
-  site: { id: string; name: string; code: string };
+  client: { id: string; name: string; payTermsDays?: number };
+  site: {
+    id: string;
+    name: string;
+    code: string;
+    address?: string | null;
+    gstin?: string | null;
+    contactName?: string | null;
+    contactPhone?: string | null;
+  };
   vehicles: VehicleDetail[];
   invoices: InvoiceDetail[];
   queries?: QueryThread[];
@@ -840,6 +913,8 @@ export const lifecycleApi = {
       vehicleType: string;
       driverName: string;
       driverPhone: string;
+      logisticsPartner?: string;
+      expectedAt?: string;
       team: Array<{ name: string; role: string; phone: string }>;
     },
   ) =>
@@ -915,7 +990,7 @@ export const lifecycleApi = {
     body: {
       processedAt: string;
       factoryId?: string;
-      categories: Array<{ entryId: string; groupCode: string; weightKg: number }>;
+      categories: Array<{ entryId: string; groupCode: string; weightKg: number; overrideReason?: string }>;
     },
   ) =>
     api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {

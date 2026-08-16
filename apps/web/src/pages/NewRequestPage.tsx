@@ -11,6 +11,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   const [siteId, setSiteId] = useState('');
   const [requestDate, setRequestDate] = useState(new Date().toISOString().slice(0, 10));
   const [location, setLocation] = useState('');
+  const [ref, setRef] = useState('');
   const [approxWeight, setApproxWeight] = useState('');
   const [approxQty, setApproxQty] = useState('');
   const [notes, setNotes] = useState('');
@@ -47,6 +48,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
         approxWeight: approxWeight ? Number(approxWeight) : undefined,
         approxQty: approxQty ? Number(approxQty) : undefined,
         notes: notes || undefined,
+        ref: ref || undefined,
         bomFileId: bomFileId || undefined,
       });
       nav(`/requests/${sub.id}`);
@@ -60,7 +62,10 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   return (
     <div>
       <h1 className="h1">New pickup request</h1>
-      <p className="muted">Stage 1 — raise a request for e-waste collection.</p>
+      <p className="muted">
+        Give us an approximate quantity and weight — exact figures are captured at weighment. Attach a
+        bill of materials if you have a detailed line list.
+      </p>
 
       <form className="card form-grid" onSubmit={submit}>
         {user.role !== 'client' ? (
@@ -70,55 +75,79 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
               <option value="">Select client…</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.id} — {c.name}
+                  {c.name} ({c.id})
                 </option>
               ))}
             </select>
           </label>
         ) : null}
 
-        <label>
-          Site
-          <select value={siteId} onChange={(e) => setSiteId(e.target.value)} required>
-            <option value="">Select site…</option>
-            {sites.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Request date
-          <input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} required />
-        </label>
-
-        <label>
-          Pickup location
-          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Building / floor / bay" />
-        </label>
-
         <div className="fr2">
           <label>
-            Approx. weight (kg)
-            <input type="number" min="0" step="0.001" value={approxWeight} onChange={(e) => setApproxWeight(e.target.value)} />
+            Site
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} required>
+              <option value="">Select site…</option>
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Pickup location
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Building / floor / warehouse"
+            />
+          </label>
+          <label>
+            Your PO / Reference
+            <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="PO-1234" />
+          </label>
+          <label>
+            Request date
+            <input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} required />
           </label>
           <label>
             Approx. quantity
-            <input type="number" min="0" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />
+            <input
+              type="number"
+              min="0"
+              value={approxQty}
+              onChange={(e) => setApproxQty(e.target.value)}
+              placeholder="e.g. 45"
+            />
+          </label>
+          <label>
+            Approx. weight (kg)
+            <input
+              type="number"
+              min="0"
+              step="0.001"
+              value={approxWeight}
+              onChange={(e) => setApproxWeight(e.target.value)}
+              placeholder="e.g. 150"
+            />
           </label>
         </div>
 
         <label>
-          Notes
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          Notes <span className="hint">anything our team should know</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Access constraints, preferred pickup window, contact on site…"
+          />
         </label>
 
+        <div className="section-hd">Bill of Materials</div>
         <FileUpload
           kind="bom"
           label="Bill of materials"
-          hint="CSV, Excel or PDF listing line items"
+          hint="Optional — CSV, Excel or PDF listing line items"
           accept=".csv,.xls,.xlsx,application/pdf,text/csv"
           disabled={busy}
           value={bomFileId ? [bomFileId] : []}

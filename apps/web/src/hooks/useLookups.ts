@@ -12,3 +12,12 @@ export function useLookups(category: string) {
 
   return items;
 }
+
+export function lookupLabel(
+  items: Array<{ id: string; label: string }>,
+  id?: string | null,
+  fallback = '—',
+): string {
+  if (!id) return fallback;
+  return items.find((x) => x.id === id)?.label ?? id;
+}

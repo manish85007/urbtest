@@ -9,6 +9,19 @@ export function fmtDate(d: string | Date | null | undefined): string {
   return x.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+export function fmtTS(d: string | Date | null | undefined): string {
+  if (!d) return '—';
+  const x = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(x.getTime())) return String(d);
+  return x.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function daysBetween(from: string, to = new Date()): number {
   const start = new Date(from);
   if (Number.isNaN(start.getTime())) return 0;

@@ -23,8 +23,8 @@ export async function loadInvoiceForActor(invoiceId: string, actor: SessionUser)
     include: {
       submission: { include: submissionInclude },
       payments: true,
-      mrn: true,
-      recycling: { include: { categories: true, serials: true } },
+      mrn: { include: { factory: true } },
+      recycling: { include: { categories: { include: { category: true } }, serials: true, factory: true } },
       certificates: true,
     },
   });

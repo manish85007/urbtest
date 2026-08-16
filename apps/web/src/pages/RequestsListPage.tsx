@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { STAGES, getFY, listFiscalYears } from '@urb-tectrack/shared';
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
 import { StageBadge } from '../components/StageProgress';
+import { fmtDate, num } from '../lib/format';
 
 interface RequestsListPageProps {
   user: SessionUser;
 }
 
 export function RequestsListPage({ user }: RequestsListPageProps) {
+  const nav = useNavigate();
   const [rows, setRows] = useState<SubmissionSummary[]>([]);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
@@ -54,7 +56,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
         if (label !== fy) return false;
       }
       if (q) {
-        const hay = `${r.id} ${r.ref ?? ''} ${r.clientName} ${r.siteName}`.toLowerCase();
+        const hay = `${r.id} ${r.ref ?? ''} ${r.location ?? ''} ${r.clientName} ${r.siteName}`.toLowerCase();
         if (!hay.includes(q.toLowerCase())) return false;
       }
       return true;
@@ -65,7 +67,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
     <div>
       <div className="f-row" style={{ marginBottom: '.9rem' }}>
         <div>
-          <div className="h1">{isStaff ? 'All Requests' : 'My Requests'}</div>
+          <h1 className="h1">{isStaff ? 'All Requests' : 'My Requests'}</h1>
           <div className="p-mu" style={{ margin: 0 }}>
             {filtered.length} of {rows.length} requests
           </div>
@@ -176,9 +178,13 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
               </thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.id} className="click">
+                  <tr
+                    key={r.id}
+                    className="click"
+                    onClick={() => nav(`/requests/${r.id}`)}
+                  >
                     <td>
-                      <Link to={`/requests/${r.id}`}>
+                      <Link to={`/requests/${r.id}`} onClick={(e) => e.stopPropagation()}>
                         <b>{r.id}</b>
                       </Link>
                       <div className="dim" style={{ fontSize: '.72rem' }}>
@@ -197,6 +203,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                             key={inv.invoiceNo}
                             className={`badge ${inv.stage >= 9 ? 'bg-g' : 'bg-bl'}`}
                             style={{ margin: 1 }}
+                            title={`Stage ${inv.stage}`}
                           >
                             {inv.invoiceNo}
                           </span>
@@ -205,8 +212,8 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                         <span className="dim">—</span>
                       )}
                     </td>
-                    <td className="mono">{r.netKg ? r.netKg.toLocaleString() : r.approxWeight}</td>
-                    <td className="dim">{r.requestDate.slice(0, 10)}</td>
+                    <td className="mono">{num(r.netKg && r.netKg > 0 ? r.netKg : Number(r.approxWeight) || 0)}</td>
+                    <td className="dim">{fmtDate(r.requestDate)}</td>
                   </tr>
                 ))}
               </tbody>

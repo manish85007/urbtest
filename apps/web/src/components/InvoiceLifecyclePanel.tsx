@@ -1,83 +1,371 @@
 import { useEffect, useState } from 'react';
-import { formatINR, stageLabel } from '@urb-tectrack/shared';
+import {
+  formatINR,
+  getPayStatus,
+  invoiceDue,
+  paymentTermsLabel,
+  recyclingSla,
+  SLA_CLASS,
+  SLA_LABEL,
+  type PayStatusKey,
+} from '@urb-tectrack/shared';
 import {
   dataApi,
   filesApi,
   lifecycleApi,
   type InvoiceDetail,
   type SessionUser,
+  type VehicleDetail,
 } from '../api';
 import { FileUpload } from './FileUpload';
-import { useLookups } from '../hooks/useLookups';
+import { FileRow, FileThumb } from './FileThumb';
+import { lookupLabel, useLookups } from '../hooks/useLookups';
+import { fmtDate, num } from '../lib/format';
 
 interface InvoiceLifecyclePanelProps {
   invoice: InvoiceDetail;
+  vehicles: VehicleDetail[];
+  payTermsDays: number;
   user: SessionUser;
   disabled: boolean;
   onAction: (fn: () => Promise<unknown>, success: string) => void;
 }
 
-export function InvoiceLifecyclePanel({ invoice, user, disabled, onAction }: InvoiceLifecyclePanelProps) {
+function payCls(key: PayStatusKey): string {
+  if (key === 'paid') return 'bg-g';
+  if (key === 'partial') return 'bg-am';
+  return 'bg-rd';
+}
+
+function asPaise(v: string | number | bigint | undefined): bigint {
+  if (v === undefined || v === null) return 0n;
+  try {
+    return BigInt(v);
+  } catch {
+    return 0n;
+  }
+}
+
+export function InvoiceLifecyclePanel({
+  invoice,
+  vehicles,
+  payTermsDays,
+  user,
+  disabled,
+  onAction,
+}: InvoiceLifecyclePanelProps) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const isFactory = user.role === 'factory' || user.role === 'admin';
   const isAdmin = user.role === 'admin';
   const isClient = user.role === 'client';
+  const paymentModes = useLookups('paymentMode');
+  const taxRates = useLookups('taxRate');
 
-  const paidPaise = invoice.payments.reduce((s, p) => s + BigInt(p.amountPaise), 0n);
-  const totalPaise = BigInt(invoice.totalPaise);
-  const isPaid = paidPaise + 1n >= totalPaise;
+  const paidPaise = invoice.payments.reduce((s, p) => s + asPaise(p.amountPaise), 0n);
+  const totalPaise = asPaise(invoice.totalPaise);
+  const taxablePaise = asPaise(invoice.taxablePaise);
+  const taxPaise = asPaise(invoice.taxPaise);
+  const pay = getPayStatus(totalPaise, paidPaise);
+  const isPaid = pay.key === 'paid';
   const stage = invoice.derivedStage;
+  const due = invoice.invoiceDate
+    ? invoiceDue(new Date(invoice.invoiceDate), payTermsDays)
+    : null;
+  const taxPct = Number(invoice.taxRatePct ?? 18);
+  const covered =
+    invoice.vehicleIds?.length
+      ? vehicles.filter((v) => invoice.vehicleIds!.includes(v.id))
+      : vehicles;
+  const billingKg = Number(invoice.billingWeight || 0);
+  const vehicleNet = Number(invoice.vehicleNetKg ?? 0);
+  const deviation = Number(invoice.deviationKg ?? 0);
+  const firstCert = invoice.certificates[0]?.certDate ?? invoice.certificates[0]?.mailedAt;
+  const sla =
+    invoice.mrn?.receivedAt
+      ? recyclingSla({
+          mrnReceivedAt: new Date(invoice.mrn.receivedAt),
+          certificateAt: firstCert ? new Date(firstCert) : null,
+        })
+      : null;
+  const slaColor =
+    sla?.state === 'met'
+      ? 'var(--g)'
+      : sla?.state === 'warn'
+        ? 'var(--am)'
+        : sla?.state === 'ok'
+          ? 'var(--bl)'
+          : 'var(--rd)';
 
   return (
-    <div className="inv-panel">
-      <div className="inv-panel-hd">
-        <strong>{invoice.invoiceNo}</strong>
-        <span className="badge">{stageLabel(stage)}</span>
-        <span className="dim">{invoice.billingWeight} kg</span>
-        <span className="dim">{formatINR(Number(totalPaise))}</span>
+    <div className="inv-panel" style={{ padding: '.7rem .3rem 0' }}>
+      <div className="card" style={{ marginBottom: '.6rem' }}>
+        <div className="card-hd">
+          <div className="card-ttl">🧾 Invoice {invoice.invoiceNo}</div>
+          <span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(118px,1fr))',
+            gap: '.45rem',
+            marginBottom: '.5rem',
+          }}
+        >
+          <div className="tile">
+            <div className="tile-l">Invoice Date</div>
+            <div className="tile-v">{fmtDate(invoice.invoiceDate)}</div>
+          </div>
+          <div className="tile">
+            <div className="tile-l">Taxable Value</div>
+            <div className="tile-v">{formatINR(Number(taxablePaise))}</div>
+          </div>
+          <div className="tile">
+            <div className="tile-l">Tax {taxPct ? `@ ${taxPct}%` : ''}</div>
+            <div className="tile-v">{formatINR(Number(taxPaise))}</div>
+            <div className="dim" style={{ fontSize: '.68rem' }}>
+              {lookupLabel(taxRates, String(taxPct), 'GST 18%')}
+            </div>
+          </div>
+          <div className="tile">
+            <div className="tile-l">Total Invoice Value</div>
+            <div className="tile-v" style={{ color: 'var(--g2)', fontWeight: 700 }}>
+              {formatINR(Number(totalPaise))}
+            </div>
+          </div>
+          <div className="tile">
+            <div className="tile-l">Billing Weight</div>
+            <div className="tile-v mono">{num(billingKg)} kg</div>
+            {deviation ? (
+              <div style={{ fontSize: '.68rem', color: 'var(--am)' }}>
+                {deviation > 0 ? '+' : ''}
+                {num(deviation)} kg vs weighed
+              </div>
+            ) : (
+              <div className="dim" style={{ fontSize: '.68rem' }}>
+                matches weighed net
+              </div>
+            )}
+          </div>
+          <div className="tile">
+            <div className="tile-l">Mode</div>
+            <div className="tile-v">
+              {invoice.billingMode === 'client' ? 'Client invoices' : 'Urbeno invoices'}
+            </div>
+          </div>
+        </div>
+        {invoice.deviationNote ? (
+          <div
+            style={{
+              background: 'var(--am2)',
+              border: '1px solid #fcd34d',
+              borderRadius: 8,
+              padding: '.45rem .7rem',
+              fontSize: '.79rem',
+              color: 'var(--g2)',
+              marginBottom: '.5rem',
+            }}
+          >
+            <b style={{ color: 'var(--am)' }}>Weight deviation:</b> {invoice.deviationNote}
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))',
+            gap: '.45rem',
+            marginBottom: '.5rem',
+          }}
+        >
+          <div className="tile">
+            <div className="tile-l">E-way Bill</div>
+            <div className="tile-v mono">{invoice.ewayBillNo || '—'}</div>
+            <div className="dim" style={{ fontSize: '.7rem' }}>
+              {invoice.ewayBillDate ? fmtDate(invoice.ewayBillDate) : ''}
+            </div>
+          </div>
+          <div className="tile">
+            <div className="tile-l">Vehicles Covered</div>
+            <div className="tile-v mono" style={{ fontSize: '.78rem' }}>
+              {covered.map((v) => v.registration).join(', ') || '—'}
+            </div>
+          </div>
+          <div className="tile">
+            <div className="tile-l">Invoice Weight</div>
+            <div className="tile-v mono">{num(vehicleNet || billingKg)} kg</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--g2)', marginBottom: '.2rem' }}>
+              Invoice PDF
+            </div>
+            <div className="frow">
+              {invoice.invoiceFileId ? (
+                <FileThumb id={invoice.invoiceFileId} kind="doc" name="Invoice" />
+              ) : (
+                <span className="dim" style={{ fontSize: '.75rem' }}>
+                  not attached
+                </span>
+              )}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--g2)', marginBottom: '.2rem' }}>
+              E-way Bill PDF
+            </div>
+            <div className="frow">
+              {invoice.ewayFileId ? (
+                <FileThumb id={invoice.ewayFileId} kind="doc" name="E-way" />
+              ) : (
+                <span className="dim" style={{ fontSize: '.75rem' }}>
+                  not attached
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {invoice.mrn ? (
-        <p className="muted sm">
-          MRN: {invoice.mrn.mrnNo}{' '}
-          {user.role !== 'client' ? (
-            <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
-              Download MRN
-            </a>
+      <div className="card" style={{ marginBottom: '.6rem' }}>
+        <div className="card-hd">
+          <div className="card-ttl">💰 Payments</div>
+          <span className={`badge ${payCls(pay.key)}`}>
+            {formatINR(Number(paidPaise))} of {formatINR(Number(totalPaise))}
+          </span>
+          {pay.key !== 'paid' && due ? (
+            due.isOverdue ? (
+              <span className="badge bg-rd">overdue {due.overdue}d</span>
+            ) : (
+              <span className="badge bg-gy">due {fmtDate(due.dueDate)}</span>
+            )
           ) : null}
-        </p>
-      ) : null}
-      {invoice.recycling ? (
-        <p className="muted sm">
-          Form 6: {invoice.recycling.form6No}{' '}
-          <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
-            Download Form 6
-          </a>
-        </p>
-      ) : null}
-      {invoice.certificates.length > 0 ? (
-        <p className="muted sm">
-          Certificate(s): {invoice.certificates.map((c) => c.certNo).join(', ')}
-        </p>
+        </div>
+        <div className="dim" style={{ fontSize: '.75rem', marginBottom: '.4rem' }}>
+          Terms: {paymentTermsLabel(payTermsDays)}
+          {due ? ` · due ${fmtDate(due.dueDate)}` : ''}
+          {pay.key !== 'paid' && due?.isOverdue ? (
+            <>
+              {' · '}
+              <span style={{ color: 'var(--rd)', fontWeight: 700 }}>reminders sending daily</span>
+            </>
+          ) : null}
+        </div>
+        {!invoice.payments.length ? (
+          <div className="dim" style={{ fontSize: '.82rem' }}>
+            No payments recorded
+          </div>
+        ) : (
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>UTR / Ref</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Mode</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.payments.map((p, i) => (
+                  <tr key={p.id ?? `${p.utr}-${i}`}>
+                    <td className="mono">{p.utr || '—'}</td>
+                    <td className="mono">{formatINR(Number(asPaise(p.amountPaise)))}</td>
+                    <td className="dim">{fmtDate(p.paidAt)}</td>
+                    <td>{lookupLabel(paymentModes, p.mode)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {isStaff && stage >= 5 && !isPaid && !invoice.closedAt ? (
+          <PaymentForm
+            amountDue={Number(totalPaise - paidPaise) / 100}
+            disabled={disabled}
+            onSubmit={(body) =>
+              onAction(() => lifecycleApi.addPayment(invoice.id, body), 'Payment recorded.')
+            }
+          />
+        ) : null}
+      </div>
+
+      {sla ? (
+        <div className="card" style={{ marginBottom: '.6rem' }}>
+          <div className="card-hd">
+            <div className="card-ttl">⏱️ Recycling SLA</div>
+            <span className={`badge ${SLA_CLASS[sla.state]}`}>{SLA_LABEL[sla.state]}</span>
+            <div className="spacer" />
+            <span className="dim" style={{ fontSize: '.76rem' }}>
+              {sla.slaDays}-day target from receipt of material
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(118px,1fr))',
+              gap: '.45rem',
+              marginBottom: '.45rem',
+            }}
+          >
+            <div className="tile">
+              <div className="tile-l">Material Received</div>
+              <div className="tile-v">{fmtDate(sla.start.toISOString())}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Certificate Target</div>
+              <div className="tile-v">{fmtDate(sla.targetDate)}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">{sla.done ? 'Certificate Issued' : 'Days Elapsed'}</div>
+              <div className="tile-v" style={{ color: slaColor }}>
+                {sla.done ? fmtDate(sla.endAt?.toISOString()) : `${sla.daysUsed} of ${sla.slaDays}`}
+              </div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">
+                {sla.done ? 'Turnaround' : sla.remaining >= 0 ? 'Days Remaining' : 'Days Over'}
+              </div>
+              <div className="tile-v" style={{ color: slaColor }}>
+                {sla.done ? `${sla.daysUsed} days` : Math.abs(sla.remaining)}
+              </div>
+            </div>
+          </div>
+          <div className="bar">
+            <div
+              className="bar-f"
+              style={{ width: `${Math.min(100, sla.pct * 100)}%`, background: slaColor }}
+            />
+            <div className="bar-t">{Math.round(Math.min(100, sla.pct * 100))}%</div>
+          </div>
+          <div className="dim" style={{ fontSize: '.75rem', marginTop: '.3rem' }}>
+            {sla.done
+              ? sla.breached
+                ? `Certificate issued ${sla.daysUsed - sla.slaDays} day${sla.daysUsed - sla.slaDays === 1 ? '' : 's'} beyond the ${sla.slaDays}-day target.`
+                : `Certificate issued within target, ${sla.slaDays - sla.daysUsed} day${sla.slaDays - sla.daysUsed === 1 ? '' : 's'} to spare.`
+              : sla.breached
+                ? `Past the ${sla.slaDays}-day target by ${sla.daysUsed - sla.slaDays} day${sla.daysUsed - sla.slaDays === 1 ? '' : 's'}. Issue the certificate to stop the clock.`
+                : 'The clock stops when the first Certificate of Destruction is issued against this invoice.'}
+          </div>
+        </div>
       ) : null}
 
-      {isFactory && stage === 5 && !invoice.mrn ? (
-        <MrnForm
+      {isStaff ? (
+        <MrnCard
+          invoice={invoice}
+          vehicles={covered}
+          canCreate={isFactory && stage === 5 && !invoice.mrn}
           disabled={disabled}
-          onSubmit={(body) => onAction(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')}
+          onAction={onAction}
         />
       ) : null}
 
-      {isFactory && stage === 6 && invoice.mrn && !invoice.recycling ? (
-        <RecyclingForm
-          defaultFactoryId={invoice.mrn.factoryId}
-          billingWeight={Number(invoice.billingWeight)}
-          disabled={disabled}
-          onSubmit={(body) =>
-            onAction(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')
-          }
-        />
-      ) : null}
+      <RecyclingCard
+        invoice={invoice}
+        canCreate={isFactory && stage === 6 && !!invoice.mrn && !invoice.recycling}
+        isStaff={isStaff}
+        disabled={disabled}
+        onAction={onAction}
+      />
 
       {isAdmin && stage >= 7 && invoice.recycling && !invoice.closedAt ? (
         <CertificateForm
@@ -90,16 +378,6 @@ export function InvoiceLifecyclePanel({ invoice, user, disabled, onAction }: Inv
 
       {isStaff && invoice.recycling ? (
         <SerialPanel invoice={invoice} disabled={disabled} onAction={onAction} />
-      ) : null}
-
-      {isStaff && stage >= 5 && !isPaid && !invoice.closedAt ? (
-        <PaymentForm
-          amountDue={Number(totalPaise - paidPaise) / 100}
-          disabled={disabled}
-          onSubmit={(body) =>
-            onAction(() => lifecycleApi.addPayment(invoice.id, body), 'Payment recorded.')
-          }
-        />
       ) : null}
 
       {(isClient || isAdmin) && stage >= 8 && !invoice.closedAt && isPaid && invoice.certificates.length > 0 ? (
@@ -115,6 +393,379 @@ export function InvoiceLifecyclePanel({ invoice, user, disabled, onAction }: Inv
       {invoice.closedAt ? (
         <p className="ok-msg sm">Closed {invoice.closedAt.slice(0, 10)}</p>
       ) : null}
+    </div>
+  );
+}
+
+function MrnCard({
+  invoice,
+  vehicles,
+  canCreate,
+  disabled,
+  onAction,
+}: {
+  invoice: InvoiceDetail;
+  vehicles: VehicleDetail[];
+  canCreate: boolean;
+  disabled: boolean;
+  onAction: (fn: () => Promise<unknown>, success: string) => void;
+}) {
+  const m = invoice.mrn;
+  if (!m && !canCreate) return null;
+  const mats = Array.isArray(m?.materials) ? m.materials : [];
+  const matQty = mats.reduce((s, x) => s + Number(x.q ?? 0), 0);
+  const matWt = mats.reduce((s, x) => s + Number(x.w ?? 0), 0);
+
+  return (
+    <div className="card" style={{ marginBottom: '.6rem' }}>
+      <div className="card-hd">
+        <div className="card-ttl">📋 Material Receipt Note</div>
+        {m ? (
+          <span className="badge bg-bl mono">{m.mrnNo}</span>
+        ) : (
+          <span className="badge bg-am">Pending</span>
+        )}
+        <div className="spacer" />
+        {m ? (
+          <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
+            ⬇ Print MRN
+          </a>
+        ) : null}
+      </div>
+      <div style={{ fontSize: '.73rem', color: 'var(--mu)', marginBottom: '.5rem' }}>
+        🔒 Internal gate document — not visible in the client portal
+      </div>
+      {!m ? (
+        <>
+          <div className="dim" style={{ fontSize: '.83rem' }}>
+            Goods not yet received at the factory. The factory manager records vehicle arrival and
+            weighment on the gate.
+          </div>
+          {canCreate ? (
+            <MrnForm
+              disabled={disabled}
+              onSubmit={(body) => onAction(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')}
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))',
+              gap: '.45rem',
+              marginBottom: '.5rem',
+            }}
+          >
+            <div className="tile">
+              <div className="tile-l">Factory Site</div>
+              <div className="tile-v">{m.factory?.name || m.factoryId}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Received On</div>
+              <div className="tile-v">{fmtDate(m.receivedAt)}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Received By</div>
+              <div className="tile-v">{m.receivedBy || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Condition</div>
+              <div className="tile-v">{m.condition || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Driver Sign</div>
+              <div className="tile-v">{m.driverSign || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Factory Mgr</div>
+              <div className="tile-v">{m.managerSign || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Security</div>
+              <div className="tile-v">{m.securitySign || '—'}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: '.74rem', fontWeight: 600, color: 'var(--g2)', marginBottom: '.25rem' }}>
+            Vehicles verified at the gate
+          </div>
+          <div className="tw" style={{ marginBottom: '.5rem' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Driver</th>
+                  <th>Gross</th>
+                  <th>Tare</th>
+                  <th>Net</th>
+                  <th>Slip #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vehicles.map((v) => (
+                  <tr key={v.id}>
+                    <td className="mono">{v.registration}</td>
+                    <td>{v.driverName}</td>
+                    <td className="mono">{v.weighment?.grossKg != null ? num(Number(v.weighment.grossKg)) : '—'}</td>
+                    <td className="mono">{v.weighment?.tareKg != null ? num(Number(v.weighment.tareKg)) : '—'}</td>
+                    <td className="mono">
+                      <b>{v.weighment ? num(Number(v.weighment.netKg)) : '—'}</b>
+                    </td>
+                    <td className="mono dim">{v.weighment?.slipNumber || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {mats.length ? (
+            <>
+              <div style={{ fontSize: '.74rem', fontWeight: 600, color: 'var(--g2)', marginBottom: '.25rem' }}>
+                Material received as counted
+              </div>
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Material</th>
+                      <th>Qty</th>
+                      <th>Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mats.map((x, i) => (
+                      <tr key={`${x.n}-${i}`}>
+                        <td>{x.n || '—'}</td>
+                        <td className="mono">{x.q ?? '—'}</td>
+                        <td className="mono">{x.w != null ? `${x.w} kg` : '—'}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ background: 'var(--g3)', fontWeight: 700 }}>
+                      <td>Total received</td>
+                      <td className="mono">{matQty}</td>
+                      <td className="mono">{num(matWt)} kg</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+          <div className="dim" style={{ fontSize: '.73rem', marginTop: '.35rem' }}>
+            Category classification happens at the recycling stage, once material is segregated inside
+            the facility.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RecyclingCard({
+  invoice,
+  canCreate,
+  isStaff,
+  disabled,
+  onAction,
+}: {
+  invoice: InvoiceDetail;
+  canCreate: boolean;
+  isStaff: boolean;
+  disabled: boolean;
+  onAction: (fn: () => Promise<unknown>, success: string) => void;
+}) {
+  const r = invoice.recycling;
+  if (!r && !canCreate) return null;
+  const cats = r?.categories ?? [];
+  const serials = r?.serials ?? [];
+  const destroyed = serials.filter((s) => s.dcodNo).length;
+  const recFe = Number(r?.recoveryFe ?? 0);
+  const recNfe = Number(r?.recoveryNfe ?? 0);
+  const recPl = Number(r?.recoveryPl ?? 0);
+  const recPcb = Number(r?.recoveryPcb ?? 0);
+  const hasRecovery = recFe + recNfe + recPl + recPcb > 0;
+
+  return (
+    <div className="card" style={{ marginBottom: '.6rem' }}>
+      <div className="card-hd">
+        <div className="card-ttl">♻️ Recycling</div>
+        {r ? (
+          <span className="badge bg-g mono">{r.form6No}</span>
+        ) : (
+          <span className="badge bg-am">Pending</span>
+        )}
+        <div className="spacer" />
+        {r ? (
+          <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
+            ⬇ Form 6
+          </a>
+        ) : null}
+      </div>
+      {!r ? (
+        <>
+          <div className="dim" style={{ fontSize: '.83rem' }}>
+            Awaiting processing at the factory.
+          </div>
+          {canCreate ? (
+            <RecyclingForm
+              defaultFactoryId={invoice.mrn?.factoryId ?? 'URB-BLR'}
+              billingWeight={Number(invoice.billingWeight)}
+              disabled={disabled}
+              onSubmit={(body) =>
+                onAction(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')
+              }
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
+              gap: '.45rem',
+              marginBottom: '.5rem',
+            }}
+          >
+            <div className="tile">
+              <div className="tile-l">Form 6 #</div>
+              <div className="tile-v mono">{r.form6No}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Processed</div>
+              <div className="tile-v">{fmtDate(r.processedAt)}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Facility</div>
+              <div className="tile-v">{r.factory?.name || r.factoryId || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Devices Destroyed</div>
+              <div className="tile-v">{destroyed}</div>
+            </div>
+          </div>
+          {cats.length ? (
+            <>
+              <div style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--g2)', margin: '.4rem 0 .25rem' }}>
+                E-waste categories processed
+              </div>
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Entry</th>
+                      <th>Description</th>
+                      <th>Group</th>
+                      <th>Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cats.map((c) => (
+                      <tr key={c.entryId}>
+                        <td className="mono">
+                          <b>{c.entryId}</b>
+                        </td>
+                        <td className="dim">{(c.category?.description || '').slice(0, 55) || '—'}</td>
+                        <td>
+                          <span className="badge bg-bl">{c.groupCode}</span>
+                        </td>
+                        <td className="mono">{num(Number(c.weightKg))} kg</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+          {(r.photoIds?.length || r.reportIds?.length) ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginTop: '.5rem' }}>
+              <div>
+                <div style={{ fontSize: '.73rem', fontWeight: 600, color: 'var(--g2)', marginBottom: '.2rem' }}>
+                  Processing photos ({r.photoIds?.length ?? 0})
+                </div>
+                <FileRow ids={r.photoIds} kind="image" />
+              </div>
+              <div>
+                <div style={{ fontSize: '.73rem', fontWeight: 600, color: 'var(--g2)', marginBottom: '.2rem' }}>
+                  Reports ({r.reportIds?.length ?? 0})
+                </div>
+                <FileRow ids={r.reportIds} kind="doc" />
+              </div>
+            </div>
+          ) : null}
+          {hasRecovery ? (
+            <>
+              <div style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--g2)', margin: '.5rem 0 .25rem' }}>
+                Material recovery by category
+              </div>
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th style={{ textAlign: 'right' }}>Received</th>
+                      <th style={{ textAlign: 'right' }}>Ferrous</th>
+                      <th style={{ textAlign: 'right' }}>Non-Ferrous</th>
+                      <th style={{ textAlign: 'right' }}>Plastics</th>
+                      <th style={{ textAlign: 'right' }}>PCB / Boards</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cats.map((c) => (
+                      <tr key={`rec-${c.entryId}`}>
+                        <td className="mono">
+                          {c.entryId}
+                          <div className="dim" style={{ fontSize: '.68rem' }}>
+                            {c.groupCode}
+                          </div>
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {num(Number(c.weightKg))}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {num(Number(c.recoveryFe ?? 0))}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {num(Number(c.recoveryNfe ?? 0))}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {num(Number(c.recoveryPl ?? 0))}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {num(Number(c.recoveryPcb ?? 0))}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr style={{ background: 'var(--g3)', fontWeight: 700 }}>
+                      <td>Total recovered</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>
+                        {num(cats.reduce((s, c) => s + Number(c.weightKg || 0), 0))}
+                      </td>
+                      <td className="mono" style={{ textAlign: 'right' }}>
+                        {num(recFe)}
+                      </td>
+                      <td className="mono" style={{ textAlign: 'right' }}>
+                        {num(recNfe)}
+                      </td>
+                      <td className="mono" style={{ textAlign: 'right' }}>
+                        {num(recPl)}
+                      </td>
+                      <td className="mono" style={{ textAlign: 'right' }}>
+                        {num(recPcb)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+          {isStaff ? (
+            <div style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--g2)', margin: '.6rem 0 .3rem' }}>
+              Serial-level custody ({serials.length})
+              {serials.length ? <span className="badge bg-g" style={{ marginLeft: '.4rem' }}>{destroyed} destroyed</span> : null}
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -178,7 +829,7 @@ function RecyclingForm({
   onSubmit: (body: {
     processedAt: string;
     factoryId?: string;
-    categories: Array<{ entryId: string; groupCode: string; weightKg: number }>;
+    categories: Array<{ entryId: string; groupCode: string; weightKg: number; overrideReason?: string }>;
   }) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -406,7 +1057,7 @@ function SerialPanel({
   async function onCsv(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    const rec = await import('../api').then(({ filesApi }) => filesApi.upload(file, 'serials'));
+    const rec = await import('../api').then(({ filesApi: fa }) => fa.upload(file, 'serials'));
     const csv = await file.text();
     await onAction(
       () => lifecycleApi.importSerials(invoice.id, { csv, serialFileId: rec.id }),
@@ -423,27 +1074,47 @@ function SerialPanel({
       </p>
       <input type="file" accept=".csv,text/csv" disabled={disabled} onChange={(e) => void onCsv(e.target.files)} />
       {serials.length ? (
-        <div className="tw">
+        <div className="tw" style={{ maxHeight: 260, overflowY: 'auto' }}>
           <table>
             <thead>
               <tr>
                 <th>Serial</th>
-                <th>Asset</th>
-                <th>Item</th>
-                <th>DCoD</th>
+                <th>Asset Tag</th>
+                <th>Standard</th>
+                <th>Operator</th>
+                <th>Device CoD</th>
               </tr>
             </thead>
             <tbody>
               {serials.slice(0, 60).map((s) => (
                 <tr key={s.id}>
-                  <td className="mono">{s.serialNo}</td>
-                  <td>{s.assetTag || '—'}</td>
-                  <td>{s.make || '—'}</td>
-                  <td>{s.dcodNo || <span className="badge bg-am">pending</span>}</td>
+                  <td className="mono">
+                    <b>{s.serialNo}</b>
+                  </td>
+                  <td className="mono dim">{s.assetTag || '—'}</td>
+                  <td>
+                    {s.destroyStd ? (
+                      <span className="badge bg-bl">{lookupLabel(standards, s.destroyStd, s.destroyStd)}</span>
+                    ) : (
+                      <span className="badge bg-am">pending</span>
+                    )}
+                  </td>
+                  <td className="dim">{s.destroyOp || '—'}</td>
+                  <td className="mono">{s.dcodNo || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="dim" style={{ fontSize: '.8rem' }}>
+          No serials imported yet. Upload a CSV with the headers{' '}
+          <span className="mono">Serial, AssetTag, Item, Condition, Weight</span>.
+        </div>
+      )}
+      {serials.length > 60 ? (
+        <div className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
+          Showing 60 of {serials.length}
         </div>
       ) : null}
       {pending > 0 ? (

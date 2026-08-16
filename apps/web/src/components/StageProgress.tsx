@@ -12,7 +12,7 @@ export function StageProgress({ current }: StageProgressProps) {
         if (s.n < current) cls += ' done';
         else if (s.n === current) cls += ' now';
         return (
-          <div key={s.n} className={cls} title={`${s.by}`}>
+          <div key={s.n} className={cls} title={`${s.d} · ${s.by}`}>
             {s.ic} {s.l}
             <span className="pstep-n">{s.n}</span>
           </div>

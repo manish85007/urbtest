@@ -35,6 +35,14 @@ export const SLA_LABEL: Record<SlaState, string> = {
   ok: 'On track',
 };
 
+export const SLA_CLASS: Record<SlaState, string> = {
+  met: 'bg-g',
+  late: 'bg-rd',
+  breached: 'bg-rd',
+  warn: 'bg-am',
+  ok: 'bg-bl',
+};
+
 /** SLA clock: MRN receipt → first certificate — ported from prototype slaFor(). */
 export function recyclingSla(input: RecyclingSlaInput): RecyclingSlaInfo | null {
   const slaDays = input.slaDays ?? 30;

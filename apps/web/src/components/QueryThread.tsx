@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { lifecycleApi, type QueryThread as QueryThreadType, type SessionUser } from '../api';
+import { fmtDate } from '../lib/format';
 
 export function QueryThread({
   submissionId,
@@ -15,10 +16,17 @@ export function QueryThread({
   onAction: (fn: () => Promise<unknown>, success: string) => void;
 }) {
   const [text, setText] = useState('');
+  const [openCompose, setOpenCompose] = useState(false);
   const [replyFor, setReplyFor] = useState<string | null>(null);
   const [reply, setReply] = useState('');
+  const composeRef = useRef<HTMLTextAreaElement>(null);
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const openCount = queries.filter((q) => q.status === 'open').length;
+
+  function startCompose() {
+    setOpenCompose(true);
+    setTimeout(() => composeRef.current?.focus(), 0);
+  }
 
   return (
     <div className="card">
@@ -26,6 +34,10 @@ export function QueryThread({
         <div className="card-ttl">
           Queries {openCount ? <span className="badge bg-rd">{openCount} open</span> : null}
         </div>
+        <div className="spacer" />
+        <button type="button" className="btn bs bsm" onClick={startCompose}>
+          + Raise
+        </button>
       </div>
       {!queries.length ? (
         <div className="dim" style={{ fontSize: '.82rem', textAlign: 'center', padding: '.6rem 0' }}>
@@ -53,7 +65,7 @@ export function QueryThread({
                 </span>
                 <b style={{ fontSize: '.8rem' }}>{q.authorName}</b>
                 <span className="dim" style={{ fontSize: '.7rem' }}>
-                  {q.createdAt.slice(0, 10)}
+                  {fmtDate(q.createdAt)}
                 </span>
                 <div className="spacer" />
                 <span className={`badge ${q.status === 'open' ? 'bg-am' : 'bg-g'}`}>{q.status}</span>
@@ -66,7 +78,7 @@ export function QueryThread({
                 >
                   <b>{r.authorName}:</b> {r.text}
                   <div className="dim" style={{ fontSize: '.7rem' }}>
-                    {r.createdAt.slice(0, 10)}
+                    {fmtDate(r.createdAt)}
                   </div>
                 </div>
               ))}
@@ -95,28 +107,37 @@ export function QueryThread({
           );
         })
       )}
-      <form
-        className="sub-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          onAction(() => lifecycleApi.raiseQuery(submissionId, text), 'Query sent');
-          setText('');
-        }}
-      >
-        <label>
-          Raise a query
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What would you like to ask?"
-            rows={3}
-            required
-          />
-        </label>
-        <button type="submit" className="btn bs bsm" disabled={disabled}>
-          + Raise
-        </button>
-      </form>
+      {openCompose ? (
+        <form
+          className="sub-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onAction(() => lifecycleApi.raiseQuery(submissionId, text), 'Query sent');
+            setText('');
+            setOpenCompose(false);
+          }}
+        >
+          <label>
+            Raise a query
+            <textarea
+              ref={composeRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="What would you like to ask?"
+              rows={3}
+              required
+            />
+          </label>
+          <div className="form-actions">
+            <button type="button" className="btn ghost" onClick={() => setOpenCompose(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn bs bsm" disabled={disabled}>
+              + Raise
+            </button>
+          </div>
+        </form>
+      ) : null}
     </div>
   );
 }
