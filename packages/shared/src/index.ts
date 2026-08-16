@@ -6,6 +6,7 @@ export * from './payments.js';
 export * from './email-merge.js';
 export * from './invoice-due.js';
 export * from './recycling-sla.js';
+export * from './sustainability.js';
 
 export const STAGES = [
   { n: 1, k: 'req', l: 'Request', by: 'Client' },

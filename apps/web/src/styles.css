@@ -486,3 +486,80 @@ select {
 .error.sm {
   font-size: 0.82rem;
 }
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .dash-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dash-main,
+.dash-side {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.card.compact {
+  padding: 0.75rem;
+}
+
+.card.compact h2 {
+  font-size: 0.95rem;
+  margin-bottom: 0.35rem;
+}
+
+.card-hd-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-hd-row h2 {
+  margin: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.alert-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.alert-warn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.alert-ok {
+  background: var(--green-light);
+  border-color: #c0dd97;
+}
+
+.badge.danger {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.badge.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.stat-value.warn {
+  color: #b45309;
+}
+
+.danger-text {
+  color: var(--danger);
+  font-size: 0.85rem;
+}

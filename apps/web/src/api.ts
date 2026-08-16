@@ -106,6 +106,82 @@ export interface SubmissionDetail {
   invoices: InvoiceDetail[];
 }
 
+export interface QueueItem {
+  submissionId: string;
+  invoiceId: string;
+  invoiceNo: string;
+  clientName: string;
+}
+
+export interface StaffDashboardReport {
+  kind: 'staff';
+  stats: {
+    newRequests: number;
+    openRequests: number;
+    openInvoices: number;
+    pendingPayments: number;
+    fyNetKg: number;
+    fyLabel: string;
+  };
+  newRequests: Array<{
+    id: string;
+    clientName: string;
+    siteName: string;
+    approxWeight: number;
+    approxQty: number;
+    requestDate: string;
+    ref: string | null;
+  }>;
+  overdue: Array<{
+    submissionId: string;
+    invoiceNo: string;
+    clientName: string;
+    outstandingPaise: string;
+    overdueDays: number;
+    reminders: number;
+  }>;
+  slaAtRisk: Array<{
+    submissionId: string;
+    invoiceNo: string;
+    clientName: string;
+    receivedDate: string;
+    daysUsed: number;
+    slaDays: number;
+    stateLabel: string;
+  }>;
+  queues: {
+    awaitingMrn: QueueItem[];
+    awaitingRecycling: QueueItem[];
+    awaitingCod: QueueItem[];
+    awaitingClose: QueueItem[];
+  };
+}
+
+export interface ClientDashboardReport {
+  kind: 'client';
+  period: { fy: string };
+  impact: {
+    kg: number;
+    tonnes: number;
+    co2: number;
+    landfill: number;
+    trees: number;
+    water: number;
+    energy: number;
+    invoices: number;
+    submissions: number;
+  };
+  treesEarned: number;
+  pendingClose: Array<{
+    submissionId: string;
+    invoiceNo: string;
+    certificates: string[];
+    issuedAt: string | null;
+  }>;
+}
+
+export type DashboardReport = StaffDashboardReport | ClientDashboardReport;
+
 export const authApi = {
   login: (email: string, password: string) =>
     api<{ user: SessionUser }>('/auth/login', {
@@ -128,6 +204,8 @@ export const dataApi = {
   factories: () => api<FactorySummary[]>('/factories'),
   categories: (factoryId: string) =>
     api<CategorySummary[]>(`/factories/${factoryId}/categories`),
+  reportsDashboard: (siteId?: string) =>
+    api<DashboardReport>(siteId ? `/reports/dashboard?siteId=${siteId}` : '/reports/dashboard'),
 };
 
 export const filesApi = {

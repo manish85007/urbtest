@@ -29,6 +29,12 @@ export function currentFY(): FiscalYear | null {
   return getFY(new Date());
 }
 
+/** Whether a date falls in the given FY label (e.g. "FY 2025-26"). */
+export function inFiscalYear(date: Date, fyLabel: string): boolean {
+  const fy = getFY(date);
+  return !!fy && fy.label === fyLabel;
+}
+
 export function formatMrnNumber(
   factoryCode: string,
   fyShort: string,

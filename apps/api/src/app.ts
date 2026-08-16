@@ -9,6 +9,7 @@ import { mastersRoutes } from './routes/masters.js';
 import { filesRoutes } from './routes/files.js';
 import { emailsRoutes } from './routes/emails.js';
 import { adminRoutes } from './routes/admin.js';
+import { reportsRoutes } from './routes/reports.js';
 import { startScheduler } from './jobs/scheduler.js';
 
 export async function buildApp() {
@@ -36,6 +37,7 @@ export async function buildApp() {
   await app.register(filesRoutes);
   await app.register(emailsRoutes);
   await app.register(adminRoutes);
+  await app.register(reportsRoutes);
 
   if (process.env.ENABLE_JOBS !== 'false') {
     startScheduler(app);
