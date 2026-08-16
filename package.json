@@ -12,6 +12,7 @@
     "lint": "pnpm -r lint",
     "db:generate": "pnpm --filter @urb-tectrack/api db:generate",
     "db:migrate": "pnpm --filter @urb-tectrack/api db:migrate",
+    "db:migrate:deploy": "pnpm --filter @urb-tectrack/api db:migrate:deploy",
     "db:seed": "pnpm --filter @urb-tectrack/api db:seed",
     "db:studio": "pnpm --filter @urb-tectrack/api db:studio"
   },

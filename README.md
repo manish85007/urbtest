@@ -38,7 +38,7 @@ cp .env.example .env
 
 # 4. Migrate and seed
 pnpm db:generate
-pnpm db:migrate
+pnpm db:migrate        # dev: creates/applies migrations interactively
 pnpm db:seed
 
 # 5. Run API + web
@@ -81,6 +81,12 @@ pnpm test
 ```
 
 Shared and API unit tests cover fiscal year boundaries, stage derivation, money/payments, file limits, and legal compliance. Set `DATABASE_URL` to run the full lifecycle integration test.
+
+For CI, staging, and production, apply migrations non-interactively:
+
+```bash
+pnpm db:migrate:deploy
+```
 
 ## License
 
