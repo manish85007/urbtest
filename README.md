@@ -58,17 +58,15 @@ pnpm dev
 
 ## Build plan alignment
 
-This scaffold covers **Phase 1 (Foundation)** and starts **Phase 2–3**:
+Phases **1–9** of the production build plan are implemented in this branch:
 
-- ✅ Postgres schema with money-as-paise and weight decimals
-- ✅ Derived stage logic in `@urb-tectrack/shared` (never stored as source of truth)
-- ✅ Atomic MRN counter service (transaction + upsert)
-- ✅ Session auth with bcrypt (replacing prototype SHA-256)
-- ✅ 252 category master rows seeded from prototype
-- ✅ Audit log append-only service
-- 🔲 Full 9-stage lifecycle endpoints (Phase 3 — next)
-- 🔲 Prototype UI screen migration (Phase 6)
-- 🔲 S3 file storage, email queue, scheduled jobs (Phases 4–7)
+- ✅ Foundation, auth, Prisma schema, shared domain logic
+- ✅ Nine-stage lifecycle API (ported prototype business rules)
+- ✅ React frontend with full lifecycle UI
+- ✅ File upload storage (local dev; S3-ready)
+- ✅ Email queue + scheduled payment/SLA reminders
+- ✅ Reporting dashboard + sustainability metrics
+- ✅ DPDPA legal consent, audit log, security headers
 
 ## Critical rule from the build plan
 
@@ -82,7 +80,7 @@ Every validation message, stage rule, and reconciliation check in the prototype 
 pnpm test
 ```
 
-Shared package includes tests for fiscal year boundaries (31 Mar / 1 Apr), stage derivation, money paise, and category weight balance.
+Shared and API unit tests cover fiscal year boundaries, stage derivation, money/payments, file limits, and legal compliance. Set `DATABASE_URL` to run the full lifecycle integration test.
 
 ## License
 
