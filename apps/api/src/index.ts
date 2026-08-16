@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './lib/load-env.js';
 import { buildApp } from './app.js';
 import { disconnectDb } from './lib/prisma.js';
 

@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '../lib/load-env.js';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { FileKind } from '@prisma/client';
 import { invStage } from '@urb-tectrack/shared';

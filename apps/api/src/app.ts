@@ -27,6 +27,15 @@ export async function buildApp() {
 
   registerSecurityHeaders(app);
 
+  app.addHook('preSerialization', async (_request, _reply, payload) => {
+    if (payload === undefined || payload === null) return payload;
+    return JSON.parse(
+      JSON.stringify(payload, (_key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      ),
+    );
+  });
+
   app.get('/health', async () => ({
     ok: true,
     service: 'urb-tectrack-api',

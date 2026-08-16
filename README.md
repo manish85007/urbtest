@@ -35,6 +35,7 @@ docker compose up -d
 
 # 3. Configure environment
 cp .env.example .env
+cp .env apps/api/.env
 
 # 4. Migrate and seed
 pnpm db:generate

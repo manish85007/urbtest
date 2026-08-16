@@ -1,11 +1,21 @@
+import { config } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PrismaClient, UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+
+const here = dirname(fileURLToPath(import.meta.url));
+for (const envPath of [resolve(here, '../.env'), resolve(here, '../../../.env')]) {
+  if (existsSync(envPath)) {
+    config({ path: envPath });
+    break;
+  }
+}
 
 const prisma = new PrismaClient();
-const here = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const passwordHash = await bcrypt.hash('demo', 12);
