@@ -144,6 +144,17 @@ async function main() {
     create: { key: 'sub', prefix: 'REQ-', pad: 5, nextValue: 46 },
   });
 
+  for (const seq of [
+    { key: 'f6', prefix: 'F6-', pad: 5, nextValue: 120 },
+    { key: 'dcod', prefix: 'DCOD-', pad: 6, nextValue: 340 },
+  ]) {
+    await prisma.idSequence.upsert({
+      where: { key: seq.key },
+      update: {},
+      create: seq,
+    });
+  }
+
   console.log(`Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories`);
 }
 

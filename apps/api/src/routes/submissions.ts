@@ -1,33 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { subStage } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { attachSession, requireAuth, requireStaff } from '../middleware/session.js';
 import { clientScopeFilter } from '../lib/auth-context.js';
-
-function mapSubmissionStage(sub: {
-  acknowledgedAt: Date | null;
-  vehicles: { weighment: unknown | null }[];
-  invoices: {
-    closedAt: Date | null;
-    certificates: unknown[];
-    recycling: unknown | null;
-    mrn: unknown | null;
-  }[];
-}) {
-  const stage = subStage({
-    acknowledged: !!sub.acknowledgedAt,
-    hasVehicles: sub.vehicles.length > 0,
-    allVehiclesWeighed: sub.vehicles.length > 0 && sub.vehicles.every((v) => !!v.weighment),
-    invoices: sub.invoices.map((inv) => ({
-      closedAt: inv.closedAt,
-      hasCertificate: inv.certificates.length > 0,
-      hasRecycling: !!inv.recycling,
-      hasMrn: !!inv.mrn,
-    })),
-  });
-
-  return { stage };
-}
+import { submissionInclude } from '../lib/db-helpers.js';
+import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 
 export async function submissionRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
@@ -37,24 +13,12 @@ export async function submissionRoutes(app: FastifyInstance) {
     const rows = await prisma.submission.findMany({
       where: scope,
       orderBy: { createdAt: 'desc' },
-      include: {
-        client: { select: { id: true, name: true } },
-        site: { select: { id: true, code: true, name: true } },
-        vehicles: { include: { weighment: true } },
-        invoices: {
-          include: {
-            mrn: true,
-            recycling: true,
-            certificates: true,
-            payments: true,
-          },
-        },
-      },
+      include: submissionInclude,
       take: 100,
     });
 
     return rows.map((sub) => {
-      const { stage } = mapSubmissionStage(sub);
+      const stage = deriveSubmissionStage(sub);
       return {
         id: sub.id,
         clientId: sub.clientId,
@@ -76,25 +40,12 @@ export async function submissionRoutes(app: FastifyInstance) {
 
     const sub = await prisma.submission.findFirst({
       where: { id, ...scope },
-      include: {
-        client: true,
-        site: true,
-        vehicles: { include: { team: true, weighment: true } },
-        invoices: {
-          include: {
-            payments: true,
-            mrn: true,
-            recycling: { include: { categories: true } },
-            certificates: true,
-          },
-        },
-      },
+      include: submissionInclude,
     });
 
     if (!sub) return reply.notFound('Request not found');
 
-    const { stage } = mapSubmissionStage(sub);
-    return { ...sub, derivedStage: stage };
+    return withDerivedStages(sub);
   });
 
   app.get('/health/dashboard', { preHandler: requireStaff }, async () => {

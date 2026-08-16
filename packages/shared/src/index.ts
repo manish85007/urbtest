@@ -2,6 +2,7 @@ export * from './fiscal-year.js';
 export * from './stage.js';
 export * from './money.js';
 export * from './recovery.js';
+export * from './payments.js';
 
 export const STAGES = [
   { n: 1, k: 'req', l: 'Request', by: 'Client' },

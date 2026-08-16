@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { prisma } from './prisma.js';
+import { prisma } from '../lib/prisma.js';
 
 export interface AuditEntry {
   actorEmail: string;

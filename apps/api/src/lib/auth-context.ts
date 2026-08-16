@@ -30,7 +30,7 @@ export function canSeeMrn(user: SessionUser): boolean {
   return isStaff(user);
 }
 
-export function clientScopeFilter(user: SessionUser) {
+export function clientScopeFilter(user: SessionUser): Record<string, unknown> {
   if (user.role === 'admin' || user.role === 'factory') return {};
   return {
     clientId: user.clientId ?? '__none__',
