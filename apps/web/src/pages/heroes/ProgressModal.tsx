@@ -46,16 +46,9 @@ export function ProgressModal({ planting: t, onClose, onSaved }: ProgressModalPr
     <Modal
       title={`Growth Photo — ${t.trees} tree${t.trees > 1 ? 's' : ''} at ${t.location || 'partner site'}`}
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            Add to Timeline
-          </button>
-        </>
-      }
+      okLabel="Add to Timeline"
+      busy={busy}
+      onOk={() => void save()}
     >
       <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.8rem' }}>
         Planted {fmtDate(t.plantedAt)}, {days} days ago. Adding dated photos over time gives the CSR

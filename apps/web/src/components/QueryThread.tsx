@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { lifecycleApi, type QueryThread as QueryThreadType, type SessionUser } from '../api';
 import { fmtDate } from '../lib/format';
+import { Modal } from './Modal';
 
 export function QueryThread({
   submissionId,
@@ -13,19 +14,31 @@ export function QueryThread({
   queries: QueryThreadType[];
   user: SessionUser;
   disabled: boolean;
-  onAction: (fn: () => Promise<unknown>, success: string) => void;
+  onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
 }) {
   const [text, setText] = useState('');
   const [openCompose, setOpenCompose] = useState(false);
   const [replyFor, setReplyFor] = useState<string | null>(null);
   const [reply, setReply] = useState('');
-  const composeRef = useRef<HTMLTextAreaElement>(null);
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const openCount = queries.filter((q) => q.status === 'open').length;
+  const replyTarget = queries.find((q) => q.id === replyFor);
 
-  function startCompose() {
-    setOpenCompose(true);
-    setTimeout(() => composeRef.current?.focus(), 0);
+  async function sendQuery() {
+    const ok = await onAction(() => lifecycleApi.raiseQuery(submissionId, text), 'Query sent');
+    if (ok !== false) {
+      setText('');
+      setOpenCompose(false);
+    }
+  }
+
+  async function sendReply() {
+    if (!replyFor) return;
+    const ok = await onAction(() => lifecycleApi.replyQuery(replyFor, reply), 'Reply sent');
+    if (ok !== false) {
+      setReply('');
+      setReplyFor(null);
+    }
   }
 
   return (
@@ -35,7 +48,7 @@ export function QueryThread({
           Queries {openCount ? <span className="badge bg-rd">{openCount} open</span> : null}
         </div>
         <div className="spacer" />
-        <button type="button" className="btn bs bsm" onClick={startCompose}>
+        <button type="button" className="btn bs bsm" onClick={() => setOpenCompose(true)}>
           + Raise
         </button>
       </div>
@@ -82,61 +95,72 @@ export function QueryThread({
                   </div>
                 </div>
               ))}
-              {canReply && replyFor !== q.id ? (
+              {canReply ? (
                 <button type="button" className="btn bs bsm" style={{ marginTop: '.35rem' }} onClick={() => setReplyFor(q.id)}>
                   Reply
                 </button>
-              ) : null}
-              {replyFor === q.id ? (
-                <form
-                  className="sub-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    onAction(() => lifecycleApi.replyQuery(q.id, reply), 'Reply sent');
-                    setReply('');
-                    setReplyFor(null);
-                  }}
-                >
-                  <textarea value={reply} onChange={(e) => setReply(e.target.value)} required rows={3} />
-                  <button type="submit" className="btn bp bsm" disabled={disabled}>
-                    Send Reply
-                  </button>
-                </form>
               ) : null}
             </div>
           );
         })
       )}
+
       {openCompose ? (
-        <form
-          className="sub-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onAction(() => lifecycleApi.raiseQuery(submissionId, text), 'Query sent');
-            setText('');
-            setOpenCompose(false);
-          }}
+        <Modal
+          title="Raise a Query"
+          onClose={() => setOpenCompose(false)}
+          okLabel="Send"
+          form="query-form"
+          busy={disabled}
         >
-          <label>
-            Raise a query
-            <textarea
-              ref={composeRef}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="What would you like to ask?"
-              rows={3}
-              required
-            />
-          </label>
-          <div className="form-actions">
-            <button type="button" className="btn ghost" onClick={() => setOpenCompose(false)}>
-              Cancel
-            </button>
-            <button type="submit" className="btn bs bsm" disabled={disabled}>
-              + Raise
-            </button>
+          <form
+            id="query-form"
+            className="sub-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void sendQuery();
+            }}
+          >
+            <label>
+              Your question or note
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="What would you like to ask?"
+                rows={4}
+                required
+              />
+            </label>
+          </form>
+        </Modal>
+      ) : null}
+
+      {replyTarget ? (
+        <Modal
+          title="Reply to Query"
+          onClose={() => setReplyFor(null)}
+          okLabel="Send Reply"
+          form="reply-form"
+          busy={disabled}
+        >
+          <div className="card" style={{ background: 'var(--g5)', marginBottom: '.6rem' }}>
+            <b style={{ fontSize: '.82rem' }}>{replyTarget.authorName}</b>
+            <div style={{ fontSize: '.85rem', marginTop: '.2rem' }}>{replyTarget.text}</div>
           </div>
-        </form>
+          <form
+            id="reply-form"
+            className="sub-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void sendReply();
+            }}
+          >
+            <label>
+              Your reply
+              <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} required />
+            </label>
+          </form>
+        </Modal>
       ) : null}
     </div>
   );

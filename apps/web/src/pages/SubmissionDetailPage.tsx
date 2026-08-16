@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getPayStatus, formatINR, rupeesToPaise } from '@urb-tectrack/shared';
-import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetail, type VehicleDetail } from '../api';
+import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetail } from '../api';
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
 import { FileRow, FileThumb } from '../components/FileThumb';
 import { QueryThread } from '../components/QueryThread';
 import { PhoneField } from '../components/PhoneField';
+import { Modal } from '../components/Modal';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, fmtTS, num } from '../lib/format';
+
+type StepModal =
+  | { kind: 'ack' }
+  | { kind: 'reject' }
+  | { kind: 'vehicle' }
+  | { kind: 'weigh'; vehicleId: string }
+  | { kind: 'invoice' }
+  | { kind: 'edit' };
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const { id } = useParams<{ id: string }>();
@@ -18,7 +27,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [invTab, setInvTab] = useState('');
-  const [addInvoice, setAddInvoice] = useState(false);
+  const [step, setStep] = useState<StepModal | null>(null);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -39,16 +48,25 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
     }
   }, [sub, invTab]);
 
-  async function act(fn: () => Promise<unknown>, success: string) {
+  useEffect(() => {
+    if (user.role === 'client' && sub?.derivedStage === 1 && sub.rejectNote) {
+      setStep({ kind: 'edit' });
+    }
+  }, [user.role, sub?.id, sub?.derivedStage, sub?.rejectNote]);
+
+  async function act(fn: () => Promise<unknown>, success: string): Promise<boolean> {
     setBusy(true);
     setError('');
     setMsg('');
     try {
       await fn();
       setMsg(success);
+      setStep(null);
       load();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -69,8 +87,9 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const activeInv = sub.invoices.find((i) => i.id === invTab) ?? sub.invoices[0];
   const netKg = sub.vehicles.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
   const allWeighed = sub.vehicles.length > 0 && sub.vehicles.every((v) => v.weighment);
-  const showInvoiceForm =
-    isStaff && stage >= 5 && allWeighed && (sub.invoices.length === 0 || addInvoice);
+  const weighTarget =
+    step?.kind === 'weigh' ? sub.vehicles.find((v) => v.id === step.vehicleId) : unweighed[0];
+  const showResubmit = user.role === 'client' && stage === 1 && !!sub.rejectNote;
 
   return (
     <div>
@@ -90,41 +109,27 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           ← Back
         </Link>
         {isAdmin && stage === 1 ? (
-          <button
-            type="button"
-            className="btn bp"
-            disabled={busy}
-            onClick={() => act(() => lifecycleApi.acknowledge(sub.id), 'Request acknowledged.')}
-          >
+          <button type="button" className="btn bp" disabled={busy} onClick={() => setStep({ kind: 'ack' })}>
             ✅ Acknowledge Request
           </button>
         ) : null}
-        {isAdmin && stage === 3 ? (
-          <button type="button" className="btn bp" onClick={() => document.getElementById('assign-vehicle')?.scrollIntoView()}>
+        {isStaff && stage === 3 ? (
+          <button type="button" className="btn bp" onClick={() => setStep({ kind: 'vehicle' })}>
             🚚 Assign Vehicle
           </button>
         ) : null}
-        {isAdmin && stage === 4 ? (
-          unweighed.length ? (
-            <button type="button" className="btn bp" onClick={() => document.getElementById('weigh-form')?.scrollIntoView()}>
-              ⚖️ Weigh ({unweighed.length} pending)
-            </button>
-          ) : (
-            <button type="button" className="btn bp" onClick={() => document.getElementById('raise-invoice')?.scrollIntoView()}>
-              🧾 Raise Invoice
-            </button>
-          )
-        ) : null}
-        {isAdmin && stage === 5 ? (
+        {isAdmin && stage === 4 && unweighed.length ? (
           <button
             type="button"
             className="btn bp"
-            onClick={() => {
-              setAddInvoice(true);
-              document.getElementById('raise-invoice')?.scrollIntoView();
-            }}
+            onClick={() => setStep({ kind: 'weigh', vehicleId: unweighed[0].id })}
           >
-            🧾 Add Invoice
+            ⚖️ Weigh ({unweighed.length} pending)
+          </button>
+        ) : null}
+        {isAdmin && stage === 5 && allWeighed ? (
+          <button type="button" className="btn bp" onClick={() => setStep({ kind: 'invoice' })}>
+            {sub.invoices.length ? '🧾 Add Invoice' : '🧾 Raise Invoice'}
           </button>
         ) : null}
       </div>
@@ -156,9 +161,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             sub={sub}
             user={user}
             busy={busy}
-            onSave={(body) =>
-              act(() => lifecycleApi.updateSubmission(sub.id, body), 'Request updated and sent back to Urbeno.')
-            }
+            onEdit={() => setStep({ kind: 'edit' })}
             onBom={(bomFileId) =>
               act(() => lifecycleApi.updateSubmission(sub.id, { bomFileId }), 'Bill of materials updated.')
             }
@@ -168,42 +171,22 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             <div className="card">
               <div className="card-ttl">Acknowledge request</div>
               <p className="p-mu">
-                Accepting this request moves it to Assign Vehicle and notifies the requestor. Use the
-                header action to accept, or request changes below.
+                Accepting this request moves it to Assign Vehicle and sends an acknowledgement email to
+                the requestor. Use the header action, or request changes.
               </p>
-              <RejectForm
-                disabled={busy}
-                onReject={(reason) =>
-                  act(() => lifecycleApi.reject(sub.id, reason), 'Changes requested from client.')
-                }
-              />
+              <button type="button" className="btn ghost" disabled={busy} onClick={() => setStep({ kind: 'reject' })}>
+                Request changes
+              </button>
             </div>
           ) : null}
 
           <VehicleCard
             sub={sub}
             user={user}
-            busy={busy}
             netKg={netKg}
-            unweighed={unweighed}
-            onAssign={(body) => act(() => lifecycleApi.addVehicle(sub.id, body), 'Vehicle assigned.')}
-            onWeigh={(vehicleId, body) => act(() => lifecycleApi.weigh(vehicleId, body), 'Weighment recorded.')}
+            onAddVehicle={() => setStep({ kind: 'vehicle' })}
+            onWeighVehicle={(vehicleId) => setStep({ kind: 'weigh', vehicleId })}
           />
-
-          {showInvoiceForm ? (
-            <div className="card" id="raise-invoice">
-              <div className="card-ttl">🧾 Raise invoice</div>
-              <p className="p-mu">All vehicles weighed — ready to bill.</p>
-              <InvoiceForm
-                vehicles={sub.vehicles}
-                disabled={busy}
-                onCreate={(body) => {
-                  setAddInvoice(false);
-                  return act(() => lifecycleApi.createInvoice(sub.id, body), 'Invoice created.');
-                }}
-              />
-            </div>
-          ) : null}
 
           {sub.invoices.length > 0 ? (
             <div className="card" style={{ padding: '.5rem' }}>
@@ -224,15 +207,12 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                     </span>
                   </button>
                 ))}
-                {isAdmin ? (
+                {isAdmin && allWeighed ? (
                   <button
                     type="button"
                     className="inv-tab"
                     style={{ color: 'var(--g)', fontWeight: 700 }}
-                    onClick={() => {
-                      setAddInvoice(true);
-                      document.getElementById('raise-invoice')?.scrollIntoView();
-                    }}
+                    onClick={() => setStep({ kind: 'invoice' })}
                   >
                     + Invoice
                   </button>
@@ -266,6 +246,152 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           />
         </div>
       </div>
+
+      {step?.kind === 'ack' ? (
+        <Modal
+          title={`Acknowledge Request — ${sub.id}`}
+          onClose={() => setStep(null)}
+          okLabel="Acknowledge"
+          busy={busy}
+          onOk={() => act(() => lifecycleApi.acknowledge(sub.id), 'Request acknowledged.')}
+        >
+          <p style={{ fontSize: '.87rem', marginBottom: '.8rem' }}>
+            Accepting this request moves it to <b>Assign Vehicle</b> and sends an automatic acknowledgement
+            email to the requestor.
+          </p>
+          <div className="card" style={{ background: 'var(--g5)', marginBottom: '.7rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '.4rem' }}>
+              <div className="tile">
+                <div className="tile-l">Client</div>
+                <div className="tile-v">{sub.client.name}</div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">Site</div>
+                <div className="tile-v">{sub.site.name}</div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">Approx</div>
+                <div className="tile-v">
+                  {num(Number(sub.approxWeight))} kg · {sub.approxQty} units
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">Requestor</div>
+                <div className="tile-v">{sub.createdBy}</div>
+              </div>
+            </div>
+            {sub.notes ? (
+              <div className="tile" style={{ marginTop: '.4rem' }}>
+                <div className="tile-l">Client notes</div>
+                <div className="tile-v" style={{ fontWeight: 400 }}>
+                  {sub.notes}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div
+            style={{
+              background: 'var(--bl2)',
+              padding: '.55rem .8rem',
+              borderRadius: 8,
+              fontSize: '.78rem',
+              color: 'var(--bl)',
+            }}
+          >
+            📧 Email will be sent to <b>{sub.createdBy}</b> using the Request Acknowledgement template.
+          </div>
+        </Modal>
+      ) : null}
+
+      {step?.kind === 'reject' ? (
+        <Modal
+          title={`Request changes — ${sub.id}`}
+          onClose={() => setStep(null)}
+          okLabel="Send back to client"
+          form="reject-form"
+          busy={busy}
+        >
+          <RejectForm
+            formId="reject-form"
+            disabled={busy}
+            onReject={(reason) => act(() => lifecycleApi.reject(sub.id, reason), 'Changes requested from client.')}
+          />
+        </Modal>
+      ) : null}
+
+      {step?.kind === 'vehicle' ? (
+        <Modal
+          title={`Assign Vehicle — ${sub.id}`}
+          onClose={() => setStep(null)}
+          okLabel="Assign vehicle"
+          form="assign-vehicle-form"
+          busy={busy}
+          wide
+        >
+          <AssignVehicleForm
+            formId="assign-vehicle-form"
+            disabled={busy}
+            onAssign={(body) => act(() => lifecycleApi.addVehicle(sub.id, body), 'Vehicle assigned.')}
+          />
+        </Modal>
+      ) : null}
+
+      {step?.kind === 'weigh' && weighTarget ? (
+        <Modal
+          title={`Weighment — ${weighTarget.registration}`}
+          onClose={() => setStep(null)}
+          okLabel="Record weighment"
+          form="weigh-form"
+          busy={busy}
+          wide
+        >
+          <WeighForm
+            formId="weigh-form"
+            vehicle={weighTarget}
+            disabled={busy}
+            onWeigh={(body) => act(() => lifecycleApi.weigh(weighTarget.id, body), 'Weighment recorded.')}
+          />
+        </Modal>
+      ) : null}
+
+      {step?.kind === 'invoice' ? (
+        <Modal
+          title={`Raise Invoice — ${sub.id}`}
+          onClose={() => setStep(null)}
+          okLabel="Create invoice"
+          form="invoice-form"
+          busy={busy}
+          wide
+        >
+          <InvoiceForm
+            formId="invoice-form"
+            vehicles={sub.vehicles}
+            disabled={busy}
+            onCreate={(body) => act(() => lifecycleApi.createInvoice(sub.id, body), 'Invoice created.')}
+          />
+        </Modal>
+      ) : null}
+
+      {step?.kind === 'edit' ? (
+        <Modal
+          title={`Edit Request — ${sub.id}`}
+          onClose={() => setStep(null)}
+          okLabel={showResubmit ? 'Save and resubmit' : 'Save changes'}
+          form="edit-request-form"
+          busy={busy}
+          wide
+        >
+          <EditRequestForm
+            formId="edit-request-form"
+            sub={sub}
+            disabled={busy}
+            resubmit={showResubmit}
+            onSave={(body) =>
+              act(() => lifecycleApi.updateSubmission(sub.id, body), 'Request updated and sent back to Urbeno.')
+            }
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -274,29 +400,28 @@ function RequestCard({
   sub,
   user,
   busy,
-  onSave,
+  onEdit,
   onBom,
 }: {
   sub: SubmissionDetail;
   user: SessionUser;
   busy: boolean;
-  onSave: (body: { location?: string; approxQty?: number; approxWeight?: number; notes?: string; ref?: string }) => void;
+  onEdit: () => void;
   onBom: (bomFileId: string | null) => void;
 }) {
   const isClient = user.role === 'client';
   const isAdmin = user.role === 'admin';
   const canEdit = sub.derivedStage === 1 && (isAdmin || (isClient && !!sub.rejectNote));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
-  const [editing, setEditing] = useState(false);
 
   return (
     <div className="card">
       <div className="card-hd">
         <div className="card-ttl">📝 Request Details</div>
         <div className="spacer" />
-        {showResubmit ? <span className="badge bg-am">Update below</span> : null}
-        {canEdit && !showResubmit ? (
-          <button type="button" className="btn bs bsm" onClick={() => setEditing((v) => !v)}>
+        {showResubmit ? <span className="badge bg-am">Update in the popup</span> : null}
+        {canEdit ? (
+          <button type="button" className="btn bs bsm" onClick={onEdit}>
             ✏️ Edit
           </button>
         ) : null}
@@ -364,9 +489,6 @@ function RequestCard({
           }}
         />
       ) : null}
-      {showResubmit || editing ? (
-        <EditRequestForm sub={sub} disabled={busy} resubmit={showResubmit} onSave={onSave} />
-      ) : null}
     </div>
   );
 }
@@ -374,53 +496,26 @@ function RequestCard({
 function VehicleCard({
   sub,
   user,
-  busy,
   netKg,
-  unweighed,
-  onAssign,
-  onWeigh,
+  onAddVehicle,
+  onWeighVehicle,
 }: {
   sub: SubmissionDetail;
   user: SessionUser;
-  busy: boolean;
   netKg: number;
-  unweighed: VehicleDetail[];
-  onAssign: (body: {
-    registration: string;
-    vehicleType: string;
-    driverName: string;
-    driverPhone: string;
-    logisticsPartner?: string;
-    expectedAt?: string;
-    team: Array<{ name: string; role: string; phone: string }>;
-  }) => void;
-  onWeigh: (
-    vehicleId: string,
-    body: {
-      weighedAt: string;
-      manual?: boolean;
-      gross?: number;
-      tare?: number;
-      net?: number;
-      slipNumber?: string;
-      reason?: string;
-      slipPhotoIds: string[];
-      pickupPhotoIds: string[];
-    },
-  ) => void;
+  onAddVehicle: () => void;
+  onWeighVehicle: (vehicleId: string) => void;
 }) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
+  const isAdmin = user.role === 'admin';
   const stage = sub.derivedStage;
   const vehicleTypes = useLookups('vehicleType');
   const logistics = useLookups('logistics');
   const teamRoles = useLookups('teamRole');
-  const [addOpen, setAddOpen] = useState(false);
 
   if (!sub.vehicles.length && stage < 3) return null;
 
   const canAdd = isStaff && stage >= 3 && stage <= 5;
-  const showAssign = isStaff && (stage === 3 || (canAdd && addOpen));
-  const weighTarget = unweighed[0];
 
   return (
     <div className="card" id="assign-vehicle">
@@ -428,8 +523,8 @@ function VehicleCard({
         <div className="card-ttl">🚚 Vehicles & Weighment ({sub.vehicles.length})</div>
         <div className="spacer" />
         {netKg ? <span className="badge bg-g">{num(netKg)} kg net</span> : null}
-        {canAdd && stage !== 3 ? (
-          <button type="button" className="btn bs bsm" onClick={() => setAddOpen((v) => !v)}>
+        {canAdd ? (
+          <button type="button" className="btn bs bsm" onClick={onAddVehicle}>
             + Add Vehicle
           </button>
         ) : null}
@@ -453,6 +548,17 @@ function VehicleCard({
                   <span className="badge bg-am" title="Recorded without a weighbridge">
                     ✍️ Manual
                   </span>
+                ) : null}
+                <div className="spacer" />
+                {isAdmin && !w && stage >= 4 && stage <= 5 ? (
+                  <button type="button" className="btn bp bsm" onClick={() => onWeighVehicle(v.id)}>
+                    Record Weighment
+                  </button>
+                ) : null}
+                {isAdmin && w && stage >= 4 && stage <= 5 ? (
+                  <button type="button" className="btn bs bsm" onClick={() => onWeighVehicle(v.id)}>
+                    Edit weighment
+                  </button>
                 ) : null}
               </div>
               <div
@@ -578,16 +684,6 @@ function VehicleCard({
           <span className="mono">{num(netKg)} kg</span>
         </div>
       ) : null}
-      {showAssign ? <AssignVehicleForm disabled={busy} onAssign={onAssign} /> : null}
-      {isStaff && stage === 4 && weighTarget ? (
-        <div id="weigh-form">
-          <WeighForm
-            vehicle={weighTarget}
-            disabled={busy}
-            onWeigh={(body) => onWeigh(weighTarget.id, body)}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -663,7 +759,7 @@ function CertificatesCard({ sub, user }: { sub: SubmissionDetail; user: SessionU
             className={`btn ${rows.length ? 'bs' : 'bp'} bsm`}
             onClick={() => document.querySelector('.inv-panel')?.scrollIntoView()}
           >
-            + Upload Certificate
+            Go to invoice
           </button>
         ) : null}
       </div>
@@ -899,10 +995,12 @@ function EditRequestForm({
   disabled,
   resubmit,
   onSave,
+  formId,
 }: {
   sub: SubmissionDetail;
   disabled: boolean;
   resubmit: boolean;
+  formId?: string;
   onSave: (body: { location?: string; approxQty?: number; approxWeight?: number; notes?: string; ref?: string }) => void;
 }) {
   const [location, setLocation] = useState(sub.location ?? '');
@@ -913,6 +1011,7 @@ function EditRequestForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -925,31 +1024,44 @@ function EditRequestForm({
         });
       }}
     >
-      <label>
-        Pickup location
-        <input value={location} onChange={(e) => setLocation(e.target.value)} />
-      </label>
-      <div className="fr2">
-        <label>
-          Approx. quantity
-          <input type="number" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />
-        </label>
-        <label>
-          Approx. weight (kg)
-          <input type="number" step="0.001" value={approxWeight} onChange={(e) => setApproxWeight(e.target.value)} />
-        </label>
+      <p className="dim" style={{ fontSize: '.83rem', marginBottom: '.8rem' }}>
+        {resubmit
+          ? 'Update the details Urbeno asked for and send the request back.'
+          : 'Give us an approximate quantity and weight — exact figures are captured at weighment.'}
+      </p>
+      <div className="fg">
+        <label htmlFor="er-loc">Pickup location</label>
+        <input id="er-loc" value={location} onChange={(e) => setLocation(e.target.value)} />
       </div>
-      <label>
-        PO / Reference
-        <input value={ref} onChange={(e) => setRef(e.target.value)} />
-      </label>
-      <label>
-        Notes
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-      </label>
-      <button type="submit" className="btn primary" disabled={disabled}>
-        {resubmit ? 'Save and resubmit' : 'Save changes'}
-      </button>
+      <div className="fr2">
+        <div className="fg">
+          <label htmlFor="er-qty">Approx. quantity</label>
+          <input id="er-qty" type="number" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label htmlFor="er-wt">Approx. weight (kg)</label>
+          <input
+            id="er-wt"
+            type="number"
+            step="0.001"
+            value={approxWeight}
+            onChange={(e) => setApproxWeight(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="fg">
+        <label htmlFor="er-ref">PO / Reference</label>
+        <input id="er-ref" value={ref} onChange={(e) => setRef(e.target.value)} />
+      </div>
+      <div className="fg">
+        <label htmlFor="er-notes">Notes</label>
+        <textarea id="er-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+      </div>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled}>
+          {resubmit ? 'Save and resubmit' : 'Save changes'}
+        </button>
+      )}
     </form>
   );
 }
@@ -957,44 +1069,40 @@ function EditRequestForm({
 function RejectForm({
   disabled,
   onReject,
+  formId,
 }: {
   disabled: boolean;
+  formId?: string;
   onReject: (reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <button type="button" className="btn ghost" disabled={disabled} onClick={() => setOpen(true)}>
-        Request changes
-      </button>
-    );
-  }
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
         onReject(reason);
-        setOpen(false);
         setReason('');
       }}
     >
-      <h3>Request changes</h3>
-      <label>
-        Note to client
-        <textarea value={reason} onChange={(e) => setReason(e.target.value)} required rows={3} />
-      </label>
-      <div className="form-actions">
-        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </button>
+      <div className="fg">
+        <label htmlFor="ak-rej">Note to client</label>
+        <textarea
+          id="ak-rej"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          required
+          rows={3}
+          placeholder="e.g. Please split this into two requests, one per site."
+        />
+      </div>
+      {formId ? null : (
         <button type="submit" className="btn secondary" disabled={disabled || !reason.trim()}>
           Send back to client
         </button>
-      </div>
+      )}
     </form>
   );
 }
@@ -1007,8 +1115,10 @@ function localDateTimeValue(d = new Date()) {
 function AssignVehicleForm({
   disabled,
   onAssign,
+  formId,
 }: {
   disabled: boolean;
+  formId?: string;
   onAssign: (body: {
     registration: string;
     vehicleType: string;
@@ -1043,6 +1153,7 @@ function AssignVehicleForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -1176,9 +1287,11 @@ function AssignVehicleForm({
         + Add Team Member
       </button>
       {error ? <p className="error">{error}</p> : null}
-      <button type="submit" className="btn primary" disabled={disabled} style={{ marginTop: '.6rem' }}>
-        Assign vehicle
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled} style={{ marginTop: '.6rem' }}>
+          Assign vehicle
+        </button>
+      )}
     </form>
   );
 }
@@ -1187,9 +1300,11 @@ function WeighForm({
   vehicle,
   disabled,
   onWeigh,
+  formId,
 }: {
   vehicle: { registration: string };
   disabled: boolean;
+  formId?: string;
   onWeigh: (body: {
     weighedAt: string;
     manual?: boolean;
@@ -1214,6 +1329,7 @@ function WeighForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -1292,13 +1408,15 @@ function WeighForm({
         value={pickupPhotos}
         onChange={setPickupPhotos}
       />
-      <button
-        type="submit"
-        className="btn primary"
-        disabled={disabled || !pickupPhotos.length || (!manual && !slipPhotos.length)}
-      >
-        Record weighment
-      </button>
+      {formId ? null : (
+        <button
+          type="submit"
+          className="btn primary"
+          disabled={disabled || !pickupPhotos.length || (!manual && !slipPhotos.length)}
+        >
+          Record weighment
+        </button>
+      )}
     </form>
   );
 }
@@ -1307,9 +1425,11 @@ function InvoiceForm({
   vehicles,
   disabled,
   onCreate,
+  formId,
 }: {
   vehicles: Array<{ id: string; registration: string; weighment: { netKg: string } | null }>;
   disabled: boolean;
+  formId?: string;
   onCreate: (body: {
     invoiceNo: string;
     invoiceDate: string;
@@ -1372,6 +1492,7 @@ function InvoiceForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -1585,9 +1706,11 @@ function InvoiceForm({
           onChange={(ids) => setEwayFileId(ids[0] ?? '')}
         />
       </div>
-      <button type="submit" className="btn primary" disabled={disabled}>
-        Create invoice
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled}>
+          Create invoice
+        </button>
+      )}
     </form>
   );
 }

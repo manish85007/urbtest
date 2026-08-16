@@ -200,16 +200,9 @@ function LookupModal({
     <Modal
       title={row ? `Edit — ${def.name}` : `Add — ${def.name}`}
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            {row ? 'Save' : 'Add'}
-          </button>
-        </>
-      }
+      okLabel={row ? 'Save' : 'Add'}
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       {def.cols.map((c) => (

@@ -14,6 +14,7 @@ test.describe('full lifecycle', () => {
     // Stage 1 — client raises request
     await login(page, 'ramesh@techcorp.in');
     await page.getByRole('link', { name: /New request/i }).click();
+    await expect(page.getByRole('heading', { name: 'New pickup request' })).toBeVisible();
     await page.getByLabel('Pickup location').fill(`E2E bay ${uniq}`);
     await page.getByLabel('Approx. weight (kg)').fill('75');
     await page.getByLabel('Approx. quantity').fill('12');
@@ -29,32 +30,36 @@ test.describe('full lifecycle', () => {
     // Stage 2 — admin acknowledges
     await login(page, 'admin@urbeno.in');
     await page.goto(`/requests/${submissionId}`);
-    await page.getByRole('button', { name: 'Acknowledge' }).click();
+    await page.getByRole('button', { name: 'Acknowledge Request' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Acknowledge' }).click();
     await expect(page.getByText('Request acknowledged.')).toBeVisible({ timeout: 10_000 });
 
     // Stage 3 — assign vehicle
+    await page.getByRole('button', { name: 'Assign Vehicle' }).click();
     await page.getByLabel('Registration').fill(`KA-E2E-${uniq}`);
     await page.getByLabel('Driver name').fill('E2E Driver');
     await page.getByLabel('Driver phone').fill('9900112233');
-    await page.getByRole('button', { name: 'Assign vehicle' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Assign vehicle' }).click();
     await expect(page.getByText('Vehicle assigned.')).toBeVisible({ timeout: 10_000 });
 
     // Stage 4 — weighment with photos
-    const fileInputs = page.locator('input[type="file"]');
+    await page.getByRole('button', { name: /Weigh/ }).click();
+    const fileInputs = page.locator('.modal input[type="file"]');
     await fileInputs.nth(0).setInputFiles(photo);
     await fileInputs.nth(1).setInputFiles(photo);
     await expect(page.getByText(/seed|sample|\.jpg/i).first()).toBeVisible({ timeout: 15_000 });
     await page.getByLabel('Gross (kg)').fill('5200');
     await page.getByLabel('Tare (kg)').fill('5125');
     await page.getByLabel('Slip no.').fill(`WB-E2E-${uniq}`);
-    await page.getByRole('button', { name: 'Record weighment' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Record weighment' }).click();
     await expect(page.getByText('Weighment recorded.')).toBeVisible({ timeout: 15_000 });
 
     // Stage 5 — raise invoice
+    await page.getByRole('button', { name: 'Raise Invoice' }).click();
     await page.getByLabel('Invoice no.').fill(`INV-E2E-${uniq}`);
     await page.getByLabel('Taxable amount (₹)').fill('8500');
     await page.getByLabel('E-way bill no.').fill(`EWB-E2E-${uniq}`);
-    await page.getByRole('button', { name: 'Create invoice' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Create invoice' }).click();
     await expect(page.getByText('Invoice created.')).toBeVisible({ timeout: 10_000 });
 
     await logout(page);
@@ -62,9 +67,12 @@ test.describe('full lifecycle', () => {
     // Stage 5–6 — factory MRN + recycling
     await login(page, 'blr@urbeno.in');
     await page.goto(`/requests/${submissionId}`);
-    await page.getByRole('button', { name: 'Record goods receipt (MRN)' }).click();
+    await page.getByRole('button', { name: 'Create MRN' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Record goods receipt (MRN)' }).click();
     await expect(page.getByText('MRN created.')).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: 'Issue Form 6' }).click();
+    await page.getByRole('button', { name: 'Process & Issue Form 6' }).click();
+    await expect(page.locator('#recy-form select').nth(1).locator('option')).not.toHaveCount(0);
+    await page.locator('.modal').getByRole('button', { name: 'Issue Form 6' }).click();
     await expect(page.getByText('Recycling recorded.')).toBeVisible({ timeout: 15_000 });
 
     await logout(page);
@@ -73,14 +81,16 @@ test.describe('full lifecycle', () => {
     await login(page, 'admin@urbeno.in');
     await page.goto(`/requests/${submissionId}`);
 
-    const certInput = page.locator('.inv-panel input[type="file"]').first();
-    await certInput.setInputFiles(pdf);
+    await page.locator('.inv-panel').getByRole('button', { name: 'Upload Certificate' }).click();
+    await page.locator('.modal input[type="file"]').first().setInputFiles(pdf);
+    await expect(page.locator('.modal').getByText(/sample|\.pdf/i).first()).toBeVisible({ timeout: 15_000 });
     await page.getByLabel('Certificate no.').fill(`DCOD-E2E-${uniq}`);
-    await page.getByRole('button', { name: /Upload.*certificate/i }).click();
+    await page.locator('.modal').getByRole('button', { name: /Upload.*certificate/i }).click();
     await expect(page.getByText('Certificate uploaded.')).toBeVisible({ timeout: 15_000 });
 
+    await page.getByRole('button', { name: '+ Record Payment' }).click();
     await page.getByLabel('UTR / reference').fill(`UTR-E2E-${uniq}`);
-    await page.getByRole('button', { name: 'Record payment' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Record payment' }).click();
     await expect(page.getByText('Payment recorded.')).toBeVisible({ timeout: 10_000 });
 
     await logout(page);
@@ -88,7 +98,8 @@ test.describe('full lifecycle', () => {
     // Stage 9 — client acknowledges closure
     await login(page, 'ramesh@techcorp.in');
     await page.goto(`/requests/${submissionId}`);
-    await page.getByRole('button', { name: 'Acknowledge closure' }).click();
+    await page.getByRole('button', { name: 'Review & Close' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Acknowledge closure' }).click();
     await expect(page.getByText('Invoice closed.')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.ok-msg.sm')).toContainText('Closed');
   });
@@ -110,7 +121,7 @@ test.describe('full lifecycle', () => {
     await page.goto(`/requests/${submissionId}`);
     await page.getByRole('button', { name: 'Request changes' }).click();
     await page.getByLabel('Note to client').fill('Please update pickup location details.');
-    await page.getByRole('button', { name: 'Send back to client' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Send back to client' }).click();
     await expect(page.getByText('Changes requested from client.')).toBeVisible();
 
     await logout(page);
@@ -118,7 +129,7 @@ test.describe('full lifecycle', () => {
     await page.goto(`/requests/${submissionId}`);
     await expect(page.getByText('Please update pickup location details.')).toBeVisible();
     await page.getByLabel('Pickup location').fill(`Updated bay ${uniq}`);
-    await page.getByRole('button', { name: 'Save and resubmit' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Save and resubmit' }).click();
     await expect(page.getByText('Request updated and sent back to Urbeno.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Acknowledge' })).not.toBeVisible();
   });

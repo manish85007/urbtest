@@ -19,6 +19,7 @@ import {
 } from '../api';
 import { FileUpload } from './FileUpload';
 import { FileRow, FileThumb } from './FileThumb';
+import { Modal } from './Modal';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 
@@ -28,7 +29,7 @@ interface InvoiceLifecyclePanelProps {
   payTermsDays: number;
   user: SessionUser;
   disabled: boolean;
-  onAction: (fn: () => Promise<unknown>, success: string) => void;
+  onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
 }
 
 function payCls(key: PayStatusKey): string {
@@ -60,6 +61,12 @@ export function InvoiceLifecyclePanel({
   const isClient = user.role === 'client';
   const paymentModes = useLookups('paymentMode');
   const taxRates = useLookups('taxRate');
+  const [panel, setPanel] = useState<'pay' | 'mrn' | 'recy' | 'cod' | 'close' | null>(null);
+
+  async function run(fn: () => Promise<unknown>, success: string) {
+    const ok = await onAction(fn, success);
+    if (ok !== false) setPanel(null);
+  }
 
   const paidPaise = invoice.payments.reduce((s, p) => s + asPaise(p.amountPaise), 0n);
   const totalPaise = asPaise(invoice.totalPaise);
@@ -279,13 +286,9 @@ export function InvoiceLifecyclePanel({
           </div>
         )}
         {isStaff && stage >= 5 && !isPaid && !invoice.closedAt ? (
-          <PaymentForm
-            amountDue={Number(totalPaise - paidPaise) / 100}
-            disabled={disabled}
-            onSubmit={(body) =>
-              onAction(() => lifecycleApi.addPayment(invoice.id, body), 'Payment recorded.')
-            }
-          />
+          <button type="button" className="btn bs bsm" onClick={() => setPanel('pay')}>
+            + Record Payment
+          </button>
         ) : null}
       </div>
 
@@ -354,8 +357,7 @@ export function InvoiceLifecyclePanel({
           invoice={invoice}
           vehicles={covered}
           canCreate={isFactory && stage === 5 && !invoice.mrn}
-          disabled={disabled}
-          onAction={onAction}
+          onCreateClick={() => setPanel('mrn')}
         />
       ) : null}
 
@@ -363,17 +365,45 @@ export function InvoiceLifecyclePanel({
         invoice={invoice}
         canCreate={isFactory && stage === 6 && !!invoice.mrn && !invoice.recycling}
         isStaff={isStaff}
-        disabled={disabled}
-        onAction={onAction}
+        onCreateClick={() => setPanel('recy')}
       />
 
       {isAdmin && stage >= 7 && invoice.recycling && !invoice.closedAt ? (
-        <CertificateForm
-          disabled={disabled}
-          onSubmit={(body) =>
-            onAction(() => lifecycleApi.uploadCertificate(invoice.id, body), 'Certificate uploaded.')
-          }
-        />
+        <div className="card" style={{ marginBottom: '.6rem' }}>
+          <div className="card-hd">
+            <div className="card-ttl">🏅 Certificate of Destruction</div>
+            <div className="spacer" />
+            <button type="button" className="btn bp bsm" onClick={() => setPanel('cod')}>
+              Upload Certificate
+            </button>
+          </div>
+          {invoice.certificates.length ? (
+            <div className="tw">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Certificate</th>
+                    <th>Issued</th>
+                    <th>Emailed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.certificates.map((c) => (
+                    <tr key={c.id ?? c.certNo}>
+                      <td className="mono">{c.certNo}</td>
+                      <td className="dim">{fmtDate(c.certDate)}</td>
+                      <td>{c.mailedAt ? <span className="badge bg-g">sent</span> : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="dim" style={{ fontSize: '.83rem' }}>
+              Upload the signed PDF — the client is emailed automatically with it attached.
+            </div>
+          )}
+        </div>
       ) : null}
 
       {isStaff && invoice.recycling ? (
@@ -381,17 +411,111 @@ export function InvoiceLifecyclePanel({
       ) : null}
 
       {(isClient || isAdmin) && stage >= 8 && !invoice.closedAt && isPaid && invoice.certificates.length > 0 ? (
-        <CloseForm
-          disabled={disabled}
-          isAdmin={isAdmin}
-          onSubmit={(body) =>
-            onAction(() => lifecycleApi.closeInvoice(invoice.id, body), 'Invoice closed.')
-          }
-        />
+        <div className="card" style={{ marginBottom: '.6rem' }}>
+          <div className="card-hd">
+            <div className="card-ttl">🎉 Review & Close</div>
+            <div className="spacer" />
+            <button type="button" className="btn bp bsm" onClick={() => setPanel('close')}>
+              Review & Close
+            </button>
+          </div>
+          <div className="dim" style={{ fontSize: '.83rem' }}>
+            Confirm you have received the Certificate of Destruction, then acknowledge closure.
+          </div>
+        </div>
       ) : null}
 
       {invoice.closedAt ? (
         <p className="ok-msg sm">Closed {invoice.closedAt.slice(0, 10)}</p>
+      ) : null}
+
+      {panel === 'pay' ? (
+        <Modal
+          title={`Record Payment — ${invoice.invoiceNo}`}
+          onClose={() => setPanel(null)}
+          okLabel="Record payment"
+          form="pay-form"
+          busy={disabled}
+        >
+          <PaymentForm
+            formId="pay-form"
+            amountDue={Number(totalPaise - paidPaise) / 100}
+            disabled={disabled}
+            onSubmit={(body) => run(() => lifecycleApi.addPayment(invoice.id, body), 'Payment recorded.')}
+          />
+        </Modal>
+      ) : null}
+
+      {panel === 'mrn' ? (
+        <Modal
+          title={`Create MRN — ${invoice.invoiceNo}`}
+          onClose={() => setPanel(null)}
+          okLabel="Record goods receipt (MRN)"
+          form="mrn-form"
+          busy={disabled}
+          wide
+        >
+          <MrnForm
+            formId="mrn-form"
+            disabled={disabled}
+            onSubmit={(body) => run(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')}
+          />
+        </Modal>
+      ) : null}
+
+      {panel === 'recy' ? (
+        <Modal
+          title={`Process Invoice — ${invoice.invoiceNo}`}
+          onClose={() => setPanel(null)}
+          okLabel="Issue Form 6"
+          form="recy-form"
+          busy={disabled}
+          wide
+        >
+          <RecyclingForm
+            formId="recy-form"
+            defaultFactoryId={invoice.mrn?.factoryId ?? 'URB-BLR'}
+            billingWeight={Number(invoice.billingWeight)}
+            disabled={disabled}
+            onSubmit={(body) => run(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')}
+          />
+        </Modal>
+      ) : null}
+
+      {panel === 'cod' ? (
+        <Modal
+          title={`Upload Certificate of Destruction — ${invoice.invoiceNo}`}
+          onClose={() => setPanel(null)}
+          okLabel="Upload & email certificate"
+          form="cod-form"
+          busy={disabled}
+          wide
+        >
+          <CertificateForm
+            formId="cod-form"
+            disabled={disabled}
+            onSubmit={(body) =>
+              run(() => lifecycleApi.uploadCertificate(invoice.id, body), 'Certificate uploaded.')
+            }
+          />
+        </Modal>
+      ) : null}
+
+      {panel === 'close' ? (
+        <Modal
+          title={`Review & Close — ${invoice.invoiceNo}`}
+          onClose={() => setPanel(null)}
+          okLabel="Acknowledge closure"
+          form="close-form"
+          busy={disabled}
+        >
+          <CloseForm
+            formId="close-form"
+            disabled={disabled}
+            isAdmin={isAdmin}
+            onSubmit={(body) => run(() => lifecycleApi.closeInvoice(invoice.id, body), 'Invoice closed.')}
+          />
+        </Modal>
       ) : null}
     </div>
   );
@@ -401,14 +525,12 @@ function MrnCard({
   invoice,
   vehicles,
   canCreate,
-  disabled,
-  onAction,
+  onCreateClick,
 }: {
   invoice: InvoiceDetail;
   vehicles: VehicleDetail[];
   canCreate: boolean;
-  disabled: boolean;
-  onAction: (fn: () => Promise<unknown>, success: string) => void;
+  onCreateClick: () => void;
 }) {
   const m = invoice.mrn;
   if (!m && !canCreate) return null;
@@ -442,10 +564,9 @@ function MrnCard({
             weighment on the gate.
           </div>
           {canCreate ? (
-            <MrnForm
-              disabled={disabled}
-              onSubmit={(body) => onAction(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')}
-            />
+            <button type="button" className="btn bp bsm" style={{ marginTop: '.5rem' }} onClick={onCreateClick}>
+              Create MRN
+            </button>
           ) : null}
         </>
       ) : (
@@ -564,14 +685,12 @@ function RecyclingCard({
   invoice,
   canCreate,
   isStaff,
-  disabled,
-  onAction,
+  onCreateClick,
 }: {
   invoice: InvoiceDetail;
   canCreate: boolean;
   isStaff: boolean;
-  disabled: boolean;
-  onAction: (fn: () => Promise<unknown>, success: string) => void;
+  onCreateClick: () => void;
 }) {
   const r = invoice.recycling;
   if (!r && !canCreate) return null;
@@ -606,14 +725,9 @@ function RecyclingCard({
             Awaiting processing at the factory.
           </div>
           {canCreate ? (
-            <RecyclingForm
-              defaultFactoryId={invoice.mrn?.factoryId ?? 'URB-BLR'}
-              billingWeight={Number(invoice.billingWeight)}
-              disabled={disabled}
-              onSubmit={(body) =>
-                onAction(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')
-              }
-            />
+            <button type="button" className="btn bp bsm" style={{ marginTop: '.5rem' }} onClick={onCreateClick}>
+              Process & Issue Form 6
+            </button>
           ) : null}
         </>
       ) : (
@@ -771,9 +885,11 @@ function RecyclingCard({
 }
 
 function MrnForm({
+  formId,
   disabled,
   onSubmit,
 }: {
+  formId?: string;
   disabled: boolean;
   onSubmit: (body: {
     factoryId: string;
@@ -793,6 +909,7 @@ function MrnForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -810,19 +927,23 @@ function MrnForm({
           ))}
         </select>
       </label>
-      <button type="submit" className="btn primary" disabled={disabled}>
-        Record goods receipt (MRN)
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled}>
+          Record goods receipt (MRN)
+        </button>
+      )}
     </form>
   );
 }
 
 function RecyclingForm({
+  formId,
   defaultFactoryId,
   billingWeight,
   disabled,
   onSubmit,
 }: {
+  formId?: string;
   defaultFactoryId: string;
   billingWeight: number;
   disabled: boolean;
@@ -850,6 +971,7 @@ function RecyclingForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -892,17 +1014,21 @@ function RecyclingForm({
           placeholder="Required only if category TPA would be exceeded"
         />
       </label>
-      <button type="submit" className="btn primary" disabled={disabled || !selected}>
-        Issue Form 6
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled || !selected}>
+          Issue Form 6
+        </button>
+      )}
     </form>
   );
 }
 
 function CertificateForm({
+  formId,
   disabled,
   onSubmit,
 }: {
+  formId?: string;
   disabled: boolean;
   onSubmit: (body: { certNo: string; certDate: string; fileId: string; department?: string }) => void;
 }) {
@@ -912,6 +1038,7 @@ function CertificateForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -934,18 +1061,22 @@ function CertificateForm({
         value={fileId ? [fileId] : []}
         onChange={(ids) => setFileId(ids[0] ?? '')}
       />
-      <button type="submit" className="btn primary" disabled={disabled || !fileId}>
-        Upload &amp; email certificate
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled || !fileId}>
+          Upload &amp; email certificate
+        </button>
+      )}
     </form>
   );
 }
 
 function PaymentForm({
+  formId,
   amountDue,
   disabled,
   onSubmit,
 }: {
+  formId?: string;
   amountDue: number;
   disabled: boolean;
   onSubmit: (body: { utr: string; amount: number; paidAt: string; mode: string }) => void;
@@ -958,6 +1089,7 @@ function PaymentForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -985,18 +1117,22 @@ function PaymentForm({
           ))}
         </select>
       </label>
-      <button type="submit" className="btn primary" disabled={disabled}>
-        Record payment
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled}>
+          Record payment
+        </button>
+      )}
     </form>
   );
 }
 
 function CloseForm({
+  formId,
   disabled,
   isAdmin,
   onSubmit,
 }: {
+  formId?: string;
   disabled: boolean;
   isAdmin: boolean;
   onSubmit: (body: { rating?: number; note?: string; forced?: boolean }) => void;
@@ -1006,6 +1142,7 @@ function CloseForm({
 
   return (
     <form
+      id={formId}
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -1033,9 +1170,11 @@ function CloseForm({
           Force close (60+ days)
         </button>
       ) : null}
-      <button type="submit" className="btn primary" disabled={disabled}>
-        Acknowledge closure
-      </button>
+      {formId ? null : (
+        <button type="submit" className="btn primary" disabled={disabled}>
+          Acknowledge closure
+        </button>
+      )}
     </form>
   );
 }
@@ -1047,12 +1186,13 @@ function SerialPanel({
 }: {
   invoice: InvoiceDetail;
   disabled: boolean;
-  onAction: (fn: () => Promise<unknown>, success: string) => void;
+  onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
 }) {
   const serials = invoice.recycling?.serials ?? [];
   const pending = serials.filter((s) => !s.dcodNo).length;
   const standards = useLookups('destructStd');
   const [std, setStd] = useState('NIST');
+  const [destroyOpen, setDestroyOpen] = useState(false);
 
   async function onCsv(files: FileList | null) {
     const file = files?.[0];
@@ -1063,6 +1203,14 @@ function SerialPanel({
       () => lifecycleApi.importSerials(invoice.id, { csv, serialFileId: rec.id }),
       `${csv.split(/\n/).length - 1} serials imported.`,
     );
+  }
+
+  async function recordDestroy() {
+    const ok = await onAction(
+      () => lifecycleApi.destroySerials(invoice.id, { serialNos: 'all', std }),
+      'Destruction recorded.',
+    );
+    if (ok !== false) setDestroyOpen(false);
   }
 
   return (
@@ -1118,7 +1266,22 @@ function SerialPanel({
         </div>
       ) : null}
       {pending > 0 ? (
-        <div className="fr2">
+        <button type="button" className="btn bp bsm" disabled={disabled} onClick={() => setDestroyOpen(true)}>
+          Record destruction ({pending})
+        </button>
+      ) : null}
+      {destroyOpen ? (
+        <Modal
+          title={`Record Data Destruction — ${invoice.invoiceNo}`}
+          onClose={() => setDestroyOpen(false)}
+          okLabel="Record destruction"
+          busy={disabled}
+          onOk={() => recordDestroy()}
+        >
+          <p className="dim" style={{ fontSize: '.83rem', marginBottom: '.8rem' }}>
+            {pending} serial{pending === 1 ? '' : 's'} still pending sanitization. Recording destruction issues a
+            device-level Certificate of Destruction for each.
+          </p>
           <label>
             Sanitization standard
             <select value={std} onChange={(e) => setStd(e.target.value)}>
@@ -1129,20 +1292,7 @@ function SerialPanel({
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="btn bp bsm"
-            disabled={disabled}
-            onClick={() =>
-              onAction(
-                () => lifecycleApi.destroySerials(invoice.id, { serialNos: 'all', std }),
-                'Destruction recorded.',
-              )
-            }
-          >
-            Record destruction ({pending})
-          </button>
-        </div>
+        </Modal>
       ) : null}
     </div>
   );

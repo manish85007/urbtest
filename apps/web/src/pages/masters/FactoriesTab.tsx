@@ -160,16 +160,9 @@ function FactoryModal({
     <Modal
       title={factory ? `Edit Factory — ${factory.id}` : 'New Factory Site'}
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            {factory ? 'Save Factory' : 'Create Factory'}
-          </button>
-        </>
-      }
+      okLabel={factory ? 'Save Factory' : 'Create Factory'}
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">

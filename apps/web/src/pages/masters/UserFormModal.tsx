@@ -96,16 +96,9 @@ export function UserFormModal({
     <Modal
       title={user ? `Edit User — ${user.name}` : 'New User'}
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            {user ? 'Save User' : 'Create User'}
-          </button>
-        </>
-      }
+      okLabel={user ? 'Save User' : 'Create User'}
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">

@@ -209,16 +209,9 @@ function NewClientModal({
       title="New Client"
       wide
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            Create Client
-          </button>
-        </>
-      }
+      okLabel="Create Client"
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">

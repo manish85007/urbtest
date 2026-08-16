@@ -383,16 +383,9 @@ function EditClientModal({
     <Modal
       title={`Edit Client — ${client.id}`}
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            Save Changes
-          </button>
-        </>
-      }
+      okLabel="Save Changes"
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">
@@ -505,16 +498,9 @@ function SiteModal({
     <Modal
       title={site ? `Edit Site — ${site.name}` : 'Add Site'}
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            {site ? 'Save Site' : 'Add Site'}
-          </button>
-        </>
-      }
+      okLabel={site ? 'Save Site' : 'Add Site'}
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">
@@ -605,16 +591,9 @@ function PlantingModal({
     <Modal
       title="Log Planting"
       onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn bs" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn bp" disabled={busy} onClick={() => void save()}>
-            Save
-          </button>
-        </>
-      }
+      okLabel="Save"
+      busy={busy}
+      onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">

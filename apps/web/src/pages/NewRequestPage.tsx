@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { dataApi, lifecycleApi, type SessionUser } from '../api';
 import { FileUpload } from '../components/FileUpload';
+import { Modal } from '../components/Modal';
 
 export function NewRequestPage({ user }: { user: SessionUser }) {
   const nav = useNavigate();
@@ -60,14 +61,20 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   }
 
   return (
-    <div>
-      <h1 className="h1">New pickup request</h1>
-      <p className="muted">
+    <Modal
+      title="New pickup request"
+      heading
+      wide
+      onClose={() => nav('/requests')}
+      okLabel={busy ? 'Submitting…' : 'Submit request'}
+      form="new-request-form"
+      busy={busy}
+    >
+      <p className="dim" style={{ fontSize: '.83rem', marginBottom: '.8rem' }}>
         Give us an approximate quantity and weight — exact figures are captured at weighment. Attach a
         bill of materials if you have a detailed line list.
       </p>
-
-      <form className="card form-grid" onSubmit={submit}>
+      <form id="new-request-form" className="sub-form" onSubmit={submit}>
         {user.role !== 'client' ? (
           <label>
             Client
@@ -155,16 +162,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
         />
 
         {error ? <p className="error">{error}</p> : null}
-
-        <div className="form-actions">
-          <Link to="/" className="btn ghost">
-            Cancel
-          </Link>
-          <button type="submit" className="btn primary" disabled={busy}>
-            {busy ? 'Submitting…' : 'Submit request'}
-          </button>
-        </div>
       </form>
-    </div>
+    </Modal>
   );
 }
