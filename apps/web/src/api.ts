@@ -72,32 +72,73 @@ export interface CapacityReport {
   alerts: CapacityReport['entries'];
 }
 
-export interface HeroesReport {
-  period: { fy: string; kind?: string; label?: string };
-  impact: {
-    kg: number;
-    tonnes: number;
-    co2: number;
-    landfill: number;
-    trees: number;
-    water: number;
-    energy: number;
-    invoices: number;
-    submissions: number;
-  };
-  treesEarned: number;
-  treesPlanted: number;
-  outstanding: number;
-  plantings: Array<{
-    id: string;
-    trees: number;
-    plantedAt: string;
-    location: string | null;
-    note: string | null;
-    clientId: string | null;
-    progress?: Array<{ id: string; notedAt: string; photoFileId: string; note: string | null }>;
-  }>;
+export interface HeroesPlanting {
+  id: string;
+  clientId: string | null;
+  clientName: string;
+  trees: number;
+  plantedAt: string;
+  location: string | null;
+  state: string | null;
+  partner: string | null;
+  species: string | null;
+  source: 'urbeno' | 'client';
+  photoFileId: string | null;
+  progress: Array<{ id: string; notedAt: string; photoFileId: string; note: string | null }>;
 }
+
+export interface HeroesMetrics {
+  tonnes: number;
+  co2: number;
+  lifetimeTonnes: number;
+  earned: number;
+  planted: number;
+  earnedAll: number;
+  plantedAll: number;
+  byUrbeno: number;
+  byClient: number;
+  owed: number;
+  badge: number;
+  nextBadge: number;
+  toNext: number;
+  pctToNext: number;
+  badges: Array<{ n: number; unlocked: boolean }>;
+}
+
+export interface HeroesClientReport {
+  view: 'client';
+  clientName: string;
+  period: { fy: string; kind?: string; label?: string };
+  metrics: HeroesMetrics;
+  seq: { kg: number; treeDays: number; perDay: number };
+  plantings: HeroesPlanting[];
+}
+
+export interface HeroesAdminReport {
+  view: 'admin';
+  period: { fy: string; kind?: string; label?: string };
+  totals: {
+    earnedAll: number;
+    byUrbeno: number;
+    byClient: number;
+    owed: number;
+    seq: { kg: number; treeDays: number; perDay: number };
+  };
+  clients: Array<{
+    id: string;
+    name: string;
+    tonnes: number;
+    lifetimeTonnes: number;
+    earnedAll: number;
+    byUrbeno: number;
+    byClient: number;
+    owed: number;
+    badge: number;
+  }>;
+  plantings: HeroesPlanting[];
+}
+
+export type HeroesReport = HeroesClientReport | HeroesAdminReport;
 
 export interface ClientSummary {
   id: string;
@@ -487,8 +528,8 @@ export const dataApi = {
   },
   capacity: (factoryId: string) =>
     api<CapacityReport>(`/reports/capacity?factoryId=${encodeURIComponent(factoryId)}`),
-  heroes: (period?: PeriodQuery) =>
-    api<HeroesReport>(`/reports/heroes${qs(period ?? {})}`),
+  heroes: (period?: PeriodQuery, clientId?: string) =>
+    api<HeroesReport>(`/reports/heroes${qs({ ...(period ?? {}), clientId })}`),
   register: (type: RegisterType, period?: PeriodQuery, scope?: { clientId?: string; siteId?: string }) =>
     api<RegisterReport>(
       `/reports/register/${type}${qs({ ...(period ?? {}), clientId: scope?.clientId, siteId: scope?.siteId })}`,
@@ -585,8 +626,13 @@ export const dataApi = {
     trees: number;
     plantedAt: string;
     location?: string;
+    state?: string;
+    partner?: string;
+    species?: string;
     note?: string;
+    photoFileId?: string;
     clientId?: string;
+    source?: 'urbeno' | 'client';
   }) =>
     api<{ id: string }>('/reports/heroes/plantings', {
       method: 'POST',
@@ -600,6 +646,10 @@ export const dataApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  removePlanting: (plantingId: string) =>
+    api<{ ok: boolean }>(`/trees/${plantingId}`, { method: 'DELETE' }),
+  removeTreeProgress: (plantingId: string, progressId: string) =>
+    api<{ ok: boolean }>(`/trees/${plantingId}/progress/${progressId}`, { method: 'DELETE' }),
   updateClient: (
     id: string,
     body: {

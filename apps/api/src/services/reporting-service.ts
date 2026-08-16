@@ -4,6 +4,7 @@ import {
   currentFY,
   dateInPeriod,
   getPayStatus,
+  heroProgress,
   inFiscalYear,
   invStage,
   invoiceDue,
@@ -11,6 +12,7 @@ import {
   paymentTermsLabel,
   periodLabel,
   recyclingSla,
+  sequestered,
   stageLabel,
   sumPaise,
   treesEarned,
@@ -335,37 +337,125 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string) {
   };
 }
 
-export async function getHeroesReport(actor: SessionUser, period?: ReportPeriod) {
-  const impact = await getImpactReport(actor, undefined, period);
+export async function getHeroesReport(
+  actor: SessionUser,
+  period?: ReportPeriod,
+  filters?: { clientId?: string },
+) {
+  const resolved = period ?? parseReportPeriod({ period: 'fy' });
+  const periodMeta = {
+    fy: currentFY()?.label ?? '',
+    kind: resolved.kind,
+    label: periodLabel(resolved),
+  };
+
   const plantings = await prisma.treePlanting.findMany({
-    where: actor.role === 'client' && actor.clientId ? { clientId: actor.clientId } : {},
     include: { progress: { orderBy: { notedAt: 'asc' } } },
     orderBy: { plantedAt: 'desc' },
-    take: 50,
+  });
+  const clients = await prisma.client.findMany({
+    where: { active: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true },
+  });
+  const names = new Map(clients.map((c) => [c.id, c.name]));
+
+  const mapPlanting = (p: (typeof plantings)[number]) => ({
+    id: p.id,
+    clientId: p.clientId,
+    clientName: (p.clientId && names.get(p.clientId)) || '—',
+    trees: p.trees,
+    plantedAt: p.plantedAt.toISOString().slice(0, 10),
+    location: p.location,
+    state: p.state,
+    partner: p.partner,
+    species: p.species,
+    source: (p.source === 'client' ? 'client' : 'urbeno') as 'urbeno' | 'client',
+    photoFileId: p.photoIds[0] ?? null,
+    progress: p.progress.map((g) => ({
+      id: g.id,
+      notedAt: g.notedAt.toISOString().slice(0, 10),
+      photoFileId: g.photoFileId,
+      note: g.note,
+    })),
   });
 
-  const plantedTotal = plantings.reduce((s, p) => s + p.trees, 0);
+  const forClient = (clientId: string) => plantings.filter((p) => p.clientId === clientId);
+  const countSrc = (rows: typeof plantings, src?: 'urbeno' | 'client', inPeriod = false) =>
+    rows
+      .filter((p) => (!src || (p.source === 'client' ? 'client' : 'urbeno') === src) && (!inPeriod || dateInPeriod(p.plantedAt, resolved)))
+      .reduce((s, p) => s + p.trees, 0);
+
+  async function metricsFor(clientId: string) {
+    const periodImp = await impactForClient(clientId, resolved);
+    const lifeImp = await impactForClient(clientId, null);
+    const rows = forClient(clientId);
+    const earned = treesEarned(periodImp.tonnes);
+    const earnedAll = treesEarned(lifeImp.tonnes);
+    const byUrbeno = countSrc(rows, 'urbeno');
+    const byClient = countSrc(rows, 'client');
+    const progress = heroProgress(earnedAll);
+    return {
+      tonnes: periodImp.tonnes,
+      co2: periodImp.co2,
+      lifetimeTonnes: lifeImp.tonnes,
+      earned,
+      planted: countSrc(rows, undefined, true),
+      earnedAll,
+      plantedAll: byUrbeno + byClient,
+      byUrbeno,
+      byClient,
+      owed: Math.max(0, earnedAll - byUrbeno),
+      ...progress,
+    };
+  }
+
+  if (actor.role === 'client') {
+    if (!actor.clientId) throw new AppError('No organisation is linked to this account.');
+    const client = await prisma.client.findUnique({ where: { id: actor.clientId }, select: { name: true } });
+    const rows = forClient(actor.clientId);
+    const metrics = await metricsFor(actor.clientId);
+    return {
+      view: 'client' as const,
+      clientName: client?.name ?? 'Your organisation',
+      period: periodMeta,
+      metrics,
+      seq: sequestered(rows),
+      plantings: rows.map(mapPlanting),
+    };
+  }
+
+  const clientRows = [];
+  for (const c of clients) {
+    const m = await metricsFor(c.id);
+    clientRows.push({
+      id: c.id,
+      name: c.name,
+      tonnes: m.tonnes,
+      lifetimeTonnes: m.lifetimeTonnes,
+      earnedAll: m.earnedAll,
+      byUrbeno: m.byUrbeno,
+      byClient: m.byClient,
+      owed: m.owed,
+      badge: m.badge,
+    });
+  }
+
+  const ledgerId = filters?.clientId;
+  const ledger = ledgerId ? plantings.filter((p) => p.clientId === ledgerId) : plantings;
 
   return {
-    period: impact.period,
-    impact: impact.impact,
-    treesEarned: impact.treesEarned,
-    treesPlanted: plantedTotal,
-    outstanding: Math.max(0, impact.treesEarned - plantedTotal),
-    plantings: plantings.map((p) => ({
-      id: p.id,
-      trees: p.trees,
-      plantedAt: p.plantedAt.toISOString().slice(0, 10),
-      location: p.location,
-      note: p.note,
-      clientId: p.clientId,
-      progress: p.progress.map((g) => ({
-        id: g.id,
-        notedAt: g.notedAt.toISOString().slice(0, 10),
-        photoFileId: g.photoFileId,
-        note: g.note,
-      })),
-    })),
+    view: 'admin' as const,
+    period: periodMeta,
+    totals: {
+      earnedAll: clientRows.reduce((s, r) => s + r.earnedAll, 0),
+      byUrbeno: clientRows.reduce((s, r) => s + r.byUrbeno, 0),
+      byClient: clientRows.reduce((s, r) => s + r.byClient, 0),
+      owed: clientRows.reduce((s, r) => s + r.owed, 0),
+      seq: sequestered(plantings),
+    },
+    clients: clientRows,
+    plantings: ledger.map(mapPlanting),
   };
 }
 
@@ -695,6 +785,9 @@ export async function getRegisterReport(
         .filter((p) => p.clientId === c.id && dateInPeriod(p.plantedAt, resolved))
         .reduce((s, p) => s + p.trees, 0);
       const plantedAll = plantings.filter((p) => p.clientId === c.id).reduce((s, p) => s + p.trees, 0);
+      const byUrbeno = plantings
+        .filter((p) => p.clientId === c.id && p.source !== 'client')
+        .reduce((s, p) => s + p.trees, 0);
       const badge = Math.floor(earnedAll / HERO_MILESTONE) * HERO_MILESTONE;
       rows.push([
         c.name,
@@ -704,7 +797,7 @@ export async function getRegisterReport(
         Number(lifeImp.tonnes.toFixed(3)),
         earnedAll,
         plantedAll,
-        Math.max(0, earnedAll - plantedAll),
+        Math.max(0, earnedAll - byUrbeno),
         badge || '',
       ]);
     }

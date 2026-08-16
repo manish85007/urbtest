@@ -24,6 +24,13 @@ test.describe('smoke', () => {
     await expect(page.getByRole('button', { name: /Export CSV/ })).toBeVisible();
   });
 
+  test('admin can open recycle heroes', async ({ page }) => {
+    await login(page, 'admin@urbeno.in');
+    await page.getByRole('link', { name: 'Recycle Heroes' }).click();
+    await expect(page.locator('.h1', { hasText: 'Recycle Heroes' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Record Planting/ })).toBeVisible();
+  });
+
   test('factory user can sign in and view requests', async ({ page }) => {
     await login(page, 'blr@urbeno.in');
     await page.getByRole('link', { name: 'Requests' }).click();

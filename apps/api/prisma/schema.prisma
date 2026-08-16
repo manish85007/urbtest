@@ -525,6 +525,11 @@ model TreePlanting {
   trees       Int
   plantedAt   DateTime @map("planted_at") @db.Date
   location    String?
+  state       String?
+  partner     String?
+  species     String?
+  /// urbeno = planted against tonnage; client = client's own CSR drive
+  source      String   @default("urbeno")
   photoIds    String[] @default([]) @map("photo_ids")
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")

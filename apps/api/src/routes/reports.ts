@@ -10,7 +10,7 @@ import {
   REGISTER_KINDS,
   type RegisterType,
 } from '../services/reporting-service.js';
-import { recordTreePlanting, recordTreeProgress } from '../services/tree-planting.js';
+import { recordTreePlanting, recordTreeProgress, removeTreePlanting, removeTreeProgress } from '../services/tree-planting.js';
 import { form6Pdf, impactPdf, methodologyPdf, mrnPdf, registerPdf } from '../services/pdf.js';
 import { isAppError } from '../lib/errors.js';
 
@@ -50,7 +50,10 @@ export async function reportsRoutes(app: FastifyInstance) {
   });
 
   app.get('/reports/heroes', { preHandler: requireAuth }, async (request) => {
-    return getHeroesReport(request.user!, periodFromQuery(request.query as Record<string, unknown>));
+    const q = request.query as { clientId?: string };
+    return getHeroesReport(request.user!, periodFromQuery(request.query as Record<string, unknown>), {
+      clientId: q.clientId,
+    });
   });
 
   app.get('/reports/register/:type', { preHandler: requireAuth }, async (request, reply) => {
@@ -99,8 +102,13 @@ export async function reportsRoutes(app: FastifyInstance) {
         trees: z.number().int().positive(),
         plantedAt: z.string(),
         location: z.string().optional(),
+        state: z.string().optional(),
+        partner: z.string().optional(),
+        species: z.string().optional(),
         note: z.string().optional(),
+        photoFileId: z.string().optional(),
         clientId: z.string().length(4).optional(),
+        source: z.enum(['urbeno', 'client']).optional(),
       })
       .parse(request.body);
     try {
@@ -121,6 +129,24 @@ export async function reportsRoutes(app: FastifyInstance) {
       .parse(request.body);
     try {
       return await recordTreeProgress(request.user!, id, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.delete('/trees/:id/progress/:progressId', { preHandler: requireAuth }, async (request, reply) => {
+    const { id, progressId } = request.params as { id: string; progressId: string };
+    try {
+      return await removeTreeProgress(request.user!, id, progressId);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.delete('/trees/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      return await removeTreePlanting(request.user!, id);
     } catch (err) {
       return handleErr(err, reply);
     }

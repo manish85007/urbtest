@@ -3,9 +3,11 @@ export const SUSTAINABILITY = {
   co2PerKg: 1.44,
   landfillRatio: 0.92,
   co2PerTree: 22,
+  co2PerTreeDay: 22 / 365,
   waterPerKg: 0.61,
   energyPerKg: 2.3,
   treesPerTonne: 1,
+  heroMilestone: 10,
   cite: {
     co2: 'US EPA WARM model v16 (2023), mixed-electronics pathway',
     landfill: 'R2v3 downstream recovery tracking, industry average',
@@ -44,4 +46,59 @@ export function computeImpact(kg: number, invoiceCount: number, submissionCount:
 
 export function treesEarned(tonnes: number): number {
   return Math.floor(tonnes * SUSTAINABILITY.treesPerTonne);
+}
+
+export interface Sequestered {
+  kg: number;
+  treeDays: number;
+  perDay: number;
+}
+
+/** CO₂ actually sequestered so far — accrues daily from each planting date. */
+export function sequestered(
+  plantings: Array<{ trees: number; plantedAt: Date | string }>,
+  asOf = new Date(),
+): Sequestered {
+  let kg = 0;
+  let treeDays = 0;
+  let standing = 0;
+  for (const t of plantings) {
+    const planted = t.plantedAt instanceof Date ? t.plantedAt : new Date(t.plantedAt);
+    const days = Math.max(0, Math.floor((asOf.getTime() - planted.getTime()) / 86_400_000));
+    treeDays += days * t.trees;
+    kg += days * t.trees * SUSTAINABILITY.co2PerTreeDay;
+    standing += t.trees;
+  }
+  return { kg, treeDays, perDay: standing * SUSTAINABILITY.co2PerTreeDay };
+}
+
+export interface HeroBadge {
+  n: number;
+  unlocked: boolean;
+}
+
+export interface HeroProgress {
+  badge: number;
+  nextBadge: number;
+  toNext: number;
+  pctToNext: number;
+  badges: HeroBadge[];
+}
+
+/** Milestone badges every `heroMilestone` trees, based on lifetime trees earned. */
+export function heroProgress(earnedAll: number): HeroProgress {
+  const m = SUSTAINABILITY.heroMilestone;
+  const badge = Math.floor(earnedAll / m) * m;
+  const nextBadge = badge + m;
+  const count = Math.min(8, Math.max(5, Math.floor(earnedAll / m) + 3));
+  return {
+    badge,
+    nextBadge,
+    toNext: Math.max(0, nextBadge - earnedAll),
+    pctToNext: ((earnedAll % m) / m) * 100,
+    badges: Array.from({ length: count }, (_, i) => ({
+      n: (i + 1) * m,
+      unlocked: earnedAll >= (i + 1) * m,
+    })),
+  };
 }

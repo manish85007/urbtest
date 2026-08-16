@@ -390,14 +390,55 @@ async function main() {
 
   await prisma.treePlanting.upsert({
     where: { id: 'seed-plant-1' },
-    update: {},
+    update: {
+      trees: 5,
+      plantedAt: new Date('2025-12-15'),
+      location: 'Hesaraghatta',
+      state: 'Karnataka',
+      partner: 'Say Trees Foundation',
+      species: 'Ficus religiosa, Neem',
+      source: 'urbeno',
+    },
     create: {
       id: 'seed-plant-1',
       clientId: 'TCPL',
       trees: 5,
-      plantedAt: new Date('2026-06-15'),
-      location: 'Embassy Tech Village campus',
-      note: 'Demo planting record',
+      plantedAt: new Date('2025-12-15'),
+      location: 'Hesaraghatta',
+      state: 'Karnataka',
+      partner: 'Say Trees Foundation',
+      species: 'Ficus religiosa, Neem',
+      source: 'urbeno',
+    },
+  });
+  await prisma.treePlanting.upsert({
+    where: { id: 'seed-plant-2' },
+    update: {},
+    create: {
+      id: 'seed-plant-2',
+      clientId: 'TCPL',
+      trees: 8,
+      plantedAt: new Date('2026-03-20'),
+      location: 'Kanakapura Road',
+      state: 'Karnataka',
+      partner: 'Say Trees Foundation',
+      species: 'Neem, Pongamia',
+      source: 'urbeno',
+    },
+  });
+  await prisma.treePlanting.upsert({
+    where: { id: 'seed-plant-3' },
+    update: {},
+    create: {
+      id: 'seed-plant-3',
+      clientId: 'TCPL',
+      trees: 25,
+      plantedAt: new Date('2026-06-05'),
+      location: 'Nandi Hills foothills',
+      state: 'Karnataka',
+      partner: 'TechCorp CSR — World Environment Day drive',
+      species: 'Mixed native',
+      source: 'client',
     },
   });
 

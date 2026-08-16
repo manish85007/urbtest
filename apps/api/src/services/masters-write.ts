@@ -287,6 +287,7 @@ export async function getClientDetail(clientId: string) {
   const kg = Number(closedAgg._sum.billingWeight ?? 0);
   const tonnes = kg / 1000;
   const earned = treesEarned(tonnes);
+  const byUrbeno = plantings.filter((p) => p.source !== 'client').reduce((s, p) => s + p.trees, 0);
   const planted = plantings.reduce((s, p) => s + p.trees, 0);
 
   return {
@@ -297,7 +298,7 @@ export async function getClientDetail(clientId: string) {
       tonnes,
       treesEarned: earned,
       treesPlanted: planted,
-      treesOwed: Math.max(0, earned - planted),
+      treesOwed: Math.max(0, earned - byUrbeno),
     },
     plantings: plantings.map((p) => ({
       id: p.id,
