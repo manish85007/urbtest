@@ -7,6 +7,9 @@ import { submissionRoutes } from './routes/submissions.js';
 import { lifecycleRoutes } from './routes/lifecycle.js';
 import { mastersRoutes } from './routes/masters.js';
 import { filesRoutes } from './routes/files.js';
+import { emailsRoutes } from './routes/emails.js';
+import { adminRoutes } from './routes/admin.js';
+import { startScheduler } from './jobs/scheduler.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -31,6 +34,12 @@ export async function buildApp() {
   await app.register(lifecycleRoutes);
   await app.register(mastersRoutes);
   await app.register(filesRoutes);
+  await app.register(emailsRoutes);
+  await app.register(adminRoutes);
+
+  if (process.env.ENABLE_JOBS !== 'false') {
+    startScheduler(app);
+  }
 
   return app;
 }

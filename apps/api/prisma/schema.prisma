@@ -426,6 +426,40 @@ model Notification {
   @@map("notifications")
 }
 
+enum EmailStatus {
+  queued
+  sent
+  failed
+}
+
+model EmailOutbox {
+  id           String      @id @default(cuid())
+  templateKey  String      @map("template_key")
+  templateName String?     @map("template_name")
+  to           String[]
+  subject      String
+  body         String
+  status       EmailStatus @default(queued)
+  vars         Json        @default("{}")
+  attachments  Json        @default("[]")
+  error        String?
+  attempts     Int         @default(0)
+  sentAt       DateTime?   @map("sent_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("email_outbox")
+}
+
+model ReminderLog {
+  key       String   @id
+  lastRun   DateTime @map("last_run") @db.Date
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("reminder_log")
+}
+
 model EmailTemplate {
   id        String   @id @default(cuid())
   key       String?  @unique

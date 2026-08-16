@@ -149,6 +149,37 @@ async function main() {
     });
   }
 
+  const emailTemplates = JSON.parse(
+    readFileSync(join(here, 'data/email-templates-seed.json'), 'utf8'),
+  ) as Array<{
+    key: string;
+    name: string;
+    subject: string;
+    body: string;
+    variables: string[];
+  }>;
+
+  for (const t of emailTemplates) {
+    await prisma.emailTemplate.upsert({
+      where: { key: t.key },
+      update: {
+        name: t.name,
+        subject: t.subject,
+        body: t.body,
+        variables: t.variables,
+        editable: false,
+      },
+      create: {
+        key: t.key,
+        name: t.name,
+        subject: t.subject,
+        body: t.body,
+        variables: t.variables,
+        editable: false,
+      },
+    });
+  }
+
   // Demo submissions for development / UAT
   await prisma.submission.upsert({
     where: { id: 'REQ-00046' },
@@ -293,7 +324,7 @@ async function main() {
   });
 
   console.log(
-    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, 3 demo requests`,
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, 3 demo requests`,
   );
 }
 

@@ -87,6 +87,8 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
     approx_qty: input.approxQty ?? 0,
     raised_by: actor.name,
     raised_email: actor.email,
+    site_contact: site.contactName ?? client.contact ?? '—',
+    site_phone: site.contactPhone ?? client.phone ?? '—',
     notes: input.notes || '(none)',
   });
 
