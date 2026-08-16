@@ -1,14 +1,37 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { authApi, type SessionUser } from './api';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { RequestsListPage } from './pages/RequestsListPage';
 import { NewRequestPage } from './pages/NewRequestPage';
 import { SubmissionDetailPage } from './pages/SubmissionDetailPage';
 import { LegalPage } from './pages/LegalPage';
 import { AuditPage } from './pages/AuditPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { ImpactPage } from './pages/ImpactPage';
+import { HeroesPage } from './pages/HeroesPage';
+import { CapacityPage } from './pages/CapacityPage';
+import { MastersPage } from './pages/MastersPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { Shell } from './components/Shell';
 import { LegalConsentGate } from './components/LegalConsentGate';
+
+function StaffOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
+  if (user.role === 'client') return <Navigate to="/" replace />;
+  return children;
+}
+
+function AdminOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
+  if (user.role !== 'admin') return <Navigate to="/" replace />;
+  return children;
+}
+
+function ClientOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
+  if (user.role !== 'client') return <Navigate to="/" replace />;
+  return children;
+}
 
 export function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -62,10 +85,45 @@ export function App() {
     <Shell user={user} onLogout={() => setUser(null)}>
       <Routes>
         <Route path="/" element={<DashboardPage user={user} />} />
+        <Route path="/requests" element={<RequestsListPage user={user} />} />
         <Route path="/requests/new" element={<NewRequestPage user={user} />} />
         <Route path="/requests/:id" element={<SubmissionDetailPage user={user} />} />
+        <Route path="/reports" element={<ReportsPage user={user} />} />
+        <Route path="/heroes" element={<HeroesPage user={user} />} />
+        <Route
+          path="/impact"
+          element={
+            <ClientOnly user={user}>
+              <ImpactPage />
+            </ClientOnly>
+          }
+        />
+        <Route
+          path="/capacity"
+          element={
+            <StaffOnly user={user}>
+              <CapacityPage user={user} />
+            </StaffOnly>
+          }
+        />
+        <Route
+          path="/masters"
+          element={
+            <AdminOnly user={user}>
+              <MastersPage />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="/audit"
+          element={
+            <AdminOnly user={user}>
+              <AuditPage />
+            </AdminOnly>
+          }
+        />
+        <Route path="/profile" element={<ProfilePage user={user} />} />
         <Route path="/legal/:key" element={<LegalPage />} />
-        {user.role === 'admin' ? <Route path="/audit" element={<AuditPage />} /> : null}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

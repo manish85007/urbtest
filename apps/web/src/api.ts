@@ -19,6 +19,60 @@ export interface SessionUser {
   name: string;
   role: 'admin' | 'factory' | 'client';
   clientId: string | null;
+  factoryIds?: string[];
+  siteIds?: string[];
+}
+
+export type RegisterType = 'summary' | 'invoices' | 'mrn' | 'form6' | 'cod';
+
+export interface CapacityReport {
+  factoryId: string;
+  fy: string;
+  stats: {
+    authorized: number;
+    processed: number;
+    utilization: number;
+    atRisk: number;
+  };
+  entries: Array<{
+    entryId: string;
+    description: string;
+    groupCode: string;
+    activity: string;
+    capacityTpa: string;
+    usedKg: number;
+    capKg: number;
+    pct: number;
+    atRisk: boolean;
+    exceeded: boolean;
+  }>;
+  alerts: CapacityReport['entries'];
+}
+
+export interface HeroesReport {
+  period: { fy: string };
+  impact: {
+    kg: number;
+    tonnes: number;
+    co2: number;
+    landfill: number;
+    trees: number;
+    water: number;
+    energy: number;
+    invoices: number;
+    submissions: number;
+  };
+  treesEarned: number;
+  treesPlanted: number;
+  outstanding: number;
+  plantings: Array<{
+    id: string;
+    trees: number;
+    plantedAt: string;
+    location: string | null;
+    note: string | null;
+    clientId: string | null;
+  }>;
 }
 
 export interface ClientSummary {
@@ -225,14 +279,31 @@ export const dataApi = {
     api<CategorySummary[]>(`/factories/${factoryId}/categories`),
   reportsDashboard: (siteId?: string) =>
     api<DashboardReport>(siteId ? `/reports/dashboard?siteId=${siteId}` : '/reports/dashboard'),
-  auditLog: (limit = 50) => api<Array<{
-    id: string;
-    ts: string;
-    actorEmail: string;
-    action: string;
-    entity: string;
-    entityId: string | null;
-  }>>(`/audit?limit=${limit}`),
+  auditLog: (limit = 50, q?: string, entity?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (q) params.set('q', q);
+    if (entity) params.set('entity', entity);
+    return api<Array<{
+      id: string;
+      ts: string;
+      actorEmail: string;
+      action: string;
+      entity: string;
+      entityId: string | null;
+    }>>(`/audit?${params}`);
+  },
+  capacity: (factoryId: string) =>
+    api<CapacityReport>(`/reports/capacity?factoryId=${encodeURIComponent(factoryId)}`),
+  heroes: () => api<HeroesReport>('/reports/heroes'),
+  register: (type: RegisterType) =>
+    api<Record<string, unknown>[]>(`/reports/register/${type}`),
+};
+
+export const emailsApi = {
+  outbox: (limit = 50) =>
+    api<Array<{ id: string; subject: string; status: string; createdAt: string; to: string[] }>>(
+      `/emails/outbox?limit=${limit}`,
+    ),
 };
 
 export const filesApi = {

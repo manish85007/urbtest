@@ -77,7 +77,12 @@ function StaffDashboard({ report, subs }: { report: StaffDashboardReport; subs: 
           ) : null}
 
           <section className="card">
-            <h2>Active requests</h2>
+            <div className="card-hd-row">
+              <h2>Active requests</h2>
+              <Link to="/requests" className="muted">
+                View all →
+              </Link>
+            </div>
             {subs.length === 0 ? (
               <p className="muted">No open requests.</p>
             ) : (

@@ -55,7 +55,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   return (
     <div>
       <p className="muted">
-        <Link to="/">← Dashboard</Link>
+        <Link to="/requests">← Requests</Link>
       </p>
       <div className="f-row">
         <h1 className="h1">{sub.id}</h1>
@@ -107,6 +107,12 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               Acknowledge
             </button>
           </div>
+          <RejectForm
+            disabled={busy}
+            onReject={(reason) =>
+              act(() => lifecycleApi.reject(sub.id, reason), 'Changes requested from client.')
+            }
+          />
         </section>
       ) : null}
 
@@ -186,6 +192,51 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         </section>
       ) : null}
     </div>
+  );
+}
+
+function RejectForm({
+  disabled,
+  onReject,
+}: {
+  disabled: boolean;
+  onReject: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button type="button" className="btn ghost" disabled={disabled} onClick={() => setOpen(true)}>
+        Request changes
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className="sub-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onReject(reason);
+        setOpen(false);
+        setReason('');
+      }}
+    >
+      <h3>Request changes</h3>
+      <label>
+        Note to client
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} required rows={3} />
+      </label>
+      <div className="form-actions">
+        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+        <button type="submit" className="btn secondary" disabled={disabled || !reason.trim()}>
+          Send back to client
+        </button>
+      </div>
+    </form>
   );
 }
 

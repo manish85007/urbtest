@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authApi, type SessionUser } from '../api';
+import { navItems } from '../lib/nav';
 
 interface ShellProps {
   user: SessionUser;
@@ -10,10 +11,19 @@ interface ShellProps {
 
 export function Shell({ user, onLogout, children }: ShellProps) {
   const loc = useLocation();
+  const items = navItems(user.role);
 
   async function logout() {
-    await authApi.logout();
-    onLogout();
+    try {
+      await authApi.logout();
+    } finally {
+      onLogout();
+    }
+  }
+
+  function isActive(item: (typeof items)[number]) {
+    if (item.match) return item.match(loc.pathname);
+    return loc.pathname === item.to || loc.pathname.startsWith(`${item.to}/`);
   }
 
   return (
@@ -27,21 +37,17 @@ export function Shell({ user, onLogout, children }: ShellProps) {
           </div>
         </Link>
         <nav className="nav">
-          <Link to="/" className={loc.pathname === '/' ? 'on' : ''}>
-            Dashboard
-          </Link>
-          <Link to="/requests/new" className={loc.pathname === '/requests/new' ? 'on' : ''}>
-            New request
-          </Link>
-          {user.role === 'admin' ? (
-            <Link to="/audit" className={loc.pathname === '/audit' ? 'on' : ''}>
-              Audit
+          {items.map((item) => (
+            <Link key={item.to} to={item.to} className={isActive(item) ? 'on' : ''}>
+              {item.label}
             </Link>
-          ) : null}
+          ))}
         </nav>
         <div className="user-chip">
-          <span className="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
-          <span>{user.name}</span>
+          <Link to="/profile" className="avatar-link" title="My profile">
+            <span className="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
+            <span>{user.name}</span>
+          </Link>
           <button type="button" className="btn ghost" onClick={logout}>
             Sign out
           </button>
