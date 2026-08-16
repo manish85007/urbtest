@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { attachSession, requireAuth, requireStaff } from '../middleware/session.js';
 import { clientScopeFilter } from '../lib/auth-context.js';
+import { redactSubmissionForActor } from '../lib/access.js';
 import { submissionInclude } from '../lib/db-helpers.js';
 import { deriveInvoiceStage, deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 
@@ -52,7 +53,7 @@ export async function submissionRoutes(app: FastifyInstance) {
 
     if (!sub) return reply.notFound('Request not found');
 
-    return withDerivedStages(sub);
+    return redactSubmissionForActor(withDerivedStages(sub), request.user!);
   });
 
   app.get('/health/dashboard', { preHandler: requireStaff }, async () => {

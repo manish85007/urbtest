@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { dataApi, lifecycleApi, type SessionUser } from '../api';
+import { FileUpload } from '../components/FileUpload';
 
 export function NewRequestPage({ user }: { user: SessionUser }) {
   const nav = useNavigate();
@@ -13,6 +14,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   const [approxWeight, setApproxWeight] = useState('');
   const [approxQty, setApproxQty] = useState('');
   const [notes, setNotes] = useState('');
+  const [bomFileId, setBomFileId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -45,6 +47,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
         approxWeight: approxWeight ? Number(approxWeight) : undefined,
         approxQty: approxQty ? Number(approxQty) : undefined,
         notes: notes || undefined,
+        bomFileId: bomFileId || undefined,
       });
       nav(`/requests/${sub.id}`);
     } catch (err) {
@@ -111,6 +114,16 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
           Notes
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </label>
+
+        <FileUpload
+          kind="bom"
+          label="Bill of materials"
+          hint="CSV, Excel or PDF listing line items"
+          accept=".csv,.xls,.xlsx,application/pdf,text/csv"
+          disabled={busy}
+          value={bomFileId ? [bomFileId] : []}
+          onChange={(ids) => setBomFileId(ids[0] ?? '')}
+        />
 
         {error ? <p className="error">{error}</p> : null}
 

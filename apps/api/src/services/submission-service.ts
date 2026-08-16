@@ -182,6 +182,7 @@ export interface UpdateSubmissionInput {
   approxWeight?: number;
   notes?: string;
   ref?: string;
+  bomFileId?: string | null;
 }
 
 export async function updateSubmission(
@@ -214,6 +215,7 @@ export async function updateSubmission(
       approxWeight: input.approxWeight,
       notes: input.notes !== undefined ? input.notes.trim() || null : undefined,
       ref: input.ref !== undefined ? input.ref.trim() || null : undefined,
+      bomFileId: input.bomFileId !== undefined ? input.bomFileId : undefined,
       rejectNote: actor.role === 'client' ? null : undefined,
       rejectAt: actor.role === 'client' ? null : undefined,
     },

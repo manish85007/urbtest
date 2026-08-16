@@ -163,6 +163,7 @@ model Submission {
   site         Site      @relation(fields: [siteId], references: [id])
   vehicles     Vehicle[]
   invoices     Invoice[]
+  queries      RequestQuery[]
 
   @@map("submissions")
 }
@@ -523,7 +524,67 @@ model TreePlanting {
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")
 
+  progress    TreeProgress[]
+
   @@map("tree_plantings")
+}
+
+model TreeProgress {
+  id          String   @id @default(cuid())
+  plantingId  String   @map("planting_id")
+  notedAt     DateTime @map("noted_at") @db.Date
+  photoFileId String   @map("photo_file_id")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  planting    TreePlanting @relation(fields: [plantingId], references: [id], onDelete: Cascade)
+
+  @@index([plantingId])
+  @@map("tree_progress")
+}
+
+model RequestQuery {
+  id           String   @id @default(cuid())
+  submissionId String   @map("submission_id") @db.VarChar(16)
+  fromRole     String   @map("from_role")
+  authorName   String   @map("author_name")
+  authorEmail  String   @map("author_email")
+  stage        Int
+  text         String
+  status       String   @default("open")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  submission   Submission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  replies      QueryReply[]
+
+  @@index([submissionId])
+  @@map("queries")
+}
+
+model QueryReply {
+  id          String   @id @default(cuid())
+  queryId     String   @map("query_id")
+  authorName  String   @map("author_name")
+  authorEmail String   @map("author_email")
+  text        String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  query       RequestQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@index([queryId])
+  @@map("query_replies")
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  email     String
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("password_resets")
 }
 
 model IdSequence {

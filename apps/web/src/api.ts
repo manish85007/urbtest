@@ -54,7 +54,7 @@ export interface CapacityReport {
 }
 
 export interface HeroesReport {
-  period: { fy: string };
+  period: { fy: string; kind?: string; label?: string };
   impact: {
     kg: number;
     tonnes: number;
@@ -76,6 +76,7 @@ export interface HeroesReport {
     location: string | null;
     note: string | null;
     clientId: string | null;
+    progress?: Array<{ id: string; notedAt: string; photoFileId: string; note: string | null }>;
   }>;
 }
 
@@ -121,6 +122,28 @@ export interface SubmissionSummary {
   netKg?: number;
 }
 
+export interface QueryThread {
+  id: string;
+  fromRole: string;
+  authorName: string;
+  authorEmail: string;
+  stage: number;
+  text: string;
+  status: string;
+  createdAt: string;
+  replies: Array<{ id: string; authorName: string; text: string; createdAt: string }>;
+}
+
+export interface SerialRow {
+  id: string;
+  serialNo: string;
+  assetTag: string | null;
+  make: string | null;
+  model: string | null;
+  dcodNo: string | null;
+  destroyStd: string | null;
+}
+
 export interface VehicleDetail {
   id: string;
   registration: string;
@@ -145,7 +168,12 @@ export interface InvoiceDetail {
   derivedStage: number;
   closedAt: string | null;
   mrn: { mrnNo: string; factoryId: string; receivedAt?: string } | null;
-  recycling: { form6No: string; processedAt?: string } | null;
+  recycling: {
+    form6No: string;
+    processedAt?: string;
+    serials?: SerialRow[];
+    serialFileId?: string | null;
+  } | null;
   certificates: Array<{
     certNo: string;
     certDate?: string;
@@ -166,6 +194,7 @@ export interface SubmissionDetail {
   approxQty: number;
   approxWeight: string;
   notes: string | null;
+  bomFileId?: string | null;
   rejectNote?: string | null;
   rejectAt?: string | null;
   createdBy: string;
@@ -175,6 +204,7 @@ export interface SubmissionDetail {
   site: { id: string; name: string; code: string };
   vehicles: VehicleDetail[];
   invoices: InvoiceDetail[];
+  queries?: QueryThread[];
 }
 
 export interface QueueItem {
@@ -230,7 +260,7 @@ export interface StaffDashboardReport {
 
 export interface ClientDashboardReport {
   kind: 'client';
-  period: { fy: string };
+  period: { fy: string; kind?: string; label?: string };
   impact: {
     kg: number;
     tonnes: number;
@@ -276,7 +306,34 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
+  requestReset: (email: string) =>
+    api<{ sent: true; demoCode?: string | null }>('/auth/reset/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  confirmReset: (email: string, code: string, newPassword: string) =>
+    api<{ ok: boolean }>('/auth/reset', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, newPassword }),
+    }),
 };
+
+export type PeriodQuery = {
+  period?: string;
+  fy?: string;
+  year?: string;
+  from?: string;
+  to?: string;
+};
+
+function qs(params: Record<string, string | undefined>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) p.set(k, v);
+  }
+  const s = p.toString();
+  return s ? `?${s}` : '';
+}
 
 export const legalApi = {
   list: () =>
@@ -299,8 +356,10 @@ export const dataApi = {
   factories: () => api<FactorySummary[]>('/factories'),
   categories: (factoryId: string) =>
     api<CategorySummary[]>(`/factories/${factoryId}/categories`),
-  reportsDashboard: (siteId?: string) =>
-    api<DashboardReport>(siteId ? `/reports/dashboard?siteId=${siteId}` : '/reports/dashboard'),
+  reportsDashboard: (siteId?: string, period?: PeriodQuery) =>
+    api<DashboardReport>(
+      `/reports/dashboard${qs({ siteId, ...(period ?? {}) })}`,
+    ),
   auditLog: (limit = 50, q?: string, entity?: string) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (q) params.set('q', q);
@@ -316,11 +375,12 @@ export const dataApi = {
   },
   capacity: (factoryId: string) =>
     api<CapacityReport>(`/reports/capacity?factoryId=${encodeURIComponent(factoryId)}`),
-  heroes: () => api<HeroesReport>('/reports/heroes'),
-  register: (type: RegisterType) =>
-    api<Record<string, unknown>[]>(`/reports/register/${type}`),
+  heroes: (period?: PeriodQuery) =>
+    api<HeroesReport>(`/reports/heroes${qs(period ?? {})}`),
+  register: (type: RegisterType, period?: PeriodQuery) =>
+    api<Record<string, unknown>[]>(`/reports/register/${type}${qs(period ?? {})}`),
   lookups: (category: string) =>
-    api<Array<{ id: string; category: string; label: string; active: boolean }>>(
+    api<Array<{ id: string; category: string; label: string; active: boolean; rate?: number; description?: string }>>(
       `/lookups/${category}`,
     ),
   search: (q: string) =>
@@ -393,6 +453,29 @@ export const dataApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  addTreeProgress: (
+    plantingId: string,
+    body: { notedAt: string; photoFileId: string; note?: string },
+  ) =>
+    api<{ id: string }>(`/trees/${plantingId}/progress`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateClient: (
+    id: string,
+    body: { name?: string; city?: string; payTermsDays?: number; active?: boolean },
+  ) => api<unknown>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  updateSite: (id: string, body: { active?: boolean; name?: string }) =>
+    api<unknown>(`/sites/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  upsertFactory: (body: { id: string; name: string; address?: string; gstin?: string }) =>
+    api<unknown>('/factories', { method: 'POST', body: JSON.stringify(body) }),
+  upsertCategory: (body: {
+    factoryId: string;
+    entryId: string;
+    description: string;
+    groupCode: string;
+    capacityTpa: number;
+  }) => api<unknown>('/categories', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const adminApi = {
@@ -409,6 +492,26 @@ export const emailsApi = {
     api<Array<{ id: string; subject: string; status: string; createdAt: string; to: string[] }>>(
       `/emails/outbox?limit=${limit}`,
     ),
+  templates: () =>
+    api<
+      Array<{
+        id: string;
+        key: string | null;
+        name: string;
+        subject: string;
+        body: string;
+        editable: boolean;
+      }>
+    >('/email-templates'),
+  createTemplate: (body: { key: string; name: string; subject: string; body: string }) =>
+    api<unknown>('/email-templates', { method: 'POST', body: JSON.stringify(body) }),
+  updateTemplate: (key: string, body: { name?: string; subject?: string; body?: string }) =>
+    api<unknown>(`/email-templates/${key}`, { method: 'PUT', body: JSON.stringify(body) }),
+  sendCampaign: (key: string, to: string[]) =>
+    api<{ queued: boolean }>(`/email-templates/${key}/campaign`, {
+      method: 'POST',
+      body: JSON.stringify({ to }),
+    }),
 };
 
 export const filesApi = {
@@ -434,6 +537,7 @@ export const filesApi = {
     }>;
   },
   url: (id: string) => `${base}/files/${id}`,
+  pdf: (path: string) => `${base}${path}`,
 };
 
 export const lifecycleApi = {
@@ -446,6 +550,7 @@ export const lifecycleApi = {
     approxWeight?: number;
     notes?: string;
     ref?: string;
+    bomFileId?: string;
   }) => api<SubmissionDetail>('/submissions', { method: 'POST', body: JSON.stringify(body) }),
 
   acknowledge: (id: string) =>
@@ -465,6 +570,7 @@ export const lifecycleApi = {
       approxWeight?: number;
       notes?: string;
       ref?: string;
+      bomFileId?: string | null;
     },
   ) =>
     api<SubmissionDetail>(`/submissions/${id}`, {
@@ -517,6 +623,9 @@ export const lifecycleApi = {
       vehicleIds?: string[];
       billingWeight?: number;
       deviationNote?: string;
+      taxRatePct?: number;
+      invoiceFileId?: string;
+      ewayFileId?: string;
     },
   ) =>
     api<SubmissionDetail>(`/submissions/${submissionId}/invoices`, {
@@ -572,5 +681,29 @@ export const lifecycleApi = {
     api<unknown>(`/invoices/${invoiceId}/close`, {
       method: 'POST',
       body: JSON.stringify(body ?? {}),
+    }),
+
+  raiseQuery: (submissionId: string, text: string) =>
+    api<QueryThread>(`/submissions/${submissionId}/queries`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  replyQuery: (queryId: string, text: string) =>
+    api<unknown>(`/queries/${queryId}/replies`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  importSerials: (invoiceId: string, body: { csv?: string; serialFileId?: string }) =>
+    api<SerialRow[]>(`/invoices/${invoiceId}/serials`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  destroySerials: (invoiceId: string, body: { serialNos?: 'all' | string[]; std: string; method?: string }) =>
+    api<{ destroyed: number }>(`/invoices/${invoiceId}/serials/destroy`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
 };

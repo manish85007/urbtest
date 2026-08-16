@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { formatINR, stageLabel } from '@urb-tectrack/shared';
 import {
   dataApi,
+  filesApi,
   lifecycleApi,
   type InvoiceDetail,
   type SessionUser,
@@ -37,10 +38,22 @@ export function InvoiceLifecyclePanel({ invoice, user, disabled, onAction }: Inv
       </div>
 
       {invoice.mrn ? (
-        <p className="muted sm">MRN: {invoice.mrn.mrnNo}</p>
+        <p className="muted sm">
+          MRN: {invoice.mrn.mrnNo}{' '}
+          {user.role !== 'client' ? (
+            <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
+              Download MRN
+            </a>
+          ) : null}
+        </p>
       ) : null}
       {invoice.recycling ? (
-        <p className="muted sm">Form 6: {invoice.recycling.form6No}</p>
+        <p className="muted sm">
+          Form 6: {invoice.recycling.form6No}{' '}
+          <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
+            Download Form 6
+          </a>
+        </p>
       ) : null}
       {invoice.certificates.length > 0 ? (
         <p className="muted sm">
@@ -66,13 +79,17 @@ export function InvoiceLifecyclePanel({ invoice, user, disabled, onAction }: Inv
         />
       ) : null}
 
-      {isAdmin && stage === 7 && invoice.recycling && invoice.certificates.length === 0 ? (
+      {isAdmin && stage >= 7 && invoice.recycling && !invoice.closedAt ? (
         <CertificateForm
           disabled={disabled}
           onSubmit={(body) =>
             onAction(() => lifecycleApi.uploadCertificate(invoice.id, body), 'Certificate uploaded.')
           }
         />
+      ) : null}
+
+      {isStaff && invoice.recycling ? (
+        <SerialPanel invoice={invoice} disabled={disabled} onAction={onAction} />
       ) : null}
 
       {isStaff && stage >= 5 && !isPaid && !invoice.closedAt ? (
@@ -369,5 +386,93 @@ function CloseForm({
         Acknowledge closure
       </button>
     </form>
+  );
+}
+
+function SerialPanel({
+  invoice,
+  disabled,
+  onAction,
+}: {
+  invoice: InvoiceDetail;
+  disabled: boolean;
+  onAction: (fn: () => Promise<unknown>, success: string) => void;
+}) {
+  const serials = invoice.recycling?.serials ?? [];
+  const pending = serials.filter((s) => !s.dcodNo).length;
+  const standards = useLookups('destructStd');
+  const [std, setStd] = useState('NIST');
+
+  async function onCsv(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const rec = await import('../api').then(({ filesApi }) => filesApi.upload(file, 'serials'));
+    const csv = await file.text();
+    await onAction(
+      () => lifecycleApi.importSerials(invoice.id, { csv, serialFileId: rec.id }),
+      `${csv.split(/\n/).length - 1} serials imported.`,
+    );
+  }
+
+  return (
+    <div className="sub-form">
+      <h3>Serial-level custody ({serials.length})</h3>
+      <p className="dim" style={{ fontSize: '.8rem' }}>
+        Upload a CSV with headers Serial, AssetTag, Item, Condition, Weight —{' '}
+        <a href={filesApi.pdf('/serials/template.csv')}>sample CSV</a>.
+      </p>
+      <input type="file" accept=".csv,text/csv" disabled={disabled} onChange={(e) => void onCsv(e.target.files)} />
+      {serials.length ? (
+        <div className="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Serial</th>
+                <th>Asset</th>
+                <th>Item</th>
+                <th>DCoD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {serials.slice(0, 60).map((s) => (
+                <tr key={s.id}>
+                  <td className="mono">{s.serialNo}</td>
+                  <td>{s.assetTag || '—'}</td>
+                  <td>{s.make || '—'}</td>
+                  <td>{s.dcodNo || <span className="badge bg-am">pending</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {pending > 0 ? (
+        <div className="fr2">
+          <label>
+            Sanitization standard
+            <select value={std} onChange={(e) => setStd(e.target.value)}>
+              {(standards.length ? standards : [{ id: 'NIST', label: 'NIST SP 800-88' }]).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn bp bsm"
+            disabled={disabled}
+            onClick={() =>
+              onAction(
+                () => lifecycleApi.destroySerials(invoice.id, { serialNos: 'all', std }),
+                'Destruction recorded.',
+              )
+            }
+          >
+            Record destruction ({pending})
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

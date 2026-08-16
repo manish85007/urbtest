@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatINR } from '@urb-tectrack/shared';
-import { dataApi, type RegisterType, type SessionUser } from '../api';
+import { dataApi, type PeriodQuery, type RegisterType, type SessionUser } from '../api';
 import { downloadCsv } from '../lib/csv';
+import { PeriodPicker } from '../components/PeriodPicker';
 
 const REPORTS: Array<{ id: RegisterType; label: string; staffOnly?: boolean }> = [
   { id: 'summary', label: 'Request Summary' },
@@ -23,16 +24,17 @@ export function ReportsPage({ user }: ReportsPageProps) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
 
   useEffect(() => {
     setLoading(true);
     setError('');
     dataApi
-      .register(type)
+      .register(type, period)
       .then((data) => setRows(data as Record<string, unknown>[]))
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load report'))
       .finally(() => setLoading(false));
-  }, [type]);
+  }, [type, period.period, period.fy, period.year, period.from, period.to]);
 
   const headers = rows[0] ? Object.keys(rows[0]) : [];
 
@@ -42,10 +44,11 @@ export function ReportsPage({ user }: ReportsPageProps) {
         <div>
           <div className="h1">Reports</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            Registers aligned with the v6.3.1 prototype — export CSV for the current financial year.
+            Registers aligned with the v6.3.1 prototype — export CSV for the selected period.
           </div>
         </div>
         <div className="spacer" />
+        <PeriodPicker value={period} onChange={setPeriod} />
         <button
           type="button"
           className="btn bs"

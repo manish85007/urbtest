@@ -63,6 +63,18 @@ export function requireFactory(actor: SessionUser, factoryId: string) {
   }
 }
 
+/** Rule R4 — clients never see MRNs. */
+export function redactSubmissionForActor<T extends { invoices: Array<{ mrn: unknown }> }>(
+  sub: T,
+  actor: SessionUser,
+): T {
+  if (isStaff(actor)) return sub;
+  return {
+    ...sub,
+    invoices: sub.invoices.map((inv) => ({ ...inv, mrn: null })),
+  };
+}
+
 export function assertSubmissionStage(sub: SubmissionFull, expected: number, message: string) {
   const stage = deriveSubmissionStage(sub);
   if (stage !== expected) throw new AppError(message);

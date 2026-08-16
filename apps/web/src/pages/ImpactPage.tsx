@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SUSTAINABILITY } from '@urb-tectrack/shared';
-import { dataApi, type ClientDashboardReport } from '../api';
+import { dataApi, filesApi, type ClientDashboardReport, type PeriodQuery } from '../api';
+import { PeriodPicker } from '../components/PeriodPicker';
 
 export function ImpactPage() {
   const [report, setReport] = useState<ClientDashboardReport | null>(null);
   const [error, setError] = useState('');
+  const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
 
   useEffect(() => {
     dataApi
-      .reportsDashboard()
+      .reportsDashboard(undefined, period)
       .then((r) => {
         if (r.kind === 'client') setReport(r);
         else setError('Sustainability impact is available to client users.');
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
-  }, []);
+  }, [period.period, period.fy, period.year, period.from, period.to]);
 
   if (error) return <p className="error">{error}</p>;
   if (!report) return <p className="muted">Loading sustainability impact…</p>;
@@ -28,10 +30,24 @@ export function ImpactPage() {
         <div>
           <div className="h1">Sustainability</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            {report.period.fy} · closed lifecycle impact for BRSR / ESG disclosure
+            {report.period.label || report.period.fy} · closed lifecycle impact for BRSR / ESG disclosure
           </div>
         </div>
         <div className="spacer" />
+        <PeriodPicker value={period} onChange={setPeriod} />
+        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+          Methodology PDF
+        </a>
+        <a
+          className="btn bs"
+          href={filesApi.pdf(
+            `/reports/impact.pdf?period=${encodeURIComponent(period.period ?? 'fy')}&fy=${encodeURIComponent(period.fy ?? '')}&year=${encodeURIComponent(period.year ?? '')}&from=${encodeURIComponent(period.from ?? '')}&to=${encodeURIComponent(period.to ?? '')}`,
+          )}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Impact PDF
+        </a>
         <Link to="/heroes" className="btn bp">
           Recycle Heroes →
         </Link>

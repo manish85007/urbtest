@@ -11,6 +11,11 @@ import {
   createSite,
   createUser,
   listUsers,
+  updateClient,
+  updateSite,
+  updateUser,
+  upsertCategory,
+  upsertFactory,
 } from '../services/masters-write.js';
 
 function handleErr(err: unknown, reply: { badRequest: (m: string) => unknown; status: (n: number) => { send: (b: unknown) => unknown } }) {
@@ -163,9 +168,127 @@ export async function mastersRoutes(app: FastifyInstance) {
           id: z.string().min(1),
           label: z.string().min(1),
           active: z.boolean().optional(),
+          rate: z.number().optional(),
+          description: z.string().optional(),
         })
         .parse(request.body);
       return await upsertLookup(body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.patch('/clients/:clientId', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { clientId } = request.params as { clientId: string };
+      const body = z
+        .object({
+          name: z.string().min(1).optional(),
+          city: z.string().optional(),
+          contact: z.string().optional(),
+          phone: z.string().optional(),
+          email: z.string().email().optional(),
+          payTermsDays: z.number().int().positive().optional(),
+          logoFileId: z.string().nullable().optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(request.body);
+      return await updateClient(request.user!, clientId, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.patch('/sites/:siteId', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { siteId } = request.params as { siteId: string };
+      const body = z
+        .object({
+          name: z.string().optional(),
+          address: z.string().optional(),
+          gstin: z.string().optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(request.body);
+      return await updateSite(request.user!, siteId, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.patch('/users/:userId', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { userId } = request.params as { userId: string };
+      const body = z
+        .object({
+          name: z.string().optional(),
+          role: z.nativeEnum(UserRole).optional(),
+          clientId: z.string().length(4).nullable().optional(),
+          factoryIds: z.array(z.string()).optional(),
+          siteIds: z.array(z.string()).optional(),
+          active: z.boolean().optional(),
+          password: z.string().min(4).optional(),
+        })
+        .parse(request.body);
+      return await updateUser(request.user!, userId, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.post('/factories', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const body = z
+        .object({
+          id: z.string().min(2).max(16),
+          name: z.string().min(1),
+          address: z.string().optional(),
+          gstin: z.string().optional(),
+          kspcbConsent: z.string().optional(),
+          cpcbEpr: z.string().optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(request.body);
+      return await upsertFactory(request.user!, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.patch('/factories/:factoryId', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { factoryId } = request.params as { factoryId: string };
+      const body = z
+        .object({
+          name: z.string().min(1),
+          address: z.string().optional(),
+          gstin: z.string().optional(),
+          kspcbConsent: z.string().optional(),
+          cpcbEpr: z.string().optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(request.body);
+      return await upsertFactory(request.user!, { id: factoryId, ...body });
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.post('/categories', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const body = z
+        .object({
+          factoryId: z.string().min(1),
+          entryId: z.string().min(1),
+          description: z.string().min(1),
+          groupCode: z.string().min(1),
+          capacityTpa: z.number().positive(),
+          activity: z.string().optional(),
+          authRef: z.string().optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(request.body);
+      return await upsertCategory(request.user!, body);
     } catch (err) {
       return handleErr(err, reply);
     }

@@ -33,5 +33,12 @@
     "subject": "SLA alert — {{invoice_no}} is {{sla_state}} ({{days_used}} of {{sla_days}} days)",
     "body": "Internal SLA alert.\n\n  Request        : {{request_id}}\n  Invoice        : {{invoice_no}}\n  Client         : {{client_name}}\n  Material received : {{received_date}}\n  Target for certificate : {{target_date}}\n  Days elapsed   : {{days_used}} of {{sla_days}}\n  Status         : {{sla_state}}\n\nThe clock runs from receipt of material at the facility to issue of the Certificate of Destruction.\n\nUrb TecTrack automated alert",
     "variables": ["request_id", "invoice_no", "client_name", "received_date", "target_date", "days_used", "sla_days", "sla_state"]
+  },
+  {
+    "key": "password_reset",
+    "name": "Password Reset Code",
+    "subject": "Your Urb TecTrack password reset code",
+    "body": "Dear {{user_name}},\n\nA password reset was requested for your Urb TecTrack account.\n\nYour 6-digit code is: {{code}}\n\nIt expires in {{expiry_minutes}} minutes. If you did not request this, ignore this email and contact {{support_email}}.\n\nUrb TecTrack",
+    "variables": ["user_name", "code", "expiry_minutes", "support_email"]
   }
 ]

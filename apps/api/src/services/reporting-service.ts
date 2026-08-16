@@ -2,14 +2,18 @@ import {
   SLA_LABEL,
   computeImpact,
   currentFY,
+  dateInPeriod,
   getPayStatus,
   inFiscalYear,
   invStage,
   invoiceDue,
+  parseReportPeriod,
   paymentTermsLabel,
+  periodLabel,
   recyclingSla,
   sumPaise,
   treesEarned,
+  type ReportPeriod,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { clientScopeFilter, isStaff } from '../lib/auth-context.js';
@@ -210,8 +214,9 @@ export async function getStaffDashboard(actor: SessionUser) {
   };
 }
 
-export async function getImpactReport(actor: SessionUser, siteId?: string) {
+export async function getImpactReport(actor: SessionUser, siteId?: string, period?: ReportPeriod) {
   const scope = clientScopeFilter(actor);
+  const resolved = period ?? parseReportPeriod({ period: 'fy' });
   const fy = currentFY();
   const fyLabel = fy?.label ?? '';
 
@@ -232,7 +237,7 @@ export async function getImpactReport(actor: SessionUser, siteId?: string) {
   });
 
   const inPeriod = closedInvoices.filter(
-    (inv) => inv.closedAt && fyLabel && inFiscalYear(inv.closedAt, fyLabel),
+    (inv) => inv.closedAt && dateInPeriod(inv.closedAt, resolved),
   );
 
   const kg = inPeriod.reduce((sum, inv) => sum + Number(inv.billingWeight), 0);
@@ -263,18 +268,18 @@ export async function getImpactReport(actor: SessionUser, siteId?: string) {
     }));
 
   return {
-    period: { fy: fyLabel },
+    period: { fy: fyLabel, kind: resolved.kind, label: periodLabel(resolved) },
     impact,
     treesEarned: treesEarned(impact.tonnes),
     pendingClose: pending,
   };
 }
 
-export async function getReportsForActor(actor: SessionUser, siteId?: string) {
+export async function getReportsForActor(actor: SessionUser, siteId?: string, period?: ReportPeriod) {
   if (isStaff(actor)) {
     return { kind: 'staff' as const, ...(await getStaffDashboard(actor)) };
   }
-  return { kind: 'client' as const, ...(await getImpactReport(actor, siteId)) };
+  return { kind: 'client' as const, ...(await getImpactReport(actor, siteId, period)) };
 }
 
 export async function getCapacityReport(actor: SessionUser, factoryId: string) {
@@ -329,10 +334,11 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string) {
   };
 }
 
-export async function getHeroesReport(actor: SessionUser) {
-  const impact = await getImpactReport(actor);
+export async function getHeroesReport(actor: SessionUser, period?: ReportPeriod) {
+  const impact = await getImpactReport(actor, undefined, period);
   const plantings = await prisma.treePlanting.findMany({
     where: actor.role === 'client' && actor.clientId ? { clientId: actor.clientId } : {},
+    include: { progress: { orderBy: { notedAt: 'asc' } } },
     orderBy: { plantedAt: 'desc' },
     take: 50,
   });
@@ -352,15 +358,23 @@ export async function getHeroesReport(actor: SessionUser) {
       location: p.location,
       note: p.note,
       clientId: p.clientId,
+      progress: p.progress.map((g) => ({
+        id: g.id,
+        notedAt: g.notedAt.toISOString().slice(0, 10),
+        photoFileId: g.photoFileId,
+        note: g.note,
+      })),
     })),
   };
 }
 
 export type RegisterType = 'summary' | 'invoices' | 'mrn' | 'form6' | 'cod';
 
-export async function getRegisterReport(actor: SessionUser, type: RegisterType) {
+export async function getRegisterReport(actor: SessionUser, type: RegisterType, period?: ReportPeriod) {
   const scope = clientScopeFilter(actor);
   const staff = isStaff(actor);
+  const resolved = period ?? parseReportPeriod({ period: 'fy' });
+  const inP = (d: Date) => dateInPeriod(d, resolved);
 
   if (type === 'mrn' && !staff) {
     throw new AppError('MRN register is for Urbeno staff only.');
@@ -373,7 +387,7 @@ export async function getRegisterReport(actor: SessionUser, type: RegisterType) 
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
-    return subs.map((s) => ({
+    return subs.filter((s) => inP(s.requestDate)).map((s) => ({
       id: s.id,
       client: s.client.name,
       site: s.site.name,
@@ -392,7 +406,7 @@ export async function getRegisterReport(actor: SessionUser, type: RegisterType) 
       orderBy: { invoiceDate: 'desc' },
       take: 500,
     });
-    return rows.map((inv) => {
+    return rows.filter((inv) => inP(inv.invoiceDate)).map((inv) => {
       const paid = sumPaise(inv.payments.map((p) => p.amountPaise));
       const pay = getPayStatus(inv.totalPaise, paid);
       return {
@@ -415,19 +429,8 @@ export async function getRegisterReport(actor: SessionUser, type: RegisterType) 
       orderBy: { receivedAt: 'desc' },
       take: 500,
     });
-    if (actor.role === 'factory') {
-      return rows
-        .filter((m) => actor.factoryIds.includes(m.factoryId))
-        .map((m) => ({
-          mrnNo: m.mrnNo,
-          invoiceNo: m.invoice.invoiceNo,
-          submissionId: m.invoice.submissionId,
-          client: m.invoice.submission.client.name,
-          factory: m.factory.name,
-          receivedAt: m.receivedAt.toISOString().slice(0, 10),
-        }));
-    }
-    return rows.map((m) => ({
+    const visible = actor.role === 'factory' ? rows.filter((m) => actor.factoryIds.includes(m.factoryId)) : rows;
+    return visible.filter((m) => inP(m.receivedAt)).map((m) => ({
       mrnNo: m.mrnNo,
       invoiceNo: m.invoice.invoiceNo,
       submissionId: m.invoice.submissionId,
@@ -444,7 +447,7 @@ export async function getRegisterReport(actor: SessionUser, type: RegisterType) 
       orderBy: { processedAt: 'desc' },
       take: 500,
     });
-    return rows.map((r) => ({
+    return rows.filter((r) => inP(r.processedAt)).map((r) => ({
       form6No: r.form6No,
       invoiceNo: r.invoice.invoiceNo,
       submissionId: r.invoice.submissionId,
@@ -461,7 +464,7 @@ export async function getRegisterReport(actor: SessionUser, type: RegisterType) 
     orderBy: { certDate: 'desc' },
     take: 500,
   });
-  return rows.map((c) => ({
+  return rows.filter((c) => inP(c.certDate)).map((c) => ({
     certNo: c.certNo,
     invoiceNo: c.invoice.invoiceNo,
     submissionId: c.invoice.submissionId,

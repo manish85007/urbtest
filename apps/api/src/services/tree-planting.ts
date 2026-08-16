@@ -44,3 +44,39 @@ export async function recordTreePlanting(
 
   return row;
 }
+
+export async function recordTreeProgress(
+  actor: SessionUser,
+  plantingId: string,
+  input: { notedAt: string; photoFileId: string; note?: string },
+) {
+  const planting = await prisma.treePlanting.findUnique({ where: { id: plantingId } });
+  if (!planting) throw new AppError('Planting not found.', 404);
+  if (actor.role === 'client' && planting.clientId !== actor.clientId) {
+    throw new AppError('You can only add photos to your own plantings.', 403);
+  }
+  if (!input.photoFileId) throw new AppError('Attach the photo.');
+  if (!input.notedAt) throw new AppError('Photo date is required.');
+  if (new Date(input.notedAt) < planting.plantedAt) {
+    throw new AppError('The photo cannot pre-date the planting.');
+  }
+
+  const row = await prisma.treeProgress.create({
+    data: {
+      plantingId,
+      notedAt: new Date(input.notedAt),
+      photoFileId: input.photoFileId,
+      note: input.note?.trim() || null,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'tree.progress',
+    entity: 'tree_planting',
+    entityId: plantingId,
+  });
+
+  return row;
+}

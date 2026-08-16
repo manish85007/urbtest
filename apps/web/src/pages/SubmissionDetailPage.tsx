@@ -4,6 +4,7 @@ import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetai
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
+import { QueryThread } from '../components/QueryThread';
 import { useLookups } from '../hooks/useLookups';
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
@@ -151,6 +152,11 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 </div>
               </div>
             ) : null}
+            {sub.bomFileId ? (
+              <p className="muted sm">
+                BoM: <a href={filesApi.url(sub.bomFileId)} target="_blank" rel="noreferrer">Download</a>
+              </p>
+            ) : null}
             {isClient && stage === 1 && sub.rejectNote ? (
               <EditRequestForm
                 sub={sub}
@@ -270,6 +276,13 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         </div>
 
         <div>
+          <QueryThread
+            submissionId={sub.id}
+            queries={sub.queries ?? []}
+            user={user}
+            disabled={busy}
+            onAction={act}
+          />
           <div className="card">
             <div className="card-ttl">Details</div>
             <div style={{ display: 'grid', gap: '.4rem', marginTop: '.5rem' }}>
@@ -359,13 +372,14 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
   const docs: Array<{ kind: string; no: string; inv: string; dt: string; note: string; href?: string; internal?: boolean }> =
     [];
   for (const inv of sub.invoices) {
-    if (inv.mrn && isStaff) {
+                if (inv.mrn && isStaff) {
       docs.push({
         kind: 'MRN',
         no: inv.mrn.mrnNo,
         inv: inv.invoiceNo,
         dt: inv.mrn.receivedAt?.slice(0, 10) ?? '',
         note: inv.mrn.factoryId,
+        href: filesApi.pdf(`/invoices/${inv.id}/mrn.pdf`),
         internal: true,
       });
     }
@@ -376,6 +390,7 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
         inv: inv.invoiceNo,
         dt: inv.recycling.processedAt?.slice(0, 10) ?? '',
         note: `E-way ${inv.ewayBillNo || '—'}`,
+        href: filesApi.pdf(`/invoices/${inv.id}/form6.pdf`),
       });
     }
     for (const c of inv.certificates) {
@@ -621,16 +636,22 @@ function WeighForm({
   disabled: boolean;
   onWeigh: (body: {
     weighedAt: string;
-    gross: number;
-    tare: number;
-    slipNumber: string;
+    manual?: boolean;
+    gross?: number;
+    tare?: number;
+    net?: number;
+    slipNumber?: string;
+    reason?: string;
     slipPhotoIds: string[];
     pickupPhotoIds: string[];
   }) => void;
 }) {
+  const [manual, setManual] = useState(false);
   const [gross, setGross] = useState('');
   const [tare, setTare] = useState('');
+  const [net, setNet] = useState('');
   const [slip, setSlip] = useState('');
+  const [reason, setReason] = useState('');
   const [slipPhotos, setSlipPhotos] = useState<string[]>([]);
   const [pickupPhotos, setPickupPhotos] = useState<string[]>([]);
   const today = new Date().toISOString().slice(0, 10);
@@ -640,27 +661,71 @@ function WeighForm({
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onWeigh({
-          weighedAt: today,
-          gross: Number(gross),
-          tare: Number(tare),
-          slipNumber: slip,
-          slipPhotoIds: slipPhotos,
-          pickupPhotoIds: pickupPhotos,
-        });
+        onWeigh(
+          manual
+            ? {
+                weighedAt: today,
+                manual: true,
+                net: Number(net),
+                reason,
+                pickupPhotoIds: pickupPhotos,
+                slipPhotoIds: [],
+              }
+            : {
+                weighedAt: today,
+                gross: Number(gross),
+                tare: Number(tare),
+                slipNumber: slip,
+                slipPhotoIds: slipPhotos,
+                pickupPhotoIds: pickupPhotos,
+              },
+        );
       }}
     >
       <h3>Weigh {vehicle.registration}</h3>
-      <FileUpload
-        kind="weighPhoto"
-        label="Weighment slip photos"
-        hint="At least 1 photo · max 5 MB each · JPG/PNG"
-        accept="image/jpeg,image/png,image/webp"
-        required
-        disabled={disabled}
-        value={slipPhotos}
-        onChange={setSlipPhotos}
-      />
+      <label style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+        <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
+        Manual weighment (no weighbridge)
+      </label>
+      {manual ? (
+        <>
+          <label>
+            Recorded net (kg)
+            <input type="number" step="0.001" value={net} onChange={(e) => setNet(e.target.value)} required />
+          </label>
+          <label>
+            Reason
+            <input value={reason} onChange={(e) => setReason(e.target.value)} required placeholder="Why the weighbridge was not used" />
+          </label>
+        </>
+      ) : (
+        <>
+          <FileUpload
+            kind="weighPhoto"
+            label="Weighment slip photos"
+            hint="At least 1 photo · max 5 MB each · JPG/PNG"
+            accept="image/jpeg,image/png,image/webp"
+            required
+            disabled={disabled}
+            value={slipPhotos}
+            onChange={setSlipPhotos}
+          />
+          <div className="fr3">
+            <label>
+              Gross (kg)
+              <input type="number" step="0.001" value={gross} onChange={(e) => setGross(e.target.value)} required />
+            </label>
+            <label>
+              Tare (kg)
+              <input type="number" step="0.001" value={tare} onChange={(e) => setTare(e.target.value)} required />
+            </label>
+            <label>
+              Slip no.
+              <input value={slip} onChange={(e) => setSlip(e.target.value)} required />
+            </label>
+          </div>
+        </>
+      )}
       <FileUpload
         kind="pickPhoto"
         label="Pickup photos"
@@ -671,21 +736,11 @@ function WeighForm({
         value={pickupPhotos}
         onChange={setPickupPhotos}
       />
-      <div className="fr3">
-        <label>
-          Gross (kg)
-          <input type="number" step="0.001" value={gross} onChange={(e) => setGross(e.target.value)} required />
-        </label>
-        <label>
-          Tare (kg)
-          <input type="number" step="0.001" value={tare} onChange={(e) => setTare(e.target.value)} required />
-        </label>
-        <label>
-          Slip no.
-          <input value={slip} onChange={(e) => setSlip(e.target.value)} required />
-        </label>
-      </div>
-      <button type="submit" className="btn primary" disabled={disabled || !slipPhotos.length || !pickupPhotos.length}>
+      <button
+        type="submit"
+        className="btn primary"
+        disabled={disabled || !pickupPhotos.length || (!manual && !slipPhotos.length)}
+      >
         Record weighment
       </button>
     </form>
@@ -706,12 +761,19 @@ function InvoiceForm({
     ewayBillNo: string;
     ewayBillDate: string;
     vehicleIds: string[];
+    taxRatePct?: number;
+    invoiceFileId?: string;
+    ewayFileId?: string;
   }) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  const taxRates = useLookups('taxRate');
   const [invoiceNo, setInvoiceNo] = useState(`INV-${Date.now().toString().slice(-6)}`);
   const [taxableAmount, setTaxableAmount] = useState('10000');
+  const [taxRate, setTaxRate] = useState('18');
   const [eway, setEway] = useState('EWB-DEMO-001');
+  const [invoiceFileId, setInvoiceFileId] = useState('');
+  const [ewayFileId, setEwayFileId] = useState('');
 
   return (
     <form
@@ -725,6 +787,9 @@ function InvoiceForm({
           ewayBillNo: eway,
           ewayBillDate: today,
           vehicleIds: vehicles.map((v) => v.id),
+          taxRatePct: Number(taxRate),
+          invoiceFileId: invoiceFileId || undefined,
+          ewayFileId: ewayFileId || undefined,
         });
       }}
     >
@@ -740,9 +805,39 @@ function InvoiceForm({
         </label>
       </div>
       <label>
+        Tax rate
+        <select value={taxRate} onChange={(e) => setTaxRate(e.target.value)}>
+          {taxRates.length ? (
+            taxRates.map((t) => (
+              <option key={t.id} value={String(t.rate ?? 18)}>
+                {t.label}
+              </option>
+            ))
+          ) : (
+            <option value="18">GST 18%</option>
+          )}
+        </select>
+      </label>
+      <label>
         E-way bill no.
         <input value={eway} onChange={(e) => setEway(e.target.value)} required />
       </label>
+      <FileUpload
+        kind="invoice"
+        label="Invoice PDF"
+        accept="application/pdf"
+        disabled={disabled}
+        value={invoiceFileId ? [invoiceFileId] : []}
+        onChange={(ids) => setInvoiceFileId(ids[0] ?? '')}
+      />
+      <FileUpload
+        kind="eway"
+        label="E-way bill PDF"
+        accept="application/pdf"
+        disabled={disabled}
+        value={ewayFileId ? [ewayFileId] : []}
+        onChange={(ids) => setEwayFileId(ids[0] ?? '')}
+      />
       <button type="submit" className="btn primary" disabled={disabled}>
         Create invoice
       </button>

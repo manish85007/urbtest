@@ -103,6 +103,8 @@ export interface RecyclingInput {
   categories: RecyclingCategoryInput[];
   photoIds?: string[];
   reportIds?: string[];
+  serialFileId?: string;
+  serials?: Array<{ serialNo: string; assetTag?: string; make?: string; model?: string }>;
 }
 
 export interface CertificateInput {
@@ -386,8 +388,19 @@ export async function createRecycling(
       recoveryPcb: roundKg(totalPcb),
       photoIds: input.photoIds ?? [],
       reportIds: input.reportIds ?? [],
+      serialFileId: input.serialFileId ?? null,
       createdBy: actor.email,
       categories: { create: categoryRows },
+      serials: input.serials?.length
+        ? {
+            create: input.serials.map((s) => ({
+              serialNo: s.serialNo,
+              assetTag: s.assetTag ?? null,
+              make: s.make ?? null,
+              model: s.model ?? null,
+            })),
+          }
+        : undefined,
     },
     include: { categories: true },
   });

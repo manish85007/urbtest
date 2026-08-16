@@ -28,6 +28,7 @@ export const submissionInclude = {
       certificates: true,
     },
   },
+  queries: { include: { replies: { orderBy: { createdAt: 'asc' as const } } }, orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.SubmissionInclude;
 
 export type SubmissionFull = Prisma.SubmissionGetPayload<{ include: typeof submissionInclude }>;

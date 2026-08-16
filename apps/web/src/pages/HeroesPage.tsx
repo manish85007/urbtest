@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { dataApi, type HeroesReport, type SessionUser } from '../api';
+import { dataApi, filesApi, type HeroesReport, type PeriodQuery, type SessionUser } from '../api';
+import { FileUpload } from '../components/FileUpload';
+import { PeriodPicker } from '../components/PeriodPicker';
 
 interface HeroesPageProps {
   user: SessionUser;
@@ -15,17 +17,18 @@ export function HeroesPage({ user }: HeroesPageProps) {
   const [plantedAt, setPlantedAt] = useState(new Date().toISOString().slice(0, 10));
   const [location, setLocation] = useState('');
   const [note, setNote] = useState('');
+  const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
 
   function load() {
     dataApi
-      .heroes()
+      .heroes(period)
       .then(setReport)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
   }
 
   useEffect(() => {
     load();
-  }, []);
+  }, [period.period, period.fy, period.year, period.from, period.to]);
 
   async function recordPlanting(e: React.FormEvent) {
     e.preventDefault();
@@ -64,6 +67,8 @@ export function HeroesPage({ user }: HeroesPageProps) {
             Every tonne you recycle with Urbeno plants a tree — and every tree keeps working after it&apos;s planted
           </div>
         </div>
+        <div className="spacer" />
+        <PeriodPicker value={period} onChange={setPeriod} />
       </div>
       {error ? <p className="error">{error}</p> : null}
       {msg ? <p className="ok-msg">{msg}</p> : null}
@@ -205,7 +210,28 @@ export function HeroesPage({ user }: HeroesPageProps) {
                       <div className="tile-l">Note</div>
                       <div className="tile-v">{p.note || '—'}</div>
                     </div>
+                    <div className="tile">
+                      <div className="tile-l">Growth photos</div>
+                      <div className="tile-v">{p.progress?.length ?? 0}</div>
+                    </div>
                   </div>
+                  {(p.progress ?? []).map((g) => (
+                    <p key={g.id} className="muted sm">
+                      {g.notedAt} — {g.note || 'photo'}{' '}
+                      <a href={filesApi.url(g.photoFileId)} target="_blank" rel="noreferrer">
+                        view
+                      </a>
+                    </p>
+                  ))}
+                  <GrowthForm
+                    plantingId={p.id}
+                    plantedAt={p.plantedAt.slice(0, 10)}
+                    onSaved={() => {
+                      setMsg('Growth photo added.');
+                      load();
+                    }}
+                    onError={(m) => setError(m)}
+                  />
                 </div>
               ))}
             </div>
@@ -213,5 +239,61 @@ export function HeroesPage({ user }: HeroesPageProps) {
         </>
       ) : null}
     </div>
+  );
+}
+
+function GrowthForm({
+  plantingId,
+  plantedAt,
+  onSaved,
+  onError,
+}: {
+  plantingId: string;
+  plantedAt: string;
+  onSaved: () => void;
+  onError: (msg: string) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [notedAt, setNotedAt] = useState(today);
+  const [note, setNote] = useState('');
+  const [photoId, setPhotoId] = useState('');
+
+  return (
+    <form
+      className="sub-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        try {
+          await dataApi.addTreeProgress(plantingId, { notedAt, photoFileId: photoId, note });
+          setNote('');
+          setPhotoId('');
+          onSaved();
+        } catch (err) {
+          onError(err instanceof Error ? err.message : 'Failed to add photo');
+        }
+      }}
+    >
+      <div className="fr2">
+        <label>
+          Photo date
+          <input type="date" min={plantedAt} max={today} value={notedAt} onChange={(e) => setNotedAt(e.target.value)} required />
+        </label>
+        <label>
+          Observation
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. 6 months — average height 1.6 m" />
+        </label>
+      </div>
+      <FileUpload
+        kind="planting"
+        label="Growth photo"
+        accept="image/jpeg,image/png,image/webp"
+        required
+        value={photoId ? [photoId] : []}
+        onChange={(ids) => setPhotoId(ids[0] ?? '')}
+      />
+      <button type="submit" className="btn bs bsm" disabled={!photoId}>
+        Add to timeline
+      </button>
+    </form>
   );
 }

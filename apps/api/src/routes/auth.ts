@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { signIn, signOut, changePassword } from '../services/auth.js';
+import { confirmPasswordReset, requestPasswordReset } from '../services/password-reset.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
 
 const loginSchema = z.object({
@@ -71,6 +72,30 @@ export async function authRoutes(app: FastifyInstance) {
       return await changePassword(request.user!, body.currentPassword, body.newPassword);
     } catch (err) {
       return reply.badRequest(err instanceof Error ? err.message : 'Password change failed');
+    }
+  });
+
+  app.post('/auth/reset/request', async (request, reply) => {
+    const body = z.object({ email: z.string().email() }).parse(request.body);
+    try {
+      return await requestPasswordReset(body.email);
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Reset request failed');
+    }
+  });
+
+  app.post('/auth/reset', async (request, reply) => {
+    const body = z
+      .object({
+        email: z.string().email(),
+        code: z.string().min(4),
+        newPassword: z.string().min(6),
+      })
+      .parse(request.body);
+    try {
+      return await confirmPasswordReset(body.email, body.code, body.newPassword);
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Reset failed');
     }
   });
 }

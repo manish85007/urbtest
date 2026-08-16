@@ -17,6 +17,8 @@ import {
   createRecycling,
   uploadCertificate,
 } from '../services/invoice-service.js';
+import { raiseQuery, replyToQuery } from '../services/query-service.js';
+import { destroySerials, importSerials, parseSerialCsv, SERIAL_TEMPLATE_CSV } from '../services/serial-service.js';
 
 function handleServiceError(err: unknown, reply: FastifyReply) {
   if (isAppError(err)) {
@@ -124,6 +126,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           approxWeight: z.number().nonnegative().optional(),
           notes: z.string().optional(),
           ref: z.string().optional(),
+          bomFileId: z.string().nullable().optional(),
         })
         .parse(request.body);
       return await updateSubmission(request.user!, id, body);
@@ -233,6 +236,17 @@ export async function lifecycleRoutes(app: FastifyInstance) {
             .min(1),
           photoIds: z.array(z.string()).optional(),
           reportIds: z.array(z.string()).optional(),
+          serialFileId: z.string().optional(),
+          serials: z
+            .array(
+              z.object({
+                serialNo: z.string(),
+                assetTag: z.string().optional(),
+                make: z.string().optional(),
+                model: z.string().optional(),
+              }),
+            )
+            .optional(),
         })
         .parse(request.body);
       return await createRecycling(request.user!, id, {
@@ -276,6 +290,75 @@ export async function lifecycleRoutes(app: FastifyInstance) {
         })
         .parse(request.body ?? {});
       return await closeInvoice(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/submissions/:id/queries', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z.object({ text: z.string().min(1) }).parse(request.body);
+      return await raiseQuery(request.user!, id, body.text);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/queries/:id/replies', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z.object({ text: z.string().min(1) }).parse(request.body);
+      return await replyToQuery(request.user!, id, body.text);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.get('/serials/template.csv', { preHandler: requireAuth }, async (_request, reply) => {
+    return reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', 'attachment; filename="urbeno-serial-import-template.csv"')
+      .send(SERIAL_TEMPLATE_CSV);
+  });
+
+  app.post('/invoices/:id/serials', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z
+        .object({
+          csv: z.string().optional(),
+          rows: z
+            .array(
+              z.object({
+                serialNo: z.string(),
+                assetTag: z.string().optional(),
+                make: z.string().optional(),
+                model: z.string().optional(),
+              }),
+            )
+            .optional(),
+          serialFileId: z.string().optional(),
+        })
+        .parse(request.body);
+      const rows = body.rows?.length ? body.rows : body.csv ? parseSerialCsv(body.csv) : [];
+      return await importSerials(request.user!, id, rows, body.serialFileId);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/invoices/:id/serials/destroy', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z
+        .object({
+          serialNos: z.union([z.literal('all'), z.array(z.string())]).optional(),
+          std: z.string().min(1),
+          method: z.string().optional(),
+        })
+        .parse(request.body);
+      return await destroySerials(request.user!, id, body);
     } catch (err) {
       return handleServiceError(err, reply);
     }
