@@ -10,6 +10,7 @@ import { filesRoutes } from './routes/files.js';
 import { emailsRoutes } from './routes/emails.js';
 import { adminRoutes } from './routes/admin.js';
 import { reportsRoutes } from './routes/reports.js';
+import { legalRoutes, auditRoutes, registerSecurityHeaders } from './routes/legal.js';
 import { startScheduler } from './jobs/scheduler.js';
 
 export async function buildApp() {
@@ -23,6 +24,8 @@ export async function buildApp() {
   });
   await app.register(cookie);
   await app.register(sensible);
+
+  registerSecurityHeaders(app);
 
   app.get('/health', async () => ({
     ok: true,
@@ -38,6 +41,8 @@ export async function buildApp() {
   await app.register(emailsRoutes);
   await app.register(adminRoutes);
   await app.register(reportsRoutes);
+  await app.register(legalRoutes);
+  await app.register(auditRoutes);
 
   if (process.env.ENABLE_JOBS !== 'false') {
     startScheduler(app);

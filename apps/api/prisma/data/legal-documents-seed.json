@@ -1,0 +1,23 @@
+[
+  {
+    "key": "terms",
+    "version": "1.0",
+    "title": "Terms of Use",
+    "effectiveDate": "2026-08-15",
+    "body": "Version 1.0 · effective 15 August 2026 · applies to all users of Urb TecTrack™\n\n1 · What this platform is\nUrb TecTrack™ is operated by Urbeno Private Limited to record and track the collection, transport, receipt, processing and certification of end-of-life electrical and electronic equipment. It is a record-keeping and communication tool.\n\n2 · Who may use it\nAccess is granted to named individuals by Urbeno. Accounts are personal. You may not share credentials.\n\n3 · What you see\nClient users see only records belonging to their organisation and scoped sites. Internal operating records such as MRNs are visible to Urbeno staff only.\n\n4 · Accuracy of what you enter\nWeights and quantities you provide are treated as declarations. Invoicing and compliance documents use net weight recorded at collection.\n\n5 · Payment and closure\nA request cannot be marked complete until the invoice against it is paid in full.\n\n6 · Governing law\nThese terms are governed by the laws of India. Courts at Bengaluru, Karnataka have exclusive jurisdiction."
+  },
+  {
+    "key": "privacy",
+    "version": "1.0",
+    "title": "Privacy & Data",
+    "effectiveDate": "2026-08-15",
+    "body": "Version 1.0 · effective 15 August 2026\n\nWhat we hold\nFor platform users: name, work email, phone where supplied, organisation and sites, and activity records. For consignments: material records, weights, photographs, vehicle details, and documents issued.\n\nWhy we hold it\nTo operate the recycling service and meet obligations under the E-Waste (Management) Rules, 2022 and CPCB/KSPCB authorisations.\n\nWhere it sits\nAll production data is held within India.\n\nHow long\n• Consignment records and manifests — at least five years (Rule 12(4))\n• Certificates of Destruction — ten years\n• Activity and audit records — seven years\n• Sign-in records — one year\n\nYour rights (DPDPA 2023)\nYou may ask what personal data we hold, request correction, and request erasure where we are not required to retain it for compliance. Contact privacy@urbeno.in — we respond within thirty days.\n\nSecurity\nIndividual accounts with bcrypt password hashes, HttpOnly session cookies, account lockout after failed attempts, and an immutable audit trail for record changes."
+  },
+  {
+    "key": "compliance",
+    "version": "1.0",
+    "title": "Compliance Notice",
+    "effectiveDate": "2026-08-15",
+    "body": "Regulatory basis on which Urbeno operates.\n\nAuthorisations\n• CPCB EPR registration\n• KSPCB authorisation\n• ISO 9001:2015 and ISO 14001:2015\n\nProcessing sites\nMaterial is processed only at facilities authorised for the category concerned. Each site carries its own consent, category list and capacity limits. The platform warns and records an override before processing beyond authorised annual capacity."
+  }
+]

@@ -33,6 +33,11 @@ export function Shell({ user, onLogout, children }: ShellProps) {
           <Link to="/requests/new" className={loc.pathname === '/requests/new' ? 'on' : ''}>
             New request
           </Link>
+          {user.role === 'admin' ? (
+            <Link to="/audit" className={loc.pathname === '/audit' ? 'on' : ''}>
+              Audit
+            </Link>
+          ) : null}
         </nav>
         <div className="user-chip">
           <span className="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
@@ -43,6 +48,11 @@ export function Shell({ user, onLogout, children }: ShellProps) {
         </div>
       </header>
       <main className="wrap">{children}</main>
+      <footer className="footer">
+        <Link to="/legal/terms">Terms</Link>
+        <Link to="/legal/privacy">Privacy &amp; Data</Link>
+        <Link to="/legal/compliance">Compliance</Link>
+      </footer>
     </div>
   );
 }

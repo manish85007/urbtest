@@ -103,6 +103,7 @@ model User {
   sessions     Session[]
   notifications Notification[]
   auditLogs    AuditLog[] @relation("AuditActor")
+  legalAcceptances LegalAcceptance[]
 
   @@map("users")
 }
@@ -471,6 +472,33 @@ model EmailTemplate {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("email_templates")
+}
+
+model LegalDocument {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  version       String
+  title         String
+  body          String   @db.Text
+  effectiveDate DateTime @map("effective_date") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("legal_documents")
+}
+
+model LegalAcceptance {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  documentKey String   @map("document_key")
+  version     String
+  acceptedAt  DateTime @default(now()) @map("accepted_at")
+  ipAddress   String?  @map("ip_address")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentKey, version])
+  @@index([userId])
+  @@map("legal_acceptances")
 }
 
 model LookupMaster {

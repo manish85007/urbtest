@@ -190,6 +190,25 @@ export const authApi = {
     }),
   logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => api<{ user: SessionUser }>('/auth/me'),
+  legalStatus: () =>
+    api<{
+      compliant: boolean;
+      pending: Array<{ key: string; version: string; title: string }>;
+    }>('/auth/legal-status'),
+  acceptLegal: (keys: string[]) =>
+    api<{ compliant: boolean }>('/auth/accept-legal', {
+      method: 'POST',
+      body: JSON.stringify({ keys }),
+    }),
+};
+
+export const legalApi = {
+  list: () =>
+    api<Array<{ key: string; version: string; title: string; effectiveDate: string }>>('/legal'),
+  document: (key: string) =>
+    api<{ key: string; version: string; title: string; body: string; effectiveDate: string }>(
+      `/legal/${key}`,
+    ),
 };
 
 export const dataApi = {
@@ -206,6 +225,14 @@ export const dataApi = {
     api<CategorySummary[]>(`/factories/${factoryId}/categories`),
   reportsDashboard: (siteId?: string) =>
     api<DashboardReport>(siteId ? `/reports/dashboard?siteId=${siteId}` : '/reports/dashboard'),
+  auditLog: (limit = 50) => api<Array<{
+    id: string;
+    ts: string;
+    actorEmail: string;
+    action: string;
+    entity: string;
+    entityId: string | null;
+  }>>(`/audit?limit=${limit}`),
 };
 
 export const filesApi = {

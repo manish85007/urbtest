@@ -180,6 +180,56 @@ async function main() {
     });
   }
 
+  const legalDocs = JSON.parse(
+    readFileSync(join(here, 'data/legal-documents-seed.json'), 'utf8'),
+  ) as Array<{
+    key: string;
+    version: string;
+    title: string;
+    body: string;
+    effectiveDate: string;
+  }>;
+
+  for (const doc of legalDocs) {
+    await prisma.legalDocument.upsert({
+      where: { key: doc.key },
+      update: {
+        version: doc.version,
+        title: doc.title,
+        body: doc.body,
+        effectiveDate: new Date(doc.effectiveDate),
+      },
+      create: {
+        key: doc.key,
+        version: doc.version,
+        title: doc.title,
+        body: doc.body,
+        effectiveDate: new Date(doc.effectiveDate),
+      },
+    });
+  }
+
+  const allUsers = await prisma.user.findMany({ where: { active: true }, select: { id: true } });
+  for (const u of allUsers) {
+    for (const doc of legalDocs.filter((d) => d.key === 'terms' || d.key === 'privacy')) {
+      await prisma.legalAcceptance.upsert({
+        where: {
+          userId_documentKey_version: {
+            userId: u.id,
+            documentKey: doc.key,
+            version: doc.version,
+          },
+        },
+        update: {},
+        create: {
+          userId: u.id,
+          documentKey: doc.key,
+          version: doc.version,
+        },
+      });
+    }
+  }
+
   // Demo submissions for development / UAT
   await prisma.submission.upsert({
     where: { id: 'REQ-00046' },
@@ -324,7 +374,7 @@ async function main() {
   });
 
   console.log(
-    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, 3 demo requests`,
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, 3 demo requests`,
   );
 }
 

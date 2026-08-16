@@ -563,3 +563,24 @@ select {
   color: var(--danger);
   font-size: 0.85rem;
 }
+
+.footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  gap: 1rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.legal-doc .legal-body {
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  margin-top: 1rem;
+}
+
+.legal-consent .list {
+  margin: 1rem 0;
+}

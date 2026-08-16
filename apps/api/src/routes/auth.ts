@@ -8,10 +8,29 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_PER_IP = 30;
+const ipLoginCounts = new Map<string, { count: number; resetAt: number }>();
+
+function checkLoginRateLimit(ip: string) {
+  const now = Date.now();
+  const rec = ipLoginCounts.get(ip) ?? { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+  if (now > rec.resetAt) {
+    rec.count = 0;
+    rec.resetAt = now + LOGIN_WINDOW_MS;
+  }
+  rec.count += 1;
+  ipLoginCounts.set(ip, rec);
+  if (rec.count > LOGIN_MAX_PER_IP) {
+    throw new Error('Too many sign-in attempts from this network. Try again later.');
+  }
+}
+
 export async function authRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
   app.post('/auth/login', async (request, reply) => {
+    checkLoginRateLimit(request.ip);
     const body = loginSchema.parse(request.body);
     try {
       const { user, token } = await signIn(body.email, body.password);
