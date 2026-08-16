@@ -7,13 +7,14 @@ import {
   getHeroesReport,
   getRegisterReport,
   getReportsForActor,
+  REGISTER_KINDS,
   type RegisterType,
 } from '../services/reporting-service.js';
 import { recordTreePlanting, recordTreeProgress } from '../services/tree-planting.js';
-import { form6Pdf, impactPdf, methodologyPdf, mrnPdf } from '../services/pdf.js';
+import { form6Pdf, impactPdf, methodologyPdf, mrnPdf, registerPdf } from '../services/pdf.js';
 import { isAppError } from '../lib/errors.js';
 
-const registerTypes = ['summary', 'invoices', 'mrn', 'form6', 'cod'] as const;
+const registerTypes = Object.keys(REGISTER_KINDS) as RegisterType[];
 
 function periodFromQuery(query: Record<string, unknown>) {
   return parseReportPeriod({
@@ -57,12 +58,36 @@ export async function reportsRoutes(app: FastifyInstance) {
     if (!registerTypes.includes(type as RegisterType)) {
       return reply.badRequest(`Unknown register type: ${type}`);
     }
+    const q = request.query as { clientId?: string; siteId?: string };
     try {
       return await getRegisterReport(
         request.user!,
         type as RegisterType,
         periodFromQuery(request.query as Record<string, unknown>),
+        { clientId: q.clientId, siteId: q.siteId },
       );
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.get('/reports/register/:type/pdf', { preHandler: requireAuth }, async (request, reply) => {
+    const { type } = request.params as { type: string };
+    if (!registerTypes.includes(type as RegisterType)) {
+      return reply.badRequest(`Unknown register type: ${type}`);
+    }
+    const q = request.query as { clientId?: string; siteId?: string };
+    try {
+      const { filename, buffer } = await registerPdf(
+        request.user!,
+        type as RegisterType,
+        periodFromQuery(request.query as Record<string, unknown>),
+        { clientId: q.clientId, siteId: q.siteId },
+      );
+      return reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .send(buffer);
     } catch (err) {
       return handleErr(err, reply);
     }

@@ -6,7 +6,7 @@ import { loadInvoiceForActor } from '../lib/access.js';
 import { buildTextPdf } from '../lib/simple-pdf.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
-import { getImpactReport } from './reporting-service.js';
+import { getImpactReport, getRegisterReport, type RegisterType } from './reporting-service.js';
 
 const CO = {
   name: process.env.URBENO_NAME ?? 'Urbeno Private Limited',
@@ -243,4 +243,42 @@ export async function methodologyPdf(): Promise<{ filename: string; buffer: Buff
     `${CO.name} · Urb TecTrack methodology`,
   );
   return { filename: 'urb-tectrack-methodology.pdf', buffer };
+}
+
+export async function registerPdf(
+  actor: SessionUser,
+  type: RegisterType,
+  period?: ReportPeriod,
+  filters?: { clientId?: string; siteId?: string },
+): Promise<{ filename: string; buffer: Buffer }> {
+  const report = await getRegisterReport(actor, type, period, filters);
+  if (!report.rows.length) throw new AppError('Nothing to export for this period.');
+
+  const shown = report.rows.slice(0, 80).map((r) => r.map((c) => String(c ?? '')));
+  const buffer = buildTextPdf(
+    report.title,
+    `${report.periodLabel} · ${report.scopeLabel} · ${report.total} rows`,
+    [
+      {
+        heading: 'REGISTER',
+        table: { headers: report.head, rows: shown },
+      },
+      ...(report.total > 80
+        ? [{ heading: 'NOTE', lines: [`Showing 80 of ${report.total} rows. Export CSV for the full set.`] }]
+        : []),
+    ],
+    `${report.title} · ${report.periodLabel} · ${CO.name}`,
+  );
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'pdf.report',
+    entity: 'report',
+    entityId: type,
+    details: { period: report.periodLabel, rows: report.total },
+  });
+
+  const slug = report.periodLabel.replace(/[^\w]+/g, '-');
+  return { filename: `urbeno-${type}-${slug}.pdf`, buffer };
 }

@@ -11,6 +11,7 @@ import {
   paymentTermsLabel,
   periodLabel,
   recyclingSla,
+  stageLabel,
   sumPaise,
   treesEarned,
   type ReportPeriod,
@@ -368,108 +369,355 @@ export async function getHeroesReport(actor: SessionUser, period?: ReportPeriod)
   };
 }
 
-export type RegisterType = 'summary' | 'invoices' | 'mrn' | 'form6' | 'cod';
+export const REGISTER_KINDS = {
+  summary: { title: 'Request Summary', description: 'Every request with stage, weight and dates' },
+  invoices: { title: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding' },
+  mrn: { title: 'MRN Register', description: 'Goods received at factory sites — internal', staffOnly: true },
+  form6: { title: 'Form 6 Log', description: 'Processing records with categories' },
+  cod: { title: 'Certificate Log', description: 'Certificates issued and closure status' },
+  category: { title: 'Category Recovery', description: 'Weight recovered by authorized category' },
+  sustain: { title: 'Sustainability', description: 'Environmental impact with methodology' },
+  heroes: { title: 'Recycle Heroes', description: 'Tonnage and tree milestones' },
+} as const;
 
-export async function getRegisterReport(actor: SessionUser, type: RegisterType, period?: ReportPeriod) {
-  const scope = clientScopeFilter(actor);
+export type RegisterType = keyof typeof REGISTER_KINDS;
+
+export interface RegisterReport {
+  kind: RegisterType;
+  title: string;
+  description: string;
+  periodLabel: string;
+  scopeLabel: string;
+  head: string[];
+  rows: Array<Array<string | number>>;
+  total: number;
+}
+
+const HERO_MILESTONE = 10;
+
+function fmtDate(d: Date | null | undefined): string {
+  if (!d) return '';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtTs(d: Date | null | undefined): string {
+  if (!d) return '';
+  return d.toISOString().slice(0, 16).replace('T', ' ');
+}
+
+function rupees(paise: bigint | number): number {
+  return Math.round(Number(paise)) / 100;
+}
+
+function mrnMats(materials: unknown): Array<{ q?: number; w?: number }> {
+  return Array.isArray(materials) ? (materials as Array<{ q?: number; w?: number }>) : [];
+}
+
+function registerScope(
+  actor: SessionUser,
+  clientId?: string,
+  siteId?: string,
+): Record<string, unknown> {
+  const base = clientScopeFilter(actor);
+  if (!isStaff(actor)) {
+    return siteId ? { ...base, siteId } : base;
+  }
+  return {
+    ...base,
+    ...(clientId ? { clientId } : {}),
+    ...(siteId ? { siteId } : {}),
+  };
+}
+
+async function impactForClient(clientId: string, period: ReportPeriod | null, siteId?: string) {
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      closedAt: { not: null },
+      submission: { clientId, ...(siteId ? { siteId } : {}) },
+    },
+    select: { billingWeight: true, closedAt: true, submissionId: true },
+  });
+  const inPeriod = period
+    ? invoices.filter((inv) => inv.closedAt && dateInPeriod(inv.closedAt, period))
+    : invoices;
+  const kg = inPeriod.reduce((sum, inv) => sum + Number(inv.billingWeight), 0);
+  return computeImpact(kg, inPeriod.length, new Set(inPeriod.map((i) => i.submissionId)).size);
+}
+
+export async function getRegisterReport(
+  actor: SessionUser,
+  type: RegisterType,
+  period?: ReportPeriod,
+  filters?: { clientId?: string; siteId?: string },
+): Promise<RegisterReport> {
+  const meta = REGISTER_KINDS[type];
   const staff = isStaff(actor);
-  const resolved = period ?? parseReportPeriod({ period: 'fy' });
-  const inP = (d: Date) => dateInPeriod(d, resolved);
-
   if (type === 'mrn' && !staff) {
     throw new AppError('MRN register is for Urbeno staff only.');
   }
 
+  const resolved = period ?? parseReportPeriod({ period: 'fy' });
+  const inP = (d: Date) => dateInPeriod(d, resolved);
+  const clientId = staff ? filters?.clientId : actor.clientId ?? undefined;
+  const siteId = filters?.siteId;
+  const scope = registerScope(actor, clientId, siteId);
+
+  const clientName =
+    clientId
+      ? (await prisma.client.findUnique({ where: { id: clientId }, select: { name: true } }))?.name
+      : null;
+  const siteName =
+    siteId
+      ? (await prisma.site.findUnique({ where: { id: siteId }, select: { name: true } }))?.name
+      : null;
+  const scopeParts = [
+    actor.role === 'client' ? clientName || 'Your organisation' : clientName || 'All clients',
+    siteName || 'All sites',
+  ];
+
+  let head: string[] = [];
+  let rows: Array<Array<string | number>> = [];
+
   if (type === 'summary') {
+    head = ['Request', 'Client', 'Site', 'PO Ref', 'Raised', 'Stage', 'Vehicles', 'Invoices', 'Declared kg', 'Net kg', 'Closed'];
     const subs = await prisma.submission.findMany({
       where: scope,
       include: submissionInclude,
-      orderBy: { createdAt: 'desc' },
-      take: 500,
+      orderBy: { requestDate: 'desc' },
+      take: 2000,
     });
-    return subs.filter((s) => inP(s.requestDate)).map((s) => ({
-      id: s.id,
-      client: s.client.name,
-      site: s.site.name,
-      stage: deriveSubmissionStage(s),
-      requestDate: s.requestDate.toISOString().slice(0, 10),
-      netKg: submissionNetKg(s),
-      invoices: s.invoices.length,
-      closed: !!s.closedAt,
-    }));
-  }
-
-  if (type === 'invoices') {
-    const rows = await prisma.invoice.findMany({
+    rows = subs.filter((s) => inP(s.requestDate)).map((s) => {
+      const stage = deriveSubmissionStage(s);
+      return [
+        s.id,
+        s.client.name,
+        s.site.name,
+        s.ref || '',
+        fmtDate(s.requestDate),
+        `${stage} · ${stageLabel(stage)}`,
+        s.vehicles.length,
+        s.invoices.length,
+        Number(s.approxWeight),
+        Number(submissionNetKg(s).toFixed(3)),
+        s.closedAt ? fmtDate(s.closedAt) : '',
+      ];
+    });
+  } else if (type === 'invoices') {
+    head = ['Invoice', 'Request', 'Client', 'Date', 'Taxable', 'GST', 'Total', 'Paid', 'Outstanding', 'Status', 'E-way Bill', 'Stage'];
+    const invoices = await prisma.invoice.findMany({
       where: { submission: scope },
-      include: { submission: { include: { client: true } }, payments: true },
+      include: {
+        payments: true,
+        mrn: true,
+        recycling: true,
+        certificates: true,
+        submission: { include: { client: true } },
+      },
       orderBy: { invoiceDate: 'desc' },
-      take: 500,
+      take: 2000,
     });
-    return rows.filter((inv) => inP(inv.invoiceDate)).map((inv) => {
+    rows = invoices.filter((inv) => inP(inv.invoiceDate)).map((inv) => {
       const paid = sumPaise(inv.payments.map((p) => p.amountPaise));
       const pay = getPayStatus(inv.totalPaise, paid);
-      return {
-        invoiceNo: inv.invoiceNo,
-        submissionId: inv.submissionId,
-        client: inv.submission.client.name,
-        date: inv.invoiceDate.toISOString().slice(0, 10),
-        totalPaise: inv.totalPaise.toString(),
-        billingWeight: inv.billingWeight.toString(),
-        paymentStatus: pay.key,
-        closed: !!inv.closedAt,
-      };
+      const tot = rupees(inv.totalPaise);
+      const paidR = rupees(paid);
+      return [
+        inv.invoiceNo,
+        inv.submissionId,
+        inv.submission.client.name,
+        fmtDate(inv.invoiceDate),
+        rupees(inv.taxablePaise),
+        rupees(inv.taxPaise),
+        tot,
+        paidR,
+        Number((tot - paidR).toFixed(2)),
+        pay.label,
+        inv.ewayBillNo || '',
+        invoiceStage(inv),
+      ];
     });
-  }
-
-  if (type === 'mrn') {
-    const rows = await prisma.mrn.findMany({
+  } else if (type === 'mrn') {
+    head = ['MRN', 'Invoice', 'Request', 'Client', 'Factory', 'Received', 'Vehicles', 'Qty', 'Weight kg', 'Received By'];
+    const mrns = await prisma.mrn.findMany({
       where: { invoice: { submission: scope } },
-      include: { invoice: { include: { submission: { include: { client: true } } } }, factory: true },
+      include: {
+        factory: true,
+        invoice: { include: { submission: { include: { client: true } } } },
+      },
       orderBy: { receivedAt: 'desc' },
-      take: 500,
+      take: 2000,
     });
-    const visible = actor.role === 'factory' ? rows.filter((m) => factoryInScope(actor, m.factoryId)) : rows;
-    return visible.filter((m) => inP(m.receivedAt)).map((m) => ({
-      mrnNo: m.mrnNo,
-      invoiceNo: m.invoice.invoiceNo,
-      submissionId: m.invoice.submissionId,
-      client: m.invoice.submission.client.name,
-      factory: m.factory.name,
-      receivedAt: m.receivedAt.toISOString().slice(0, 10),
-    }));
-  }
-
-  if (type === 'form6') {
-    const rows = await prisma.recycling.findMany({
+    rows = mrns
+      .filter((m) => factoryInScope(actor, m.factoryId) && inP(m.receivedAt))
+      .map((m) => {
+        const mats = mrnMats(m.materials);
+        return [
+          m.mrnNo,
+          m.invoice.invoiceNo,
+          m.invoice.submissionId,
+          m.invoice.submission.client.name,
+          m.factory.name,
+          fmtDate(m.receivedAt),
+          m.invoice.vehicleIds.length,
+          mats.reduce((a, x) => a + Number(x.q ?? 0), 0),
+          Number(mats.reduce((a, x) => a + Number(x.w ?? 0), 0).toFixed(3)),
+          m.receivedBy,
+        ];
+      });
+  } else if (type === 'form6') {
+    head = ['Form 6', 'Invoice', 'Request', 'Client', 'Processed', 'Facility', 'E-way Bill', 'Categories', 'Devices', 'Weight kg'];
+    const recys = await prisma.recycling.findMany({
       where: { invoice: { submission: scope } },
-      include: { invoice: { include: { submission: { include: { client: true } } } }, factory: true },
+      include: {
+        factory: true,
+        categories: true,
+        serials: true,
+        invoice: { include: { submission: { include: { client: true } } } },
+      },
       orderBy: { processedAt: 'desc' },
-      take: 500,
+      take: 2000,
     });
-    return rows.filter((r) => inP(r.processedAt)).map((r) => ({
-      form6No: r.form6No,
-      invoiceNo: r.invoice.invoiceNo,
-      submissionId: r.invoice.submissionId,
-      client: r.invoice.submission.client.name,
-      factory: r.factory.name,
-      processedAt: r.processedAt.toISOString().slice(0, 10),
-      divertedPct: r.divertedPct.toString(),
-    }));
+    rows = recys
+      .filter((r) => (actor.role !== 'factory' || factoryInScope(actor, r.factoryId)) && inP(r.processedAt))
+      .map((r) => [
+        r.form6No,
+        r.invoice.invoiceNo,
+        r.invoice.submissionId,
+        r.invoice.submission.client.name,
+        fmtDate(r.processedAt),
+        r.factory.name,
+        r.invoice.ewayBillNo || '',
+        r.categories.map((c) => c.entryId).join(' / '),
+        r.serials.length,
+        Number(r.categories.reduce((a, c) => a + Number(c.weightKg), 0).toFixed(3)),
+      ]);
+  } else if (type === 'cod') {
+    head = ['Certificate', 'Date', 'Department', 'Invoice', 'Request', 'Client', 'Form 6', 'Uploaded', 'Emailed', 'Closed By', 'Closed On', 'Rating'];
+    const certs = await prisma.certificate.findMany({
+      where: { invoice: { submission: scope } },
+      include: {
+        invoice: {
+          include: {
+            recycling: true,
+            submission: { include: { client: true } },
+          },
+        },
+      },
+      orderBy: { certDate: 'desc' },
+      take: 2000,
+    });
+    rows = certs.filter((c) => inP(c.certDate)).map((c) => [
+      c.certNo,
+      fmtDate(c.certDate),
+      c.department || '',
+      c.invoice.invoiceNo,
+      c.invoice.submissionId,
+      c.invoice.submission.client.name,
+      c.invoice.recycling?.form6No || '',
+      fmtTs(c.uploadedAt),
+      c.mailedAt ? 'Yes' : 'No',
+      c.invoice.closedBy || '',
+      c.invoice.closedAt ? fmtDate(c.invoice.closedAt) : '',
+      c.invoice.closeRating ?? '',
+    ]);
+  } else if (type === 'category') {
+    head = ['Entry', 'Description', 'Group', 'Activity', 'Authorized TPA', 'Recovered kg', 'Utilization %'];
+    const recys = await prisma.recycling.findMany({
+      where: { invoice: { submission: scope } },
+      include: { categories: true },
+      take: 2000,
+    });
+    const used: Record<string, number> = {};
+    for (const r of recys.filter((row) => inP(row.processedAt))) {
+      for (const c of r.categories) {
+        used[c.entryId] = (used[c.entryId] || 0) + Number(c.weightKg);
+      }
+    }
+    const entryIds = Object.keys(used);
+    const cats = entryIds.length
+      ? await prisma.categoryMaster.findMany({
+          where: { active: true, entryId: { in: entryIds } },
+          orderBy: { entryId: 'asc' },
+        })
+      : [];
+    rows = cats.map((c) => {
+      const kg = used[c.entryId] || 0;
+      const tpa = Number(c.capacityTpa);
+      return [
+        c.entryId,
+        c.description,
+        c.groupCode,
+        c.activity,
+        tpa,
+        Number(kg.toFixed(3)),
+        tpa ? Number(((kg / (tpa * 1000)) * 100).toFixed(3)) : '—',
+      ];
+    });
+  } else if (type === 'sustain') {
+    head = ['Client', 'Site', 'Closed Invoices', 'Net kg', 'Tonnes', 'CO2e avoided kg', 'Landfill diverted kg', 'Tree equivalent', 'Water kL', 'Energy kWh'];
+    const clients = clientId
+      ? await prisma.client.findMany({ where: { id: clientId } })
+      : actor.role === 'client' && actor.clientId
+        ? await prisma.client.findMany({ where: { id: actor.clientId } })
+        : await prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
+    for (const c of clients) {
+      const imp = await impactForClient(c.id, resolved, siteId);
+      if (!imp.invoices) continue;
+      rows.push([
+        c.name,
+        siteName || 'All sites',
+        imp.invoices,
+        Number(imp.kg.toFixed(1)),
+        Number(imp.tonnes.toFixed(3)),
+        Number(imp.co2.toFixed(1)),
+        Number(imp.landfill.toFixed(1)),
+        Number(imp.trees.toFixed(1)),
+        Number(imp.water.toFixed(1)),
+        Number(imp.energy.toFixed(1)),
+      ]);
+    }
+  } else {
+    head = ['Client', 'Tonnes (period)', 'Trees earned (period)', 'Trees planted (period)', 'Tonnes (lifetime)', 'Trees earned (lifetime)', 'Trees planted (lifetime)', 'Outstanding', 'Milestone'];
+    const clients = clientId
+      ? await prisma.client.findMany({ where: { id: clientId } })
+      : actor.role === 'client' && actor.clientId
+        ? await prisma.client.findMany({ where: { id: actor.clientId } })
+        : await prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
+    const plantings = await prisma.treePlanting.findMany({
+      where: clientId || actor.clientId ? { clientId: clientId || actor.clientId } : {},
+    });
+    for (const c of clients) {
+      const periodImp = await impactForClient(c.id, resolved, siteId);
+      const lifeImp = await impactForClient(c.id, null, siteId);
+      const earned = treesEarned(periodImp.tonnes);
+      const earnedAll = treesEarned(lifeImp.tonnes);
+      const planted = plantings
+        .filter((p) => p.clientId === c.id && dateInPeriod(p.plantedAt, resolved))
+        .reduce((s, p) => s + p.trees, 0);
+      const plantedAll = plantings.filter((p) => p.clientId === c.id).reduce((s, p) => s + p.trees, 0);
+      const badge = Math.floor(earnedAll / HERO_MILESTONE) * HERO_MILESTONE;
+      rows.push([
+        c.name,
+        Number(periodImp.tonnes.toFixed(3)),
+        earned,
+        planted,
+        Number(lifeImp.tonnes.toFixed(3)),
+        earnedAll,
+        plantedAll,
+        Math.max(0, earnedAll - plantedAll),
+        badge || '',
+      ]);
+    }
   }
 
-  const rows = await prisma.certificate.findMany({
-    where: { invoice: { submission: scope } },
-    include: { invoice: { include: { submission: { include: { client: true } } } } },
-    orderBy: { certDate: 'desc' },
-    take: 500,
-  });
-  return rows.filter((c) => inP(c.certDate)).map((c) => ({
-    certNo: c.certNo,
-    invoiceNo: c.invoice.invoiceNo,
-    submissionId: c.invoice.submissionId,
-    client: c.invoice.submission.client.name,
-    certDate: c.certDate.toISOString().slice(0, 10),
-    department: c.department,
-  }));
+  return {
+    kind: type,
+    title: meta.title,
+    description: meta.description,
+    periodLabel: periodLabel(resolved),
+    scopeLabel: scopeParts.join(' · '),
+    head,
+    rows,
+    total: rows.length,
+  };
 }

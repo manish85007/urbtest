@@ -27,7 +27,26 @@ export interface SessionUser {
   siteIds?: string[];
 }
 
-export type RegisterType = 'summary' | 'invoices' | 'mrn' | 'form6' | 'cod';
+export type RegisterType =
+  | 'summary'
+  | 'invoices'
+  | 'mrn'
+  | 'form6'
+  | 'cod'
+  | 'category'
+  | 'sustain'
+  | 'heroes';
+
+export interface RegisterReport {
+  kind: RegisterType;
+  title: string;
+  description: string;
+  periodLabel: string;
+  scopeLabel: string;
+  head: string[];
+  rows: Array<Array<string | number>>;
+  total: number;
+}
 
 export interface CapacityReport {
   factoryId: string;
@@ -470,8 +489,10 @@ export const dataApi = {
     api<CapacityReport>(`/reports/capacity?factoryId=${encodeURIComponent(factoryId)}`),
   heroes: (period?: PeriodQuery) =>
     api<HeroesReport>(`/reports/heroes${qs(period ?? {})}`),
-  register: (type: RegisterType, period?: PeriodQuery) =>
-    api<Record<string, unknown>[]>(`/reports/register/${type}${qs(period ?? {})}`),
+  register: (type: RegisterType, period?: PeriodQuery, scope?: { clientId?: string; siteId?: string }) =>
+    api<RegisterReport>(
+      `/reports/register/${type}${qs({ ...(period ?? {}), clientId: scope?.clientId, siteId: scope?.siteId })}`,
+    ),
   lookups: (category: string, includeInactive = false) =>
     api<LookupRow[]>(
       `/lookups/${category}${includeInactive ? '?includeInactive=1' : ''}`,

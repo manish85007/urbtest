@@ -16,6 +16,14 @@ test.describe('smoke', () => {
     await expect(page.getByRole('button', { name: 'Submit request' })).toBeVisible();
   });
 
+  test('admin can open reports', async ({ page }) => {
+    await login(page, 'admin@urbeno.in');
+    await page.getByRole('link', { name: 'Reports' }).click();
+    await expect(page.locator('.h1', { hasText: 'Reports' })).toBeVisible();
+    await expect(page.getByText('Reporting Period')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Export CSV/ })).toBeVisible();
+  });
+
   test('factory user can sign in and view requests', async ({ page }) => {
     await login(page, 'blr@urbeno.in');
     await page.getByRole('link', { name: 'Requests' }).click();
