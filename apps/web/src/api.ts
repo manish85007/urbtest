@@ -84,6 +84,15 @@ export interface ClientSummary {
   id: string;
   name: string;
   city: string | null;
+  contact?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  active?: boolean;
+  payTermsDays?: number;
+  logoFileId?: string | null;
+  siteActive?: number;
+  siteInactive?: number;
+  requestCount?: number;
 }
 
 export interface SiteSummary {
@@ -91,6 +100,14 @@ export interface SiteSummary {
   code: string;
   name: string;
   address: string | null;
+  gstin?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pin?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  active?: boolean;
 }
 
 export interface CategorySummary {
@@ -99,12 +116,80 @@ export interface CategorySummary {
   description: string;
   groupCode: string;
   capacityTpa: string;
+  activity?: string;
+  authRef?: string | null;
+  active?: boolean;
 }
 
 export interface FactorySummary {
   id: string;
   name: string;
+  address?: string | null;
+  gstin?: string | null;
+  kspcbConsent?: string | null;
+  cpcbEpr?: string | null;
+  managerEmail?: string | null;
+  active?: boolean;
+  approvedTpa?: number;
+  categoryLines?: number;
+  mrnCount?: number;
+  city?: string | null;
+}
+
+export interface LookupRow {
+  id: string;
+  category: string;
+  label: string;
+  active: boolean;
+  rate?: number;
+  description?: string;
+  days?: number;
+  code?: string;
+  phone?: string;
+  gstin?: string;
+  transporterId?: string;
+  address?: string;
+  gst?: number;
+}
+
+export interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'factory' | 'client' | string;
+  clientId: string | null;
+  factoryIds: string[];
+  siteIds?: string[];
+  active: boolean;
+}
+
+export interface ClientDetail {
+  id: string;
+  name: string;
   city: string | null;
+  contact: string | null;
+  phone: string | null;
+  email: string | null;
+  payTermsDays: number;
+  logoFileId: string | null;
+  active: boolean;
+  sites: SiteSummary[];
+  users: UserRow[];
+  stats: {
+    requests: number;
+    open: number;
+    tonnes: number;
+    treesEarned: number;
+    treesPlanted: number;
+    treesOwed: number;
+  };
+  plantings: Array<{
+    id: string;
+    trees: number;
+    plantedAt: string;
+    location: string | null;
+    note: string | null;
+  }>;
 }
 
 export interface SubmissionSummary {
@@ -351,11 +436,19 @@ export const dataApi = {
     api<{ openRequests: number; openInvoices: number; activeClients: number }>(
       '/health/dashboard',
     ),
-  clients: () => api<ClientSummary[]>('/clients'),
-  sites: (clientId: string) => api<SiteSummary[]>(`/clients/${clientId}/sites`),
-  factories: () => api<FactorySummary[]>('/factories'),
-  categories: (factoryId: string) =>
-    api<CategorySummary[]>(`/factories/${factoryId}/categories`),
+  clients: (includeInactive = false) =>
+    api<ClientSummary[]>(`/clients${includeInactive ? '?includeInactive=1' : ''}`),
+  client: (id: string) => api<ClientDetail>(`/clients/${id}`),
+  sites: (clientId: string, includeInactive = false) =>
+    api<SiteSummary[]>(
+      `/clients/${clientId}/sites${includeInactive ? '?includeInactive=1' : ''}`,
+    ),
+  factories: (includeInactive = false) =>
+    api<FactorySummary[]>(`/factories${includeInactive ? '?includeInactive=1' : ''}`),
+  categories: (factoryId: string, includeInactive = false) =>
+    api<CategorySummary[]>(
+      `/factories/${factoryId}/categories${includeInactive ? '?includeInactive=1' : ''}`,
+    ),
   reportsDashboard: (siteId?: string, period?: PeriodQuery) =>
     api<DashboardReport>(
       `/reports/dashboard${qs({ siteId, ...(period ?? {}) })}`,
@@ -379,10 +472,11 @@ export const dataApi = {
     api<HeroesReport>(`/reports/heroes${qs(period ?? {})}`),
   register: (type: RegisterType, period?: PeriodQuery) =>
     api<Record<string, unknown>[]>(`/reports/register/${type}${qs(period ?? {})}`),
-  lookups: (category: string) =>
-    api<Array<{ id: string; category: string; label: string; active: boolean; rate?: number; description?: string }>>(
-      `/lookups/${category}`,
+  lookups: (category: string, includeInactive = false) =>
+    api<LookupRow[]>(
+      `/lookups/${category}${includeInactive ? '?includeInactive=1' : ''}`,
     ),
+  allLookups: () => api<LookupRow[]>('/lookups'),
   search: (q: string) =>
     api<Array<{ grp: string; label: string; sub: string; href: string }>>(
       `/search?q=${encodeURIComponent(q)}`,
@@ -396,18 +490,7 @@ export const dataApi = {
     api<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'POST' }),
   markAllNotificationsRead: () =>
     api<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
-  users: () =>
-    api<
-      Array<{
-        id: string;
-        email: string;
-        name: string;
-        role: string;
-        clientId: string | null;
-        factoryIds: string[];
-        active: boolean;
-      }>
-    >('/users'),
+  users: () => api<UserRow[]>('/users'),
   createClient: (body: {
     id: string;
     name: string;
@@ -415,19 +498,37 @@ export const dataApi = {
     contact?: string;
     phone?: string;
     email?: string;
+    payTermsDays?: number;
+    logoFileId?: string | null;
+    sites: Array<{
+      code: string;
+      name: string;
+      address: string;
+      gstin: string;
+      city?: string;
+      state?: string;
+      pin?: string;
+      contactName?: string;
+      contactPhone?: string;
+      contactEmail?: string;
+    }>;
   }) => api<{ id: string; name: string }>('/clients', { method: 'POST', body: JSON.stringify(body) }),
   createSite: (
     clientId: string,
     body: {
       code: string;
       name: string;
-      address?: string;
-      gstin?: string;
+      address: string;
+      gstin: string;
+      city?: string;
+      state?: string;
+      pin?: string;
       contactName?: string;
       contactPhone?: string;
+      contactEmail?: string;
     },
   ) =>
-    api<{ id: string; code: string; name: string }>(`/clients/${clientId}/sites`, {
+    api<SiteSummary>(`/clients/${clientId}/sites`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -439,9 +540,26 @@ export const dataApi = {
     clientId?: string | null;
     factoryIds?: string[];
     siteIds?: string[];
-  }) => api<{ id: string; email: string }>('/users', { method: 'POST', body: JSON.stringify(body) }),
-  upsertLookup: (body: { category: string; id: string; label: string }) =>
-    api<unknown>('/lookups', { method: 'POST', body: JSON.stringify(body) }),
+  }) =>
+    api<{ id: string; email: string; tempPassword?: string }>('/users', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  upsertLookup: (body: {
+    category: string;
+    id?: string;
+    label?: string;
+    active?: boolean;
+    rate?: number;
+    description?: string;
+    days?: number;
+    code?: string;
+    phone?: string;
+    gstin?: string;
+    transporterId?: string;
+    address?: string;
+    gst?: number;
+  }) => api<unknown>('/lookups', { method: 'POST', body: JSON.stringify(body) }),
   recordPlanting: (body: {
     trees: number;
     plantedAt: string;
@@ -463,19 +581,74 @@ export const dataApi = {
     }),
   updateClient: (
     id: string,
-    body: { name?: string; city?: string; payTermsDays?: number; active?: boolean },
+    body: {
+      name?: string;
+      city?: string;
+      contact?: string;
+      phone?: string;
+      email?: string;
+      payTermsDays?: number;
+      logoFileId?: string | null;
+      active?: boolean;
+    },
   ) => api<unknown>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  updateSite: (id: string, body: { active?: boolean; name?: string }) =>
-    api<unknown>(`/sites/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  upsertFactory: (body: { id: string; name: string; address?: string; gstin?: string }) =>
-    api<unknown>('/factories', { method: 'POST', body: JSON.stringify(body) }),
+  updateSite: (
+    id: string,
+    body: {
+      active?: boolean;
+      name?: string;
+      address?: string;
+      gstin?: string;
+      city?: string;
+      state?: string;
+      pin?: string;
+      contactName?: string;
+      contactPhone?: string;
+      contactEmail?: string;
+    },
+  ) => api<unknown>(`/sites/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  updateUser: (
+    id: string,
+    body: {
+      name?: string;
+      role?: 'admin' | 'factory' | 'client';
+      clientId?: string | null;
+      factoryIds?: string[];
+      siteIds?: string[];
+      active?: boolean;
+    },
+  ) => api<UserRow>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  upsertFactory: (body: {
+    id: string;
+    name: string;
+    address?: string;
+    gstin?: string;
+    kspcbConsent?: string;
+    cpcbEpr?: string;
+    managerEmail?: string;
+    active?: boolean;
+  }) => api<unknown>('/factories', { method: 'POST', body: JSON.stringify(body) }),
   upsertCategory: (body: {
     factoryId: string;
     entryId: string;
     description: string;
     groupCode: string;
     capacityTpa: number;
+    activity?: string;
+    authRef?: string;
+    active?: boolean;
   }) => api<unknown>('/categories', { method: 'POST', body: JSON.stringify(body) }),
+  patchCategory: (
+    id: number,
+    body: {
+      description?: string;
+      groupCode?: string;
+      capacityTpa?: number;
+      activity?: string;
+      authRef?: string;
+      active?: boolean;
+    },
+  ) => api<unknown>(`/categories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
 
 export const adminApi = {
@@ -489,9 +662,19 @@ export const adminApi = {
 
 export const emailsApi = {
   outbox: (limit = 50) =>
-    api<Array<{ id: string; subject: string; status: string; createdAt: string; to: string[] }>>(
-      `/emails/outbox?limit=${limit}`,
-    ),
+    api<
+      Array<{
+        id: string;
+        subject: string;
+        status: string;
+        createdAt: string;
+        sentAt: string | null;
+        to: string[];
+        body?: string;
+        templateKey?: string;
+        templateName?: string | null;
+      }>
+    >(`/emails/outbox?limit=${limit}`),
   templates: () =>
     api<
       Array<{
@@ -501,6 +684,7 @@ export const emailsApi = {
         subject: string;
         body: string;
         editable: boolean;
+        variables?: string[];
       }>
     >('/email-templates'),
   createTemplate: (body: { key: string; name: string; subject: string; body: string }) =>

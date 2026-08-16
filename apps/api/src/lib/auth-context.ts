@@ -26,6 +26,14 @@ export function isStaff(user: SessionUser): boolean {
   return user.role === 'admin' || user.role === 'factory';
 }
 
+/** Empty factoryIds means every facility (kit: leave all unchecked). */
+export function factoryInScope(user: SessionUser, factoryId: string): boolean {
+  if (user.role === 'admin') return true;
+  if (user.role !== 'factory') return false;
+  if (!user.factoryIds.length) return true;
+  return user.factoryIds.includes(factoryId);
+}
+
 export function canSeeMrn(user: SessionUser): boolean {
   return isStaff(user);
 }

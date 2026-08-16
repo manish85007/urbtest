@@ -57,8 +57,12 @@ model Site {
   name        String
   address     String?
   gstin       String?
+  city        String?
+  state       String?
+  pin         String?  @db.VarChar(10)
   contactName String?  @map("contact_name")
   contactPhone String? @map("contact_phone")
+  contactEmail String? @map("contact_email")
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -76,6 +80,7 @@ model FactorySite {
   gstin       String?
   kspcbConsent String? @map("kspcb_consent")
   cpcbEpr     String?  @map("cpcb_epr")
+  managerEmail String? @map("manager_email")
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
 

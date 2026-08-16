@@ -1,4 +1,5 @@
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
+import { treesEarned } from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
@@ -6,57 +7,124 @@ import { hashPassword } from './auth.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { sendTransactionalEmail } from './email.js';
 
-export async function createClient(
-  actor: SessionUser,
-  input: { id: string; name: string; city?: string; contact?: string; phone?: string; email?: string },
-) {
-  const id = input.id.trim().toUpperCase();
-  if (!/^[A-Z0-9]{2,4}$/.test(id)) {
-    throw new AppError('Client ID must be 2–4 uppercase letters or digits.');
-  }
+const RESERVED_CLIENT_PREFIX = /^(URB|ADM|SYS|TEST)/;
 
-  const client = await prisma.client.create({
-    data: {
-      id,
-      name: input.name.trim(),
-      city: input.city?.trim() || null,
-      contact: input.contact?.trim() || null,
-      phone: input.phone?.trim() || null,
-      email: input.email?.trim().toLowerCase() || null,
-      createdBy: actor.email,
-    },
-  });
+export type SiteInput = {
+  code: string;
+  name: string;
+  address?: string;
+  gstin?: string;
+  city?: string;
+  state?: string;
+  pin?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+};
 
-  await auditLog({
-    actorEmail: actor.email,
-    actorId: actor.id,
-    action: 'client.create',
-    entity: 'client',
-    entityId: client.id,
-  });
-
-  return client;
+export function validClientCode(code: string, taken?: boolean): string | null {
+  const c = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{4}$/.test(c)) return 'Client ID must be exactly 4 uppercase letters or digits.';
+  if (RESERVED_CLIENT_PREFIX.test(c)) return 'That prefix is reserved for Urbeno internal use.';
+  if (taken) return `Client ID ${c} is already taken.`;
+  return null;
 }
 
-export async function createSite(
+function siteData(input: SiteInput) {
+  const code = input.code.trim().toUpperCase();
+  const name = input.name.trim();
+  const gstin = input.gstin?.trim().toUpperCase() || '';
+  const address = input.address?.trim() || '';
+  if (!code || !name || !gstin || !address) {
+    throw new AppError('Site code, name, GST and address are all required.');
+  }
+  return {
+    code,
+    name,
+    address,
+    gstin,
+    city: input.city?.trim() || null,
+    state: input.state?.trim() || null,
+    pin: input.pin?.trim() || null,
+    contactName: input.contactName?.trim() || null,
+    contactPhone: input.contactPhone?.trim() || null,
+    contactEmail: input.contactEmail?.trim().toLowerCase() || null,
+  };
+}
+
+export async function createClient(
   actor: SessionUser,
-  clientId: string,
-  input: { code: string; name: string; address?: string; gstin?: string; contactName?: string; contactPhone?: string },
+  input: {
+    id: string;
+    name: string;
+    city?: string;
+    contact?: string;
+    phone?: string;
+    email?: string;
+    payTermsDays?: number;
+    logoFileId?: string | null;
+    sites?: SiteInput[];
+  },
 ) {
+  const id = input.id.trim().toUpperCase();
+  const existing = await prisma.client.findUnique({ where: { id } });
+  const err = validClientCode(id, !!existing);
+  if (err) throw new AppError(err);
+
+  const name = input.name.trim();
+  if (!name) throw new AppError('Client legal name is required.');
+
+  const sites = (input.sites ?? []).filter((s) => s.code && s.name && s.gstin && s.address);
+  if (!sites.length) {
+    throw new AppError('Add at least one site with a code, name, GST and address.');
+  }
+
+  try {
+    const client = await prisma.client.create({
+      data: {
+        id,
+        name,
+        city: input.city?.trim() || null,
+        contact: input.contact?.trim() || null,
+        phone: input.phone?.trim() || null,
+        email: input.email?.trim().toLowerCase() || null,
+        payTermsDays: input.payTermsDays ?? 30,
+        logoFileId: input.logoFileId ?? null,
+        createdBy: actor.email,
+        sites: { create: sites.map(siteData) },
+      },
+      include: { sites: true },
+    });
+
+    await auditLog({
+      actorEmail: actor.email,
+      actorId: actor.id,
+      action: 'client.create',
+      entity: 'client',
+      entityId: client.id,
+      details: { name: client.name, sites: client.sites.length },
+    });
+
+    return client;
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw new AppError(`Client ID ${id} is already taken.`);
+    }
+    throw e;
+  }
+}
+
+export async function createSite(actor: SessionUser, clientId: string, input: SiteInput) {
   const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) throw new AppError('Client not found.');
 
-  const site = await prisma.site.create({
-    data: {
-      clientId,
-      code: input.code.trim().toUpperCase(),
-      name: input.name.trim(),
-      address: input.address?.trim() || null,
-      gstin: input.gstin?.trim() || null,
-      contactName: input.contactName?.trim() || null,
-      contactPhone: input.contactPhone?.trim() || null,
-    },
+  const data = siteData(input);
+  const dup = await prisma.site.findUnique({
+    where: { clientId_code: { clientId, code: data.code } },
   });
+  if (dup) throw new AppError(`Site code ${data.code} already exists for this client.`);
+
+  const site = await prisma.site.create({ data: { clientId, ...data } });
 
   await auditLog({
     actorEmail: actor.email,
@@ -68,6 +136,10 @@ export async function createSite(
   });
 
   return site;
+}
+
+function tempPassword() {
+  return `urb${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
 export async function createUser(
@@ -84,9 +156,13 @@ export async function createUser(
 ) {
   const email = input.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) throw new AppError('A user with this email already exists.');
+  if (existing) throw new AppError(`A user with email ${email} already exists.`);
+  if (input.role === 'client' && !input.clientId) {
+    throw new AppError('Select which client this user belongs to.');
+  }
 
-  const passwordHash = await hashPassword(input.password?.trim() || 'demo');
+  const tmp = input.password?.trim() || tempPassword();
+  const passwordHash = await hashPassword(tmp);
 
   const user = await prisma.user.create({
     data: {
@@ -94,10 +170,23 @@ export async function createUser(
       name: input.name.trim(),
       role: input.role,
       passwordHash,
-      clientId: input.clientId ?? null,
-      factoryIds: input.factoryIds ?? [],
-      siteIds: input.siteIds ?? [],
+      clientId: input.role === 'client' ? input.clientId ?? null : null,
+      factoryIds: input.role === 'factory' ? input.factoryIds ?? [] : [],
+      siteIds: input.role === 'client' ? input.siteIds ?? [] : [],
     },
+  });
+
+  const clientName =
+    user.clientId
+      ? (await prisma.client.findUnique({ where: { id: user.clientId }, select: { name: true } }))?.name
+      : 'Urbeno';
+
+  await sendTransactionalEmail('user_welcome', [email], {
+    user_name: user.name,
+    user_email: email,
+    client_name: clientName ?? 'Urbeno',
+    temp_password: tmp,
+    admin_name: actor.name,
   });
 
   await auditLog({
@@ -117,6 +206,7 @@ export async function createUser(
     clientId: user.clientId,
     factoryIds: user.factoryIds,
     siteIds: user.siteIds,
+    tempPassword: tmp,
   };
 }
 
@@ -130,9 +220,117 @@ export async function listUsers() {
       role: true,
       clientId: true,
       factoryIds: true,
+      siteIds: true,
       active: true,
     },
   });
+}
+
+export async function listClientsForMasters(includeInactive = false) {
+  const clients = await prisma.client.findMany({
+    where: includeInactive ? {} : { active: true },
+    orderBy: { name: 'asc' },
+    include: {
+      sites: { select: { active: true } },
+      _count: { select: { submissions: true } },
+    },
+  });
+  return clients.map((c) => ({
+    id: c.id,
+    name: c.name,
+    city: c.city,
+    contact: c.contact,
+    phone: c.phone,
+    email: c.email,
+    active: c.active,
+    payTermsDays: c.payTermsDays,
+    logoFileId: c.logoFileId,
+    siteActive: c.sites.filter((s) => s.active).length,
+    siteInactive: c.sites.filter((s) => !s.active).length,
+    requestCount: c._count.submissions,
+  }));
+}
+
+export async function getClientDetail(clientId: string) {
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    include: {
+      sites: { orderBy: { code: 'asc' } },
+      users: {
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          siteIds: true,
+          active: true,
+        },
+      },
+    },
+  });
+  if (!client) throw new AppError('Client not found.', 404);
+
+  const [requestCount, openCount, closedAgg, plantings] = await Promise.all([
+    prisma.submission.count({ where: { clientId } }),
+    prisma.submission.count({ where: { clientId, closedAt: null } }),
+    prisma.invoice.aggregate({
+      where: { closedAt: { not: null }, submission: { clientId } },
+      _sum: { billingWeight: true },
+    }),
+    prisma.treePlanting.findMany({
+      where: { clientId },
+      orderBy: { plantedAt: 'desc' },
+    }),
+  ]);
+
+  const kg = Number(closedAgg._sum.billingWeight ?? 0);
+  const tonnes = kg / 1000;
+  const earned = treesEarned(tonnes);
+  const planted = plantings.reduce((s, p) => s + p.trees, 0);
+
+  return {
+    ...client,
+    stats: {
+      requests: requestCount,
+      open: openCount,
+      tonnes,
+      treesEarned: earned,
+      treesPlanted: planted,
+      treesOwed: Math.max(0, earned - planted),
+    },
+    plantings: plantings.map((p) => ({
+      id: p.id,
+      trees: p.trees,
+      plantedAt: p.plantedAt.toISOString().slice(0, 10),
+      location: p.location,
+      note: p.note,
+    })),
+  };
+}
+
+export async function listFactoriesForMasters(includeInactive = false) {
+  const factories = await prisma.factorySite.findMany({
+    where: includeInactive ? {} : { active: true },
+    orderBy: { name: 'asc' },
+    include: {
+      categories: { where: { active: true }, select: { capacityTpa: true } },
+      _count: { select: { mrns: true } },
+    },
+  });
+  return factories.map((f) => ({
+    id: f.id,
+    name: f.name,
+    address: f.address,
+    gstin: f.gstin,
+    kspcbConsent: f.kspcbConsent,
+    cpcbEpr: f.cpcbEpr,
+    managerEmail: f.managerEmail,
+    active: f.active,
+    approvedTpa: f.categories.reduce((s, c) => s + Number(c.capacityTpa), 0),
+    categoryLines: f.categories.length,
+    mrnCount: f._count.mrns,
+  }));
 }
 
 export async function updateClient(
@@ -179,15 +377,28 @@ export async function updateClient(
 export async function updateSite(
   actor: SessionUser,
   siteId: string,
-  input: { name?: string; address?: string; gstin?: string; active?: boolean },
+  input: {
+    name?: string;
+    address?: string;
+    gstin?: string;
+    city?: string;
+    state?: string;
+    pin?: string;
+    contactName?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    active?: boolean;
+  },
 ) {
   const site = await prisma.site.findUnique({ where: { id: siteId } });
   if (!site) throw new AppError('Site not found.');
 
-  if (input.active === false) {
-    const used = await prisma.submission.count({ where: { siteId } });
-    if (used > 0 && input.active === false) {
-      // A3 — deactivate, never delete
+  if (input.name !== undefined || input.address !== undefined || input.gstin !== undefined) {
+    const name = (input.name ?? site.name).trim();
+    const gstin = (input.gstin ?? site.gstin ?? '').trim();
+    const address = (input.address ?? site.address ?? '').trim();
+    if (!name || !gstin || !address) {
+      throw new AppError('Site name, GST and address are all required.');
     }
   }
 
@@ -196,7 +407,13 @@ export async function updateSite(
     data: {
       name: input.name?.trim() || undefined,
       address: input.address !== undefined ? input.address.trim() || null : undefined,
-      gstin: input.gstin !== undefined ? input.gstin.trim() || null : undefined,
+      gstin: input.gstin !== undefined ? input.gstin.trim().toUpperCase() || null : undefined,
+      city: input.city !== undefined ? input.city.trim() || null : undefined,
+      state: input.state !== undefined ? input.state.trim() || null : undefined,
+      pin: input.pin !== undefined ? input.pin.trim() || null : undefined,
+      contactName: input.contactName !== undefined ? input.contactName.trim() || null : undefined,
+      contactPhone: input.contactPhone !== undefined ? input.contactPhone.trim() || null : undefined,
+      contactEmail: input.contactEmail !== undefined ? input.contactEmail.trim().toLowerCase() || null : undefined,
       active: input.active,
     },
   });
@@ -204,7 +421,7 @@ export async function updateSite(
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
-    action: input.active === false ? 'site.deactivate' : 'site.update',
+    action: input.active === false ? 'site.deactivate' : input.active === true ? 'site.activate' : 'site.update',
     entity: 'site',
     entityId: siteId,
   });
@@ -226,6 +443,9 @@ export async function updateUser(
 ) {
   const existing = await prisma.user.findUnique({ where: { id: userId } });
   if (!existing) throw new AppError('User not found.');
+  if (input.active === false && existing.id === actor.id) {
+    throw new AppError('You cannot disable your own account.');
+  }
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -245,6 +465,7 @@ export async function updateUser(
       role: true,
       clientId: true,
       factoryIds: true,
+      siteIds: true,
       active: true,
     },
   });
@@ -268,10 +489,15 @@ export async function upsertFactory(
     gstin?: string;
     kspcbConsent?: string;
     cpcbEpr?: string;
+    managerEmail?: string | null;
     active?: boolean;
   },
 ) {
   const id = input.id.trim().toUpperCase();
+  if (!input.name.trim()) throw new AppError('Facility name is required.');
+  if (!input.address?.trim() && !(await prisma.factorySite.findUnique({ where: { id } }))) {
+    throw new AppError('Facility name and address are required.');
+  }
   const factory = await prisma.factorySite.upsert({
     where: { id },
     create: {
@@ -281,6 +507,7 @@ export async function upsertFactory(
       gstin: input.gstin?.trim() || null,
       kspcbConsent: input.kspcbConsent?.trim() || null,
       cpcbEpr: input.cpcbEpr?.trim() || null,
+      managerEmail: input.managerEmail?.trim().toLowerCase() || null,
       active: input.active ?? true,
     },
     update: {
@@ -289,6 +516,7 @@ export async function upsertFactory(
       gstin: input.gstin !== undefined ? input.gstin.trim() || null : undefined,
       kspcbConsent: input.kspcbConsent !== undefined ? input.kspcbConsent.trim() || null : undefined,
       cpcbEpr: input.cpcbEpr !== undefined ? input.cpcbEpr.trim() || null : undefined,
+      managerEmail: input.managerEmail !== undefined ? input.managerEmail?.trim().toLowerCase() || null : undefined,
       active: input.active,
     },
   });
@@ -351,6 +579,43 @@ export async function upsertCategory(
     action: existing ? 'category.update' : 'category.create',
     entity: 'category',
     entityId: `${input.factoryId}:${input.entryId}`,
+  });
+  return row;
+}
+
+export async function patchCategory(
+  actor: SessionUser,
+  id: number,
+  input: {
+    description?: string;
+    groupCode?: string;
+    capacityTpa?: number;
+    activity?: string;
+    authRef?: string;
+    active?: boolean;
+  },
+) {
+  const existing = await prisma.categoryMaster.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Category not found.', 404);
+
+  const row = await prisma.categoryMaster.update({
+    where: { id },
+    data: {
+      description: input.description?.trim() || undefined,
+      groupCode: input.groupCode,
+      capacityTpa: input.capacityTpa,
+      activity: input.activity,
+      authRef: input.authRef !== undefined ? input.authRef : undefined,
+      active: input.active,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'category.update',
+    entity: 'category',
+    entityId: `${row.factoryId}:${row.entryId}`,
   });
   return row;
 }

@@ -16,7 +16,7 @@ import {
   type ReportPeriod,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
-import { clientScopeFilter, isStaff } from '../lib/auth-context.js';
+import { clientScopeFilter, factoryInScope, isStaff } from '../lib/auth-context.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
@@ -73,7 +73,7 @@ function factoryCanSee(actor: SessionUser, inv: InvoiceRow): boolean {
   if (actor.role === 'admin') return true;
   if (actor.role !== 'factory') return false;
   if (!inv.mrn) return true;
-  return actor.factoryIds.includes(inv.mrn.factoryId);
+  return factoryInScope(actor, inv.mrn.factoryId);
 }
 
 export async function getStaffDashboard(actor: SessionUser) {
@@ -283,7 +283,7 @@ export async function getReportsForActor(actor: SessionUser, siteId?: string, pe
 }
 
 export async function getCapacityReport(actor: SessionUser, factoryId: string) {
-  if (actor.role === 'factory' && !actor.factoryIds.includes(factoryId)) {
+  if (actor.role === 'factory' && !factoryInScope(actor, factoryId)) {
     throw new AppError('Access denied for this factory.');
   }
   if (actor.role === 'client') {
@@ -429,7 +429,7 @@ export async function getRegisterReport(actor: SessionUser, type: RegisterType, 
       orderBy: { receivedAt: 'desc' },
       take: 500,
     });
-    const visible = actor.role === 'factory' ? rows.filter((m) => actor.factoryIds.includes(m.factoryId)) : rows;
+    const visible = actor.role === 'factory' ? rows.filter((m) => factoryInScope(actor, m.factoryId)) : rows;
     return visible.filter((m) => inP(m.receivedAt)).map((m) => ({
       mrnNo: m.mrnNo,
       invoiceNo: m.invoice.invoiceNo,

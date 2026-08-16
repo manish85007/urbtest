@@ -1,5 +1,5 @@
 import type { SessionUser } from './auth-context.js';
-import { clientScopeFilter, isStaff } from './auth-context.js';
+import { clientScopeFilter, factoryInScope, isStaff } from './auth-context.js';
 import { AppError } from './errors.js';
 import { prisma } from './prisma.js';
 import { submissionInclude, type SubmissionFull } from './db-helpers.js';
@@ -57,8 +57,7 @@ export function requireStaff(actor: SessionUser) {
 }
 
 export function requireFactory(actor: SessionUser, factoryId: string) {
-  if (actor.role === 'admin') return;
-  if (actor.role !== 'factory' || !actor.factoryIds.includes(factoryId)) {
+  if (!factoryInScope(actor, factoryId)) {
     throw new AppError('Factory access required for this facility.', 403);
   }
 }

@@ -29,6 +29,7 @@ async function main() {
       gstin: '29AABCU1234R1ZX',
       kspcbConsent: 'KSPCB/HWM/AUTH/2024-27/1142',
       cpcbEpr: 'CPCB/EPR/2022/KA/00817',
+      managerEmail: 'blr@urbeno.in',
     },
     {
       id: 'URB-KGF',
@@ -37,6 +38,7 @@ async function main() {
       gstin: '29AABCU1234R1ZX',
       kspcbConsent: 'KSPCB/HWM/AUTH/2024-27/1142',
       cpcbEpr: 'CPCB/EPR/2022/KA/00817',
+      managerEmail: 'kgf@urbeno.in',
     },
   ];
 

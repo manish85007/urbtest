@@ -40,5 +40,12 @@
     "subject": "Your Urb TecTrack password reset code",
     "body": "Dear {{user_name}},\n\nA password reset was requested for your Urb TecTrack account.\n\nYour 6-digit code is: {{code}}\n\nIt expires in {{expiry_minutes}} minutes. If you did not request this, ignore this email and contact {{support_email}}.\n\nUrb TecTrack",
     "variables": ["user_name", "code", "expiry_minutes", "support_email"]
+  },
+  {
+    "key": "user_welcome",
+    "name": "New User Welcome",
+    "subject": "Welcome to Urb TecTrack — your account is ready",
+    "body": "Hello {{user_name}},\n\nAn Urb TecTrack account has been created for you on behalf of {{client_name}}.\n\n  Sign-in email     : {{user_email}}\n  Temporary password: {{temp_password}}\n\nPlease sign in and change your password on first use.\n\nUrb TecTrack lets you raise e-waste collection requests, track them through every stage, download compliance documents, and view your sustainability impact.\n\nWarm regards,\n{{admin_name}}\nUrbeno Private Limited",
+    "variables": ["user_name", "user_email", "client_name", "temp_password", "admin_name"]
   }
 ]

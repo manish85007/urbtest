@@ -1,16 +1,20 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
-import { isStaff } from '../lib/auth-context.js';
+import { factoryInScope, isStaff } from '../lib/auth-context.js';
 import { isAppError } from '../lib/errors.js';
-import { listLookups, upsertLookup } from '../services/lookups.js';
+import { listAllLookups, listLookups, upsertLookup } from '../services/lookups.js';
 import {
   createClient,
   createSite,
   createUser,
+  getClientDetail,
+  listClientsForMasters,
+  listFactoriesForMasters,
   listUsers,
+  patchCategory,
   updateClient,
   updateSite,
   updateUser,
@@ -19,42 +23,67 @@ import {
 } from '../services/masters-write.js';
 
 function handleErr(err: unknown, reply: { badRequest: (m: string) => unknown; status: (n: number) => { send: (b: unknown) => unknown } }) {
+  if (err instanceof ZodError) {
+    return reply.status(400).send({ message: err.issues[0]?.message ?? 'Invalid input.' });
+  }
   if (isAppError(err)) {
     return reply.status(err.statusCode).send({ message: err.message });
   }
   throw err;
 }
 
+const emptyToUndef = (v: unknown) => (typeof v === 'string' && !v.trim() ? undefined : v);
+
+const siteBody = z.object({
+  code: z.string().min(1).max(16),
+  name: z.string().min(1),
+  address: z.string().min(1),
+  gstin: z.string().min(1),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  pin: z.string().optional(),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
+  contactEmail: z.preprocess(emptyToUndef, z.string().email().optional()),
+});
+
 export async function mastersRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
   app.get('/clients', { preHandler: requireAuth }, async (request) => {
     const actor = request.user!;
+    const includeInactive = isStaff(actor) && (request.query as { includeInactive?: string }).includeInactive === '1';
+
     if (isStaff(actor)) {
-      return prisma.client.findMany({
-        where: { active: true },
-        orderBy: { name: 'asc' },
-        select: { id: true, name: true, city: true },
-      });
+      return listClientsForMasters(includeInactive);
     }
     if (!actor.clientId) return [];
-    const client = await prisma.client.findUnique({
-      where: { id: actor.clientId },
-      select: { id: true, name: true, city: true },
-    });
-    return client ? [client] : [];
+    const list = await listClientsForMasters(false);
+    return list.filter((c) => c.id === actor.clientId);
+  });
+
+  app.get('/clients/:clientId', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { clientId } = request.params as { clientId: string };
+      return await getClientDetail(clientId);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
   });
 
   app.post('/clients', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       const body = z
         .object({
-          id: z.string().min(2).max(4),
+          id: z.string().length(4),
           name: z.string().min(1),
           city: z.string().optional(),
           contact: z.string().optional(),
           phone: z.string().optional(),
-          email: z.string().email().optional(),
+          email: z.preprocess(emptyToUndef, z.string().email().optional()),
+          payTermsDays: z.number().int().min(0).optional(),
+          logoFileId: z.string().nullable().optional(),
+          sites: z.array(siteBody).min(1),
         })
         .parse(request.body);
       return await createClient(request.user!, body);
@@ -66,13 +95,14 @@ export async function mastersRoutes(app: FastifyInstance) {
   app.get('/clients/:clientId/sites', { preHandler: requireAuth }, async (request, reply) => {
     const { clientId } = request.params as { clientId: string };
     const actor = request.user!;
+    const includeInactive = isStaff(actor) && (request.query as { includeInactive?: string }).includeInactive === '1';
 
     if (!isStaff(actor) && actor.clientId !== clientId) {
       return reply.forbidden('Access denied.');
     }
 
     const sites = await prisma.site.findMany({
-      where: { clientId, active: true },
+      where: { clientId, ...(includeInactive ? {} : { active: true }) },
       orderBy: { name: 'asc' },
     });
 
@@ -85,16 +115,7 @@ export async function mastersRoutes(app: FastifyInstance) {
   app.post('/clients/:clientId/sites', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       const { clientId } = request.params as { clientId: string };
-      const body = z
-        .object({
-          code: z.string().min(1).max(16),
-          name: z.string().min(1),
-          address: z.string().optional(),
-          gstin: z.string().optional(),
-          contactName: z.string().optional(),
-          contactPhone: z.string().optional(),
-        })
-        .parse(request.body);
+      const body = siteBody.parse(request.body);
       return await createSite(request.user!, clientId, body);
     } catch (err) {
       return handleErr(err, reply);
@@ -124,12 +145,10 @@ export async function mastersRoutes(app: FastifyInstance) {
 
   app.get('/factories', { preHandler: requireAuth }, async (request) => {
     const actor = request.user!;
-    const all = await prisma.factorySite.findMany({
-      where: { active: true },
-      orderBy: { name: 'asc' },
-    });
+    const includeInactive = actor.role === 'admin' && (request.query as { includeInactive?: string }).includeInactive === '1';
+    const all = await listFactoriesForMasters(includeInactive);
     if (actor.role === 'factory') {
-      return all.filter((f) => actor.factoryIds.includes(f.id));
+      return all.filter((f) => factoryInScope(actor, f.id));
     }
     return all;
   });
@@ -137,27 +156,41 @@ export async function mastersRoutes(app: FastifyInstance) {
   app.get('/factories/:factoryId/categories', { preHandler: requireAuth }, async (request, reply) => {
     const { factoryId } = request.params as { factoryId: string };
     const actor = request.user!;
+    const includeInactive = isStaff(actor) && (request.query as { includeInactive?: string }).includeInactive === '1';
 
-    if (actor.role === 'factory' && !actor.factoryIds.includes(factoryId)) {
+    if (!factoryInScope(actor, factoryId) && actor.role !== 'admin') {
+      return reply.forbidden('Access denied.');
+    }
+    if (actor.role === 'client') {
       return reply.forbidden('Access denied.');
     }
 
-    return prisma.categoryMaster.findMany({
-      where: { factoryId, active: true },
+    const rows = await prisma.categoryMaster.findMany({
+      where: { factoryId, ...(includeInactive ? {} : { active: true }) },
       orderBy: [{ groupCode: 'asc' }, { entryId: 'asc' }],
-      select: {
-        id: true,
-        entryId: true,
-        description: true,
-        groupCode: true,
-        capacityTpa: true,
-      },
     });
+    return rows.map((c) => ({
+      id: c.id,
+      entryId: c.entryId,
+      description: c.description,
+      groupCode: c.groupCode,
+      capacityTpa: c.capacityTpa.toString(),
+      activity: c.activity,
+      authRef: c.authRef,
+      active: c.active,
+    }));
+  });
+
+  app.get('/lookups', { preHandler: requireAdmin }, async (request) => {
+    const includeInactive = (request.query as { includeInactive?: string }).includeInactive !== '0';
+    return listAllLookups(includeInactive);
   });
 
   app.get('/lookups/:category', { preHandler: requireAuth }, async (request) => {
     const { category } = request.params as { category: string };
-    return listLookups(category);
+    const actor = request.user!;
+    const includeInactive = isStaff(actor) && (request.query as { includeInactive?: string }).includeInactive === '1';
+    return listLookups(category, includeInactive);
   });
 
   app.post('/lookups', { preHandler: requireAdmin }, async (request, reply) => {
@@ -165,11 +198,19 @@ export async function mastersRoutes(app: FastifyInstance) {
       const body = z
         .object({
           category: z.string().min(1),
-          id: z.string().min(1),
-          label: z.string().min(1),
+          id: z.string().optional(),
+          label: z.string().optional(),
           active: z.boolean().optional(),
           rate: z.number().optional(),
           description: z.string().optional(),
+          days: z.number().optional(),
+          code: z.string().optional(),
+          phone: z.string().optional(),
+          gstin: z.string().optional(),
+          transporterId: z.string().optional(),
+          address: z.string().optional(),
+          gst: z.number().optional(),
+          data: z.record(z.unknown()).optional(),
         })
         .parse(request.body);
       return await upsertLookup(body);
@@ -187,8 +228,8 @@ export async function mastersRoutes(app: FastifyInstance) {
           city: z.string().optional(),
           contact: z.string().optional(),
           phone: z.string().optional(),
-          email: z.string().email().optional(),
-          payTermsDays: z.number().int().positive().optional(),
+          email: z.preprocess(emptyToUndef, z.string().email().optional()),
+          payTermsDays: z.number().int().min(0).optional(),
           logoFileId: z.string().nullable().optional(),
           active: z.boolean().optional(),
         })
@@ -207,6 +248,12 @@ export async function mastersRoutes(app: FastifyInstance) {
           name: z.string().optional(),
           address: z.string().optional(),
           gstin: z.string().optional(),
+          city: z.string().optional(),
+          state: z.string().optional(),
+          pin: z.string().optional(),
+          contactName: z.string().optional(),
+          contactPhone: z.string().optional(),
+          contactEmail: z.preprocess(emptyToUndef, z.string().email().optional()),
           active: z.boolean().optional(),
         })
         .parse(request.body);
@@ -246,6 +293,7 @@ export async function mastersRoutes(app: FastifyInstance) {
           gstin: z.string().optional(),
           kspcbConsent: z.string().optional(),
           cpcbEpr: z.string().optional(),
+          managerEmail: z.preprocess(emptyToUndef, z.string().email().optional()),
           active: z.boolean().optional(),
         })
         .parse(request.body);
@@ -265,6 +313,7 @@ export async function mastersRoutes(app: FastifyInstance) {
           gstin: z.string().optional(),
           kspcbConsent: z.string().optional(),
           cpcbEpr: z.string().optional(),
+          managerEmail: z.preprocess(emptyToUndef, z.string().email().nullable().optional()),
           active: z.boolean().optional(),
         })
         .parse(request.body);
@@ -289,6 +338,26 @@ export async function mastersRoutes(app: FastifyInstance) {
         })
         .parse(request.body);
       return await upsertCategory(request.user!, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.patch('/categories/:id', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const id = Number((request.params as { id: string }).id);
+      if (!Number.isFinite(id)) throw new Error('Invalid category id');
+      const body = z
+        .object({
+          description: z.string().optional(),
+          groupCode: z.string().optional(),
+          capacityTpa: z.number().positive().optional(),
+          activity: z.string().optional(),
+          authRef: z.string().optional(),
+          active: z.boolean().optional(),
+        })
+        .parse(request.body);
+      return await patchCategory(request.user!, id, body);
     } catch (err) {
       return handleErr(err, reply);
     }

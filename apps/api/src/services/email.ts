@@ -123,6 +123,7 @@ export async function listEmailOutbox(limit = 50) {
       sentAt: true,
       createdAt: true,
       error: true,
+      body: true,
     },
   });
 }

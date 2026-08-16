@@ -14,6 +14,7 @@ import { ImpactPage } from './pages/ImpactPage';
 import { HeroesPage } from './pages/HeroesPage';
 import { CapacityPage } from './pages/CapacityPage';
 import { MastersPage } from './pages/MastersPage';
+import { ClientDetailPage } from './pages/ClientDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { Shell } from './components/Shell';
 import { LegalConsentGate } from './components/LegalConsentGate';
@@ -111,6 +112,14 @@ export function App() {
           element={
             <AdminOnly user={user}>
               <MastersPage />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="/masters/clients/:id"
+          element={
+            <AdminOnly user={user}>
+              <ClientDetailPage />
             </AdminOnly>
           }
         />
