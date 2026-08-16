@@ -39,17 +39,22 @@ export function ReportsPage({ user }: ReportsPageProps) {
   return (
     <div>
       <div className="f-row">
-        <h1 className="h1">Reports</h1>
+        <div>
+          <div className="h1">Reports</div>
+          <div className="p-mu" style={{ margin: 0 }}>
+            Registers aligned with the v6.3.1 prototype — export CSV for the current financial year.
+          </div>
+        </div>
+        <div className="spacer" />
         <button
           type="button"
-          className="btn secondary"
+          className="btn bs"
           disabled={!rows.length}
           onClick={() => downloadCsv(`${type}-report.csv`, rows)}
         >
           Export CSV
         </button>
       </div>
-      <p className="muted">Financial year reporting aligned with the prototype registers.</p>
 
       <div className="tabs">
         {available.map((r) => (

@@ -59,8 +59,8 @@ export function MastersPage() {
 
   return (
     <div>
-      <h1 className="h1">Master data</h1>
-      <p className="muted">Create clients, sites, users, and lookups. Process the email queue from the Email tab.</p>
+      <h1 className="h1">Masters</h1>
+      <p className="p-mu">Clients, sites, users, factories, category master, lookups, and the email queue.</p>
       {msg ? <p className="ok-msg">{msg}</p> : null}
       {error ? <p className="error">{error}</p> : null}
 

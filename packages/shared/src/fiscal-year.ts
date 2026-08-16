@@ -29,6 +29,18 @@ export function currentFY(): FiscalYear | null {
   return getFY(new Date());
 }
 
+/** FY labels from a start year through the current year, newest first. */
+export function listFiscalYears(fromStartYear = 2024): FiscalYear[] {
+  const cur = currentFY();
+  const end = cur?.start ?? new Date().getFullYear();
+  const out: FiscalYear[] = [];
+  for (let y = fromStartYear; y <= end; y++) {
+    const fy = getFY(`${y}-06-15`);
+    if (fy) out.push(fy);
+  }
+  return out.reverse();
+}
+
 /** Whether a date falls in the given FY label (e.g. "FY 2025-26"). */
 export function inFiscalYear(date: Date, fyLabel: string): boolean {
   const fy = getFY(date);

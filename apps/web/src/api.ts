@@ -114,8 +114,11 @@ export interface SubmissionSummary {
   siteName: string;
   requestDate: string;
   approxWeight: string;
+  ref?: string | null;
   stage: number;
   invoiceCount: number;
+  invoices?: Array<{ invoiceNo: string; stage: number }>;
+  netKg?: number;
 }
 
 export interface VehicleDetail {
@@ -135,13 +138,21 @@ export interface VehicleDetail {
 export interface InvoiceDetail {
   id: string;
   invoiceNo: string;
+  invoiceDate?: string;
   billingWeight: string;
   totalPaise: string;
+  ewayBillNo?: string;
   derivedStage: number;
   closedAt: string | null;
-  mrn: { mrnNo: string; factoryId: string } | null;
-  recycling: { form6No: string } | null;
-  certificates: Array<{ certNo: string }>;
+  mrn: { mrnNo: string; factoryId: string; receivedAt?: string } | null;
+  recycling: { form6No: string; processedAt?: string } | null;
+  certificates: Array<{
+    certNo: string;
+    certDate?: string;
+    department?: string | null;
+    fileId?: string;
+    mailedAt?: string | null;
+  }>;
   payments: Array<{ amountPaise: string }>;
 }
 

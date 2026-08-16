@@ -12,9 +12,15 @@ const ROLE_LABEL: Record<SessionUser['role'], string> = {
   client: 'Client User',
 };
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '--';
+}
+
 export function ProfilePage({ user }: ProfilePageProps) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
@@ -22,11 +28,16 @@ export function ProfilePage({ user }: ProfilePageProps) {
     e.preventDefault();
     setMsg('');
     setError('');
+    if (next !== confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
     try {
       await authApi.changePassword(current, next);
-      setMsg('Password updated.');
+      setMsg('Password updated — use it the next time you sign in.');
       setCurrent('');
       setNext('');
+      setConfirm('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Password change failed');
     }
@@ -34,60 +45,90 @@ export function ProfilePage({ user }: ProfilePageProps) {
 
   return (
     <div>
-      <h1 className="h1">My profile</h1>
+      <div className="f-row" style={{ marginBottom: '.9rem' }}>
+        <div className="h1">Your profile</div>
+      </div>
 
-      <section className="card">
-        <h2>Account</h2>
-        <dl className="tile-list">
-          <div>
-            <dt>Name</dt>
-            <dd>{user.name}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{user.email}</dd>
-          </div>
-          <div>
-            <dt>Role</dt>
-            <dd>{ROLE_LABEL[user.role]}</dd>
-          </div>
-          {user.clientId ? (
-            <div>
-              <dt>Organisation</dt>
-              <dd>{user.clientId}</dd>
+      <div className="detail-grid">
+        <div>
+          <div className="card">
+            <div className="card-hd">
+              <div className="uav" style={{ width: 42, height: 42, fontSize: '.9rem' }}>
+                {initials(user.name)}
+              </div>
+              <div>
+                <div className="card-ttl">{user.name}</div>
+                <div className="dim" style={{ fontSize: '.8rem' }}>
+                  {ROLE_LABEL[user.role]}
+                </div>
+              </div>
             </div>
-          ) : null}
-        </dl>
-      </section>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '.45rem' }}>
+              <div className="tile">
+                <div className="tile-l">Email</div>
+                <div className="tile-v">{user.email}</div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">Role</div>
+                <div className="tile-v">{ROLE_LABEL[user.role]}</div>
+              </div>
+              {user.clientId ? (
+                <div className="tile">
+                  <div className="tile-l">Organisation</div>
+                  <div className="tile-v">{user.clientId}</div>
+                </div>
+              ) : null}
+              {(user.factoryIds ?? []).length ? (
+                <div className="tile">
+                  <div className="tile-l">Facilities</div>
+                  <div className="tile-v">{user.factoryIds?.join(', ')}</div>
+                </div>
+              ) : null}
+            </div>
+          </div>
 
-      <section className="card">
-        <h2>Change password</h2>
-        <form className="sub-form" onSubmit={changePassword}>
-          <label>
-            Current password
-            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
-          </label>
-          <label>
-            New password
-            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={4} />
-          </label>
-          {msg ? <p className="ok-msg">{msg}</p> : null}
-          {error ? <p className="error">{error}</p> : null}
-          <button type="submit" className="btn primary">
-            Update password
-          </button>
-        </form>
-      </section>
-
-      <section className="card">
-        <h2>Support</h2>
-        <p className="muted">
-          Urbeno operations: <a href="mailto:admin@urbeno.in">admin@urbeno.in</a>
-        </p>
-        <p className="muted">
-          Policies: <Link to="/legal/terms">Terms</Link> · <Link to="/legal/privacy">Privacy</Link>
-        </p>
-      </section>
+          <div className="card">
+            <div className="card-ttl">Change password</div>
+            <form className="sub-form" onSubmit={changePassword} style={{ marginTop: '.6rem', paddingTop: 0, border: 'none' }}>
+              <div className="fg">
+                <label>Current password</label>
+                <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+              </div>
+              <div className="fr2">
+                <div className="fg">
+                  <label>New password</label>
+                  <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={4} />
+                </div>
+                <div className="fg">
+                  <label>Confirm new password</label>
+                  <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={4} />
+                </div>
+              </div>
+              {msg ? <p className="ok-msg">{msg}</p> : null}
+              {error ? <p className="error">{error}</p> : null}
+              <button type="submit" className="btn bp">
+                Update password
+              </button>
+            </form>
+          </div>
+        </div>
+        <div>
+          <div className="card">
+            <div className="card-ttl">Support</div>
+            <p className="dim" style={{ fontSize: '.85rem', margin: '.5rem 0' }}>
+              For a consignment, raise a query on the request. For account access, ask your Urbeno contact.
+            </p>
+            <p style={{ fontSize: '.85rem' }}>
+              <a href="mailto:operations@urbeno.in">operations@urbeno.in</a>
+            </p>
+            <div style={{ marginTop: '.8rem', display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+              <Link to="/legal/terms">Terms of Use</Link>
+              <Link to="/legal/privacy">Privacy &amp; Data</Link>
+              <Link to="/legal/support">Support</Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

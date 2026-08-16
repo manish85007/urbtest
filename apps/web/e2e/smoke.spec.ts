@@ -5,7 +5,7 @@ test.describe('smoke', () => {
   test('admin can sign in and open masters', async ({ page }) => {
     await login(page, 'admin@urbeno.in');
     await page.getByRole('link', { name: 'Masters' }).click();
-    await expect(page.getByRole('heading', { name: 'Master data' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Masters' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Add client' })).toBeVisible();
   });
 

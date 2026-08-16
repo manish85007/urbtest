@@ -12,9 +12,9 @@ export function StageProgress({ current }: StageProgressProps) {
         if (s.n < current) cls += ' done';
         else if (s.n === current) cls += ' now';
         return (
-          <div key={s.n} className={cls} title={s.by}>
+          <div key={s.n} className={cls} title={`${s.by}`}>
+            {s.ic} {s.l}
             <span className="pstep-n">{s.n}</span>
-            {s.l}
           </div>
         );
       })}
@@ -24,9 +24,10 @@ export function StageProgress({ current }: StageProgressProps) {
 
 export function StageBadge({ stage }: { stage: number }) {
   const cls = stage >= 9 ? 'bg-g' : stage >= 6 ? 'bg-bl' : stage >= 3 ? 'bg-am' : 'bg-gy';
+  const st = STAGES.find((s) => s.n === stage);
   return (
     <span className={`badge ${cls}`}>
-      {stage}. {stageLabel(stage)}
+      {st?.ic} {stage}. {stageLabel(stage)}
     </span>
   );
 }

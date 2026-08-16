@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { attachSession, requireAuth, requireStaff } from '../middleware/session.js';
 import { clientScopeFilter } from '../lib/auth-context.js';
 import { submissionInclude } from '../lib/db-helpers.js';
-import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
+import { deriveInvoiceStage, deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 
 export async function submissionRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
@@ -19,6 +19,7 @@ export async function submissionRoutes(app: FastifyInstance) {
 
     return rows.map((sub) => {
       const stage = deriveSubmissionStage(sub);
+      const netKg = sub.vehicles.reduce((sum, v) => sum + Number(v.weighment?.netKg ?? 0), 0);
       return {
         id: sub.id,
         clientId: sub.clientId,
@@ -27,8 +28,14 @@ export async function submissionRoutes(app: FastifyInstance) {
         siteName: sub.site.name,
         requestDate: sub.requestDate,
         approxWeight: sub.approxWeight,
+        ref: sub.ref,
         stage,
         invoiceCount: sub.invoices.length,
+        invoices: sub.invoices.map((inv) => ({
+          invoiceNo: inv.invoiceNo,
+          stage: deriveInvoiceStage(inv),
+        })),
+        netKg,
         createdAt: sub.createdAt,
       };
     });

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { STAGES, stageLabel } from '@urb-tectrack/shared';
+import { STAGES, getFY, listFiscalYears } from '@urb-tectrack/shared';
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
+import { StageBadge } from '../components/StageProgress';
 
 interface RequestsListPageProps {
   user: SessionUser;
@@ -10,13 +11,17 @@ interface RequestsListPageProps {
 export function RequestsListPage({ user }: RequestsListPageProps) {
   const [rows, setRows] = useState<SubmissionSummary[]>([]);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
+  const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [stage, setStage] = useState('');
   const [clientId, setClientId] = useState('');
-  const [showClosed, setShowClosed] = useState(false);
+  const [siteId, setSiteId] = useState('');
+  const [fy, setFy] = useState('');
 
   const isStaff = user.role === 'admin' || user.role === 'factory';
+  const canCreate = user.role === 'client' || user.role === 'admin';
+  const years = listFiscalYears();
 
   useEffect(() => {
     dataApi
@@ -28,104 +33,187 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
     }
   }, [isStaff]);
 
+  useEffect(() => {
+    if (user.role === 'client' && user.clientId) {
+      dataApi.sites(user.clientId).then(setSites).catch(() => undefined);
+    } else if (clientId) {
+      dataApi.sites(clientId).then(setSites).catch(() => undefined);
+    } else {
+      setSites([]);
+    }
+    setSiteId('');
+  }, [clientId, user.clientId, user.role]);
+
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (!showClosed && r.stage >= 9) return false;
       if (stage && String(r.stage) !== stage) return false;
       if (clientId && r.clientId !== clientId) return false;
+      if (siteId && r.siteId !== siteId) return false;
+      if (fy) {
+        const label = getFY(r.requestDate)?.label;
+        if (label !== fy) return false;
+      }
       if (q) {
-        const hay = `${r.id} ${r.clientName} ${r.siteName}`.toLowerCase();
+        const hay = `${r.id} ${r.ref ?? ''} ${r.clientName} ${r.siteName}`.toLowerCase();
         if (!hay.includes(q.toLowerCase())) return false;
       }
       return true;
     });
-  }, [rows, q, stage, clientId, showClosed]);
+  }, [rows, q, stage, clientId, siteId, fy]);
 
   return (
     <div>
-      <div className="f-row">
-        <h1 className="h1">{isStaff ? 'Requests' : 'My Requests'}</h1>
-        <Link to="/requests/new" className="btn bp">
-          + New Request
-        </Link>
+      <div className="f-row" style={{ marginBottom: '.9rem' }}>
+        <div>
+          <div className="h1">{isStaff ? 'All Requests' : 'My Requests'}</div>
+          <div className="p-mu" style={{ margin: 0 }}>
+            {filtered.length} of {rows.length} requests
+          </div>
+        </div>
+        <div className="spacer" />
+        {canCreate ? (
+          <Link to="/requests/new" className="btn bp">
+            + New Request
+          </Link>
+        ) : null}
       </div>
 
-      <div className="filters card">
-        <label>
-          Search
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Request ID, client, site…"
-          />
-        </label>
-        <label>
-          Stage
-          <select value={stage} onChange={(e) => setStage(e.target.value)}>
-            <option value="">All stages</option>
-            {STAGES.map((s) => (
-              <option key={s.n} value={String(s.n)}>
-                {s.n}. {s.l}
-              </option>
-            ))}
-          </select>
-        </label>
-        {isStaff ? (
-          <label>
-            Client
-            <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              <option value="">All clients</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+      <div className="card">
+        <div className="fr4">
+          <div className="fg">
+            <label>Search</label>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ID, PO, location…" />
+          </div>
+          <div className="fg">
+            <label>Stage</label>
+            <select value={stage} onChange={(e) => setStage(e.target.value)}>
+              <option value="">All stages</option>
+              {STAGES.map((s) => (
+                <option key={s.n} value={String(s.n)}>
+                  {s.n}. {s.l}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
+          {isStaff ? (
+            <div className="fg">
+              <label>Client</label>
+              <select
+                value={clientId}
+                onChange={(e) => {
+                  setClientId(e.target.value);
+                  setSiteId('');
+                }}
+              >
+                <option value="">All clients</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="fg">
+              <label>Site</label>
+              <select value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+                <option value="">All sites</option>
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="fg">
+            <label>Financial Year</label>
+            <select value={fy} onChange={(e) => setFy(e.target.value)}>
+              <option value="">All years</option>
+              {years.map((y) => (
+                <option key={y.label} value={y.label}>
+                  {y.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {isStaff && clientId ? (
+          <div className="fg" style={{ maxWidth: 280, marginTop: '.5rem' }}>
+            <label>Site</label>
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+              <option value="">All sites</option>
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
         ) : null}
-        <label className="check-label">
-          <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
-          Include closed
-        </label>
       </div>
 
       {error ? <p className="error">{error}</p> : null}
 
-      <section className="card">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Request</th>
-                {isStaff ? <th>Client</th> : null}
-                <th>Site</th>
-                <th>Stage</th>
-                <th>Invoices</th>
-                <th>Net kg</th>
-                <th>Raised</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="click-row">
-                  <td>
-                    <Link to={`/requests/${r.id}`}>{r.id}</Link>
-                  </td>
-                  {isStaff ? <td>{r.clientName}</td> : null}
-                  <td>{r.siteName}</td>
-                  <td>
-                    <span className="badge">{stageLabel(r.stage)}</span>
-                  </td>
-                  <td>{r.invoiceCount}</td>
-                  <td>{r.approxWeight}</td>
-                  <td className="dim">{r.requestDate.slice(0, 10)}</td>
+      <div className="card" style={{ padding: '.4rem' }}>
+        {filtered.length === 0 ? (
+          <div className="empty">
+            <div className="empty-t">No requests match</div>
+          </div>
+        ) : (
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Request</th>
+                  {isStaff ? <th>Client</th> : null}
+                  <th>Site</th>
+                  <th>Stage</th>
+                  <th>Invoices</th>
+                  <th>Net kg</th>
+                  <th>Raised</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!filtered.length ? <p className="muted pad">No requests match your filters.</p> : null}
-      </section>
+              </thead>
+              <tbody>
+                {filtered.map((r) => (
+                  <tr key={r.id} className="click">
+                    <td>
+                      <Link to={`/requests/${r.id}`}>
+                        <b>{r.id}</b>
+                      </Link>
+                      <div className="dim" style={{ fontSize: '.72rem' }}>
+                        {r.ref || 'no PO'}
+                      </div>
+                    </td>
+                    {isStaff ? <td>{r.clientName}</td> : null}
+                    <td className="dim">{r.siteName}</td>
+                    <td>
+                      <StageBadge stage={r.stage} />
+                    </td>
+                    <td>
+                      {r.invoices?.length ? (
+                        r.invoices.map((inv) => (
+                          <span
+                            key={inv.invoiceNo}
+                            className={`badge ${inv.stage >= 9 ? 'bg-g' : 'bg-bl'}`}
+                            style={{ margin: 1 }}
+                          >
+                            {inv.invoiceNo}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="dim">—</span>
+                      )}
+                    </td>
+                    <td className="mono">{r.netKg ? r.netKg.toLocaleString() : r.approxWeight}</td>
+                    <td className="dim">{r.requestDate.slice(0, 10)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
