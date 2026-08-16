@@ -27,6 +27,7 @@ import {
 import { deriveInvoiceStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
+import { assertCategoryCapacityOrOverride } from './category-capacity.js';
 import { sendTransactionalEmail } from './email.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
 
@@ -325,6 +326,32 @@ export async function createRecycling(
       where: { factoryId_entryId: { factoryId, entryId: cat.entryId } },
     });
     if (!master) throw new AppError(`Category ${cat.entryId} is not authorised at ${factoryId}.`);
+
+    const capacityCheck = await assertCategoryCapacityOrOverride({
+      factoryId,
+      entryId: cat.entryId,
+      addKg: kg,
+      capacityTpa: Number(master.capacityTpa),
+      processedAt: new Date(input.processedAt),
+      overrideReason: cat.overrideReason,
+    });
+
+    if (capacityCheck.exceeds && cat.overrideReason?.trim()) {
+      await auditLog({
+        actorEmail: actor.email,
+        actorId: actor.id,
+        action: 'capacity.override',
+        entity: 'invoice',
+        entityId: invoice.invoiceNo,
+        details: {
+          submissionId: invoice.submissionId,
+          entryId: cat.entryId,
+          projectedKg: capacityCheck.projectedKg,
+          capKg: capacityCheck.capKg,
+          reason: cat.overrideReason.trim(),
+        },
+      });
+    }
 
     categoryRows.push({
       categoryId: master.id,

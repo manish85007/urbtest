@@ -167,6 +167,7 @@ function RecyclingForm({
   const [factoryId, setFactoryId] = useState(defaultFactoryId);
   const [categories, setCategories] = useState<Array<{ entryId: string; description: string; groupCode: string }>>([]);
   const [entryId, setEntryId] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
 
   useEffect(() => {
     if (!factoryId) return;
@@ -187,7 +188,12 @@ function RecyclingForm({
         onSubmit({
           processedAt: today,
           factoryId,
-          categories: [{ entryId: selected.entryId, groupCode: selected.groupCode, weightKg: billingWeight }],
+          categories: [{
+            entryId: selected.entryId,
+            groupCode: selected.groupCode,
+            weightKg: billingWeight,
+            ...(overrideReason.trim() ? { overrideReason: overrideReason.trim() } : {}),
+          }],
         });
       }}
     >
@@ -208,6 +214,14 @@ function RecyclingForm({
             </option>
           ))}
         </select>
+      </label>
+      <label>
+        Capacity override reason
+        <input
+          value={overrideReason}
+          onChange={(e) => setOverrideReason(e.target.value)}
+          placeholder="Required only if category TPA would be exceeded"
+        />
       </label>
       <button type="submit" className="btn primary" disabled={disabled || !selected}>
         Issue Form 6
