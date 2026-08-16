@@ -44,9 +44,9 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
   return (
     <div>
       <div className="f-row">
-        <h1 className="h1">{isStaff ? 'All requests' : 'My requests'}</h1>
-        <Link to="/requests/new" className="btn primary">
-          + New request
+        <h1 className="h1">{isStaff ? 'Requests' : 'My Requests'}</h1>
+        <Link to="/requests/new" className="btn bp">
+          + New Request
         </Link>
       </div>
 

@@ -19,6 +19,6 @@ test.describe('smoke', () => {
   test('factory user can sign in and view requests', async ({ page }) => {
     await login(page, 'blr@urbeno.in');
     await page.getByRole('link', { name: 'Requests' }).click();
-    await expect(page.getByRole('heading', { name: 'All requests' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible();
   });
 });

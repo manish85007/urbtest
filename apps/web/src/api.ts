@@ -312,6 +312,19 @@ export const dataApi = {
     api<Array<{ id: string; category: string; label: string; active: boolean }>>(
       `/lookups/${category}`,
     ),
+  search: (q: string) =>
+    api<Array<{ grp: string; label: string; sub: string; href: string }>>(
+      `/search?q=${encodeURIComponent(q)}`,
+    ),
+  notifications: () =>
+    api<{
+      unread: number;
+      items: Array<{ id: string; kind: string; text: string; link: string | null; read: boolean; createdAt: string }>;
+    }>('/notifications'),
+  markNotificationRead: (id: string) =>
+    api<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: () =>
+    api<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
   users: () =>
     api<
       Array<{

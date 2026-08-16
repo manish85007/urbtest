@@ -55,14 +55,14 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
 
   return (
     <div>
-      <p className="muted">
+      <p className="p-mu">
         <Link to="/requests">← Requests</Link>
       </p>
       <div className="f-row">
         <h1 className="h1">{sub.id}</h1>
         <StageBadge stage={stage} />
       </div>
-      <p className="muted">
+      <p className="p-mu">
         {sub.client.name} · {sub.site.name} · {sub.requestDate.slice(0, 10)}
       </p>
 

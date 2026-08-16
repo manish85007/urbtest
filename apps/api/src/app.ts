@@ -11,6 +11,7 @@ import { emailsRoutes } from './routes/emails.js';
 import { adminRoutes } from './routes/admin.js';
 import { reportsRoutes } from './routes/reports.js';
 import { legalRoutes, auditRoutes, registerSecurityHeaders } from './routes/legal.js';
+import { searchRoutes } from './routes/search.js';
 import { startScheduler } from './jobs/scheduler.js';
 
 export async function buildApp() {
@@ -52,6 +53,7 @@ export async function buildApp() {
   await app.register(reportsRoutes);
   await app.register(legalRoutes);
   await app.register(auditRoutes);
+  await app.register(searchRoutes);
 
   if (process.env.ENABLE_JOBS !== 'false') {
     startScheduler(app);

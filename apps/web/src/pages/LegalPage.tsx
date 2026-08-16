@@ -11,6 +11,17 @@ export function LegalPage() {
 
   useEffect(() => {
     if (!key) return;
+    if (key === 'support') {
+      setDoc({
+        title: 'Support',
+        version: '1.0',
+        effectiveDate: '2026-04-01',
+        body:
+          'For anything relating to a consignment, raise a query on the request concerned.\n\nPhone — +91 80 4123 4500\nEmail — operations@urbeno.in\n\nIf you cannot sign in, ask an Urbeno admin to reset your password, then change it from Profile.',
+      });
+      setError('');
+      return;
+    }
     legalApi
       .document(key)
       .then(setDoc)

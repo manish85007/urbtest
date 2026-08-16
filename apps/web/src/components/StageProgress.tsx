@@ -23,5 +23,10 @@ export function StageProgress({ current }: StageProgressProps) {
 }
 
 export function StageBadge({ stage }: { stage: number }) {
-  return <span className="badge">{stageLabel(stage)}</span>;
+  const cls = stage >= 9 ? 'bg-g' : stage >= 6 ? 'bg-bl' : stage >= 3 ? 'bg-am' : 'bg-gy';
+  return (
+    <span className={`badge ${cls}`}>
+      {stage}. {stageLabel(stage)}
+    </span>
+  );
 }

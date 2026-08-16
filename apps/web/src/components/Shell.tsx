@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authApi, type SessionUser } from '../api';
 import { navItems } from '../lib/nav';
+import { LogoIcon } from './BrandMark';
+import { GlobalSearch } from './GlobalSearch';
+import { NotificationBell } from './NotificationBell';
 
 interface ShellProps {
   user: SessionUser;
@@ -9,9 +13,24 @@ interface ShellProps {
   children: ReactNode;
 }
 
+function brandSub(user: SessionUser) {
+  if (user.role === 'client') return 'Client portal';
+  if (user.role === 'factory') {
+    const ids = user.factoryIds ?? [];
+    return ids.length ? `Urbeno · ${ids.join(', ')}` : 'Urbeno · All facilities';
+  }
+  return 'Urbeno · Operations';
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '--';
+}
+
 export function Shell({ user, onLogout, children }: ShellProps) {
   const loc = useLocation();
   const items = navItems(user.role);
+  const [navOpen, setNavOpen] = useState(false);
 
   async function logout() {
     try {
@@ -29,35 +48,66 @@ export function Shell({ user, onLogout, children }: ShellProps) {
   return (
     <div className="app">
       <header className="top">
-        <Link to="/" className="brand">
-          <div className="brand-icon">U</div>
-          <div>
-            <div className="brand-title">Urb TecTrack™</div>
-            <div className="brand-sub">Recycling Heroes™</div>
-          </div>
-        </Link>
-        <nav className="nav">
-          {items.map((item) => (
-            <Link key={item.to} to={item.to} className={isActive(item) ? 'on' : ''}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="user-chip">
-          <Link to="/profile" className="avatar-link" title="My profile">
-            <span className="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
-            <span>{user.name}</span>
+        <div className="top-in">
+          <button type="button" className="burger" aria-label="Menu" onClick={() => setNavOpen((v) => !v)}>
+            ☰
+          </button>
+          <Link to="/" className="brand" onClick={() => setNavOpen(false)}>
+            <div className="brand-i">
+              <LogoIcon />
+            </div>
+            <div>
+              <div className="brand-t">
+                Urb TecTrack<span style={{ fontSize: '.62em', verticalAlign: 'super' }}>™</span>
+              </div>
+              <div className="brand-s">{brandSub(user)}</div>
+            </div>
           </Link>
-          <button type="button" className="btn ghost" onClick={logout}>
-            Sign out
+          <GlobalSearch />
+          <div className="spacer" />
+          <nav className={`nav ${navOpen ? 'open' : ''}`}>
+            {items.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={isActive(item) ? 'on' : ''}
+                onClick={() => setNavOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <NotificationBell />
+          <Link
+            to="/profile"
+            className={`uchip ${loc.pathname === '/profile' ? 'on' : ''}`}
+            title="Your profile and password"
+          >
+            <div className="uav">{initials(user.name)}</div>
+            <span>{user.name.split(' ')[0]}</span>
+          </Link>
+          <button type="button" className="btn bs bsm" onClick={logout}>
+            Logout
           </button>
         </div>
       </header>
       <main className="wrap">{children}</main>
-      <footer className="footer">
-        <Link to="/legal/terms">Terms</Link>
-        <Link to="/legal/privacy">Privacy &amp; Data</Link>
-        <Link to="/legal/compliance">Compliance</Link>
+      <footer className="foot">
+        <div className="foot-in">
+          <div className="foot-l">
+            <b>Urb TecTrack™</b> · Urbeno Private Limited · Recycling Heroes™
+            <br />
+            <span className="dim">
+              R2v3 certified · CPCB registered · KSPCB authorised · ISO 9001:2015 &amp; ISO 14001:2015
+            </span>
+          </div>
+          <div className="foot-r">
+            <Link to="/legal/terms">Terms of Use</Link>
+            <Link to="/legal/privacy">Privacy &amp; Data</Link>
+            <Link to="/legal/compliance">Compliance Notice</Link>
+            <Link to="/legal/support">Support</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );
