@@ -10,7 +10,17 @@ import {
 import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { sendTransactionalEmail } from './email.js';
+import { assertFilesExist } from './file-service.js';
 import { notifyAdmins, notifyClientUsers, notifyUsers } from './notifications.js';
+
+const PLACEHOLDER_ITEM = 'Mixed e-waste (see attached BoM)';
+
+export interface SubmissionLineInput {
+  name: string;
+  qty?: number;
+  weightKg?: number;
+  hsn?: string;
+}
 
 export interface CreateSubmissionInput {
   clientId: string;
@@ -22,6 +32,33 @@ export interface CreateSubmissionInput {
   approxWeight?: number;
   bomFileId?: string;
   notes?: string;
+  items?: SubmissionLineInput[];
+}
+
+function namedLines(items?: SubmissionLineInput[]) {
+  return (items ?? [])
+    .map((i) => ({
+      name: i.name.trim(),
+      qty: i.qty ?? 0,
+      weightKg: i.weightKg ?? 0,
+      hsn: i.hsn?.trim() || '854890',
+    }))
+    .filter((i) => i.name);
+}
+
+function linesForCreate(
+  items: SubmissionLineInput[] | undefined,
+  bomFileId: string | undefined,
+  approxQty: number,
+  approxWeight: number,
+) {
+  const named = namedLines(items);
+  if (!named.length && !bomFileId) {
+    throw new AppError('Add at least one line item, or attach a bill of materials.');
+  }
+  return named.length
+    ? named
+    : [{ name: PLACEHOLDER_ITEM, qty: approxQty, weightKg: approxWeight, hsn: '854890' }];
 }
 
 export async function createSubmission(actor: SessionUser, input: CreateSubmissionInput) {
@@ -43,6 +80,15 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
   const client = await prisma.client.findUnique({ where: { id: clientId, active: true } });
   if (!client) throw new AppError('Client not found.');
 
+  const location = input.location?.trim() || '';
+  const approxQty = input.approxQty ?? 0;
+  const approxWeight = input.approxWeight ?? 0;
+  if (!location || !input.requestDate || !approxQty || !approxWeight) {
+    throw new AppError('Site, location, date, approximate quantity and weight are all required.');
+  }
+  if (input.bomFileId) await assertFilesExist([input.bomFileId], ['bom']);
+  const lines = linesForCreate(input.items, input.bomFileId, approxQty, approxWeight);
+
   const id = await nextSequence('sub');
   const sub = await prisma.submission.create({
     data: {
@@ -51,12 +97,21 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
       siteId: site.id,
       ref: input.ref?.trim() || null,
       requestDate: new Date(input.requestDate),
-      location: input.location?.trim() || null,
-      approxQty: input.approxQty ?? 0,
-      approxWeight: input.approxWeight ?? 0,
+      location,
+      approxQty,
+      approxWeight,
       bomFileId: input.bomFileId ?? null,
       notes: input.notes?.trim() || null,
       createdBy: actor.email,
+      items: {
+        create: lines.map((line, i) => ({
+          name: line.name,
+          qty: line.qty,
+          weightKg: line.weightKg,
+          hsn: line.hsn,
+          sortOrder: i,
+        })),
+      },
     },
     include: submissionInclude,
   });
@@ -183,6 +238,7 @@ export interface UpdateSubmissionInput {
   notes?: string;
   ref?: string;
   bomFileId?: string | null;
+  items?: SubmissionLineInput[];
 }
 
 export async function updateSubmission(
@@ -207,6 +263,12 @@ export async function updateSubmission(
     requireStaff(actor);
   }
 
+  if (input.bomFileId) await assertFilesExist([input.bomFileId], ['bom']);
+  const nextItems = input.items ? namedLines(input.items) : null;
+  if (nextItems && !nextItems.length) {
+    throw new AppError('Keep at least one line item.');
+  }
+
   const updated = await prisma.submission.update({
     where: { id: submissionId },
     data: {
@@ -218,6 +280,20 @@ export async function updateSubmission(
       bomFileId: input.bomFileId !== undefined ? input.bomFileId : undefined,
       rejectNote: actor.role === 'client' ? null : undefined,
       rejectAt: actor.role === 'client' ? null : undefined,
+      ...(nextItems
+        ? {
+            items: {
+              deleteMany: {},
+              create: nextItems.map((line, i) => ({
+                name: line.name,
+                qty: line.qty,
+                weightKg: line.weightKg,
+                hsn: line.hsn,
+                sortOrder: i,
+              })),
+            },
+          }
+        : {}),
     },
     include: submissionInclude,
   });

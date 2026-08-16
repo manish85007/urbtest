@@ -449,6 +449,15 @@ export interface SubmissionDetail {
   vehicles: VehicleDetail[];
   invoices: InvoiceDetail[];
   queries?: QueryThread[];
+  items?: Array<{
+    id: string;
+    name: string;
+    qty: number;
+    weightKg: string | number;
+    hsn: string;
+    categoryId?: string | null;
+    invoiceId?: string | null;
+  }>;
 }
 
 export interface QueueItem {
@@ -942,6 +951,7 @@ export const lifecycleApi = {
     notes?: string;
     ref?: string;
     bomFileId?: string;
+    items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
   }) => api<SubmissionDetail>('/submissions', { method: 'POST', body: JSON.stringify(body) }),
 
   acknowledge: (id: string) =>
@@ -962,6 +972,7 @@ export const lifecycleApi = {
       notes?: string;
       ref?: string;
       bomFileId?: string | null;
+      items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
     },
   ) =>
     api<SubmissionDetail>(`/submissions/${id}`, {

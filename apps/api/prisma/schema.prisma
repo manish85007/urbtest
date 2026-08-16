@@ -169,8 +169,26 @@ model Submission {
   vehicles     Vehicle[]
   invoices     Invoice[]
   queries      RequestQuery[]
+  items        SubmissionItem[]
 
   @@map("submissions")
+}
+
+model SubmissionItem {
+  id           String  @id @default(cuid())
+  submissionId String  @map("submission_id") @db.VarChar(16)
+  name         String
+  qty          Int     @default(0)
+  weightKg     Decimal @default(0) @map("weight_kg") @db.Decimal(12, 3)
+  hsn          String  @default("854890")
+  categoryId   String? @map("category_id")
+  invoiceId    String? @map("invoice_id")
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@map("submission_items")
 }
 
 model Vehicle {

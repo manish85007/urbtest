@@ -14,12 +14,13 @@ test.describe('full lifecycle', () => {
     // Stage 1 — client raises request
     await login(page, 'ramesh@techcorp.in');
     await page.getByRole('link', { name: /New request/i }).click();
-    await expect(page.getByRole('heading', { name: 'New pickup request' })).toBeVisible();
-    await page.getByLabel('Pickup location').fill(`E2E bay ${uniq}`);
-    await page.getByLabel('Approx. weight (kg)').fill('75');
-    await page.getByLabel('Approx. quantity').fill('12');
+    await expect(page.getByRole('heading', { name: 'New Collection Request' })).toBeVisible();
+    await page.getByLabel('Pickup Location').fill(`E2E bay ${uniq}`);
+    await page.getByLabel('Approx. Weight (kg)').fill('75');
+    await page.getByLabel('Approx. Quantity (units)').fill('12');
+    await page.getByPlaceholder('Item description').fill(`E2E mixed waste ${uniq}`);
     await page.getByLabel('Notes').fill(`Playwright lifecycle ${uniq}`);
-    await page.getByRole('button', { name: 'Submit request' }).click();
+    await page.getByRole('button', { name: 'Submit Request' }).click();
     await expect(page.getByRole('heading', { name: /REQ-/ })).toBeVisible({ timeout: 15_000 });
     const heading = await page.getByRole('heading', { level: 1 }).textContent();
     const submissionId = heading?.match(/REQ-\d+/)?.[0];
@@ -109,9 +110,11 @@ test.describe('full lifecycle', () => {
 
     await login(page, 'ramesh@techcorp.in');
     await page.getByRole('link', { name: /New request/i }).click();
-    await page.getByLabel('Pickup location').fill(`Reject test ${uniq}`);
-    await page.getByLabel('Approx. weight (kg)').fill('20');
-    await page.getByRole('button', { name: 'Submit request' }).click();
+    await page.getByLabel('Pickup Location').fill(`Reject test ${uniq}`);
+    await page.getByLabel('Approx. Weight (kg)').fill('20');
+    await page.getByLabel('Approx. Quantity (units)').fill('4');
+    await page.getByPlaceholder('Item description').fill(`Reject mixed waste ${uniq}`);
+    await page.getByRole('button', { name: 'Submit Request' }).click();
     await expect(page.getByRole('heading', { name: /REQ-/ })).toBeVisible();
     const submissionId = (await page.getByRole('heading', { level: 1 }).textContent())?.match(/REQ-\d+/)?.[0];
     expect(submissionId).toBeTruthy();
@@ -128,7 +131,7 @@ test.describe('full lifecycle', () => {
     await login(page, 'ramesh@techcorp.in');
     await page.goto(`/requests/${submissionId}`);
     await expect(page.getByText('Please update pickup location details.')).toBeVisible();
-    await page.getByLabel('Pickup location').fill(`Updated bay ${uniq}`);
+    await page.getByLabel('Pickup Location').fill(`Updated bay ${uniq}`);
     await page.locator('.modal').getByRole('button', { name: 'Save and resubmit' }).click();
     await expect(page.getByText('Request updated and sent back to Urbeno.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Acknowledge' })).not.toBeVisible();

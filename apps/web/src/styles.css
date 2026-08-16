@@ -346,7 +346,7 @@ a { color: inherit; text-decoration: none; }
 .brand-i svg { width: 100%; height: 100%; display: block; }
 button.nbell, button.sres-i, button.nitem { font-family: inherit; color: inherit; }
 button.nbell { background: none; border: none; }
-label:not(.file-upload-label):not(.check-label) {
+label:not(.file-upload-label):not(.check-label):not(.btn) {
   display: grid;
   gap: .22rem;
   font-size: .76rem;

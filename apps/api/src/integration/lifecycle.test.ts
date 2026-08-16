@@ -70,6 +70,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       approxQty: 10,
       approxWeight: 50,
       notes: 'Automated lifecycle test',
+      items: [{ name: 'Mixed e-waste', qty: 10, weightKg: 50, hsn: '854890' }],
     });
     submissionId = sub.id;
     expect(sub.derivedStage).toBe(1);

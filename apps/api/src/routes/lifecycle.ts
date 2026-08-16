@@ -27,6 +27,13 @@ function handleServiceError(err: unknown, reply: FastifyReply) {
   throw err;
 }
 
+const lineItemSchema = z.object({
+  name: z.string().min(1),
+  qty: z.number().int().nonnegative().optional(),
+  weightKg: z.number().nonnegative().optional(),
+  hsn: z.string().optional(),
+});
+
 const createSubmissionSchema = z.object({
   clientId: z.string().length(4),
   siteId: z.string().min(1),
@@ -37,6 +44,7 @@ const createSubmissionSchema = z.object({
   approxWeight: z.number().nonnegative().optional(),
   bomFileId: z.string().optional(),
   notes: z.string().optional(),
+  items: z.array(lineItemSchema).optional(),
 });
 
 const vehicleSchema = z.object({
@@ -127,6 +135,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           notes: z.string().optional(),
           ref: z.string().optional(),
           bomFileId: z.string().nullable().optional(),
+          items: z.array(lineItemSchema).optional(),
         })
         .parse(request.body);
       return await updateSubmission(request.user!, id, body);

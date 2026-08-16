@@ -45,7 +45,12 @@ const MIME_BY_KIND: Partial<Record<FileKind, string[]>> = {
   certificate: ['application/pdf'],
   logo: ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'],
   serials: ['text/csv', 'application/vnd.ms-excel', 'text/plain'],
-  bom: ['text/csv', 'application/pdf', 'application/vnd.ms-excel'],
+  bom: [
+    'text/csv',
+    'application/pdf',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ],
   invoice: ['application/pdf', 'image/jpeg', 'image/png'],
   eway: ['application/pdf', 'image/jpeg', 'image/png'],
   report: ['application/pdf'],

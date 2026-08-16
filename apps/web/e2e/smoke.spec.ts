@@ -12,8 +12,8 @@ test.describe('smoke', () => {
   test('client can sign in and open new request form', async ({ page }) => {
     await login(page, 'ramesh@techcorp.in');
     await page.getByRole('link', { name: /New request/i }).click();
-    await expect(page.getByRole('heading', { name: 'New pickup request' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Submit request' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New Collection Request' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit Request' })).toBeVisible();
   });
 
   test('admin can open reports', async ({ page }) => {

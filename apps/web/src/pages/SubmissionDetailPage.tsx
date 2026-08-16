@@ -9,6 +9,7 @@ import { FileRow, FileThumb } from '../components/FileThumb';
 import { QueryThread } from '../components/QueryThread';
 import { PhoneField } from '../components/PhoneField';
 import { Modal } from '../components/Modal';
+import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, fmtTS, num } from '../lib/format';
 
@@ -488,6 +489,49 @@ function RequestCard({
             if (ids[0]) onBom(ids[0]);
           }}
         />
+      ) : null}
+      {(sub.items ?? []).length ? (
+        <div className="tw" style={{ marginTop: '.6rem' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Weight</th>
+                <th>HSN</th>
+                <th>Category</th>
+                <th>Invoice</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sub.items!.map((i) => {
+                const inv = sub.invoices.find((x) => x.id === i.invoiceId);
+                return (
+                  <tr key={i.id}>
+                    <td>{i.name}</td>
+                    <td className="mono">{i.qty}</td>
+                    <td className="mono">{num(Number(i.weightKg))} kg</td>
+                    <td className="mono dim">{i.hsn || '—'}</td>
+                    <td>
+                      {i.categoryId ? <span className="badge bg-bl">{i.categoryId}</span> : <span className="dim">—</span>}
+                    </td>
+                    <td>
+                      {inv ? <span className="badge bg-gy">{inv.invoiceNo}</span> : <span className="dim">—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr style={{ background: 'var(--g3)', fontWeight: 700 }}>
+                <td>Declared total</td>
+                <td className="mono">{sub.items!.reduce((a, i) => a + i.qty, 0)}</td>
+                <td className="mono">
+                  {num(sub.items!.reduce((a, i) => a + Number(i.weightKg), 0))} kg
+                </td>
+                <td colSpan={3} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </div>
   );
@@ -1001,13 +1045,30 @@ function EditRequestForm({
   disabled: boolean;
   resubmit: boolean;
   formId?: string;
-  onSave: (body: { location?: string; approxQty?: number; approxWeight?: number; notes?: string; ref?: string }) => void;
+  onSave: (body: {
+    location?: string;
+    approxQty?: number;
+    approxWeight?: number;
+    notes?: string;
+    ref?: string;
+    items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
+  }) => void;
 }) {
   const [location, setLocation] = useState(sub.location ?? '');
   const [approxQty, setApproxQty] = useState(String(sub.approxQty));
   const [approxWeight, setApproxWeight] = useState(String(sub.approxWeight));
   const [notes, setNotes] = useState(sub.notes ?? '');
   const [ref, setRef] = useState(sub.ref ?? '');
+  const [items, setItems] = useState<DraftLine[]>(
+    sub.items?.length
+      ? sub.items.map((i) => ({
+          n: i.name,
+          q: String(i.qty || ''),
+          w: String(i.weightKg ?? ''),
+          hsn: i.hsn || '854890',
+        }))
+      : [{ ...EMPTY_LINE }],
+  );
 
   return (
     <form
@@ -1015,48 +1076,51 @@ function EditRequestForm({
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
+        const named = namedDraftLines(items);
         onSave({
           location,
           approxQty: Number(approxQty),
           approxWeight: Number(approxWeight),
           notes,
           ref,
+          items: named,
         });
       }}
     >
       <p className="dim" style={{ fontSize: '.83rem', marginBottom: '.8rem' }}>
         {resubmit
           ? 'Update the details Urbeno asked for and send the request back.'
-          : 'Give us an approximate quantity and weight — exact figures are captured at weighment.'}
+          : 'Admin edit — all changes are audit-logged.'}
       </p>
-      <div className="fg">
-        <label htmlFor="er-loc">Pickup location</label>
-        <input id="er-loc" value={location} onChange={(e) => setLocation(e.target.value)} />
-      </div>
       <div className="fr2">
         <div className="fg">
-          <label htmlFor="er-qty">Approx. quantity</label>
+          <label htmlFor="er-loc">Pickup Location</label>
+          <input id="er-loc" value={location} onChange={(e) => setLocation(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label htmlFor="er-ref">PO / Reference</label>
+          <input id="er-ref" value={ref} onChange={(e) => setRef(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label htmlFor="er-qty">Approx. Quantity</label>
           <input id="er-qty" type="number" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />
         </div>
         <div className="fg">
-          <label htmlFor="er-wt">Approx. weight (kg)</label>
+          <label htmlFor="er-wt">Approx. Weight (kg)</label>
           <input
             id="er-wt"
             type="number"
-            step="0.001"
+            step="0.1"
             value={approxWeight}
             onChange={(e) => setApproxWeight(e.target.value)}
           />
         </div>
       </div>
       <div className="fg">
-        <label htmlFor="er-ref">PO / Reference</label>
-        <input id="er-ref" value={ref} onChange={(e) => setRef(e.target.value)} />
-      </div>
-      <div className="fg">
         <label htmlFor="er-notes">Notes</label>
-        <textarea id="er-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+        <textarea id="er-notes" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ minHeight: 52 }} />
       </div>
+      <LineItemsEditor items={items} onChange={setItems} />
       {formId ? null : (
         <button type="submit" className="btn primary" disabled={disabled}>
           {resubmit ? 'Save and resubmit' : 'Save changes'}
