@@ -83,7 +83,7 @@ export function ClientDetailPage() {
           ← Masters
         </Link>
         <button type="button" className="btn bs" onClick={() => setEditClient(true)}>
-          Edit Client
+          ✏️ Edit Client
         </button>
         <button type="button" className="btn bp" onClick={() => setSiteForm(null)}>
           + Add Site

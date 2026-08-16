@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { dataApi, emailsApi, type ClientSummary, type FactorySummary, type LookupRow, type UserRow } from '../api';
 import { CategoriesTab } from './masters/CategoriesTab';
 import { ClientsTab } from './masters/ClientsTab';
@@ -19,7 +20,9 @@ const TABS: Array<[Tab, string]> = [
 ];
 
 export function MastersPage() {
-  const [tab, setTab] = useState<Tab>('clients');
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get('tab') as Tab | null;
+  const tab: Tab = TABS.some(([id]) => id === tabParam) ? (tabParam as Tab) : 'clients';
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [factories, setFactories] = useState<FactorySummary[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -94,7 +97,7 @@ export function MastersPage() {
     <div>
       <div className="f-row" style={{ marginBottom: '.9rem' }}>
         <div>
-          <div className="h1">Master Data</div>
+          <h1 className="h1">Master Data</h1>
           <div className="p-mu" style={{ margin: 0 }}>
             Everything the platform references — clients, sites, users, factories, categories and lookups
           </div>
@@ -111,7 +114,7 @@ export function MastersPage() {
               type="button"
               className={`inv-tab ${tab === id ? 'on' : ''}`}
               style={{ borderRadius: 7, borderBottom: '1px solid var(--bd)' }}
-              onClick={() => setTab(id)}
+              onClick={() => setParams(id === 'clients' ? {} : { tab: id })}
             >
               {label}
             </button>

@@ -70,9 +70,9 @@ export function UsersTab({ users, clients, factories, onChanged }: UsersTabProps
                     )}
                   </td>
                   <td>
-                    <button type="button" className="btn bs bsm" onClick={() => setEditing(u)}>
-                      Edit
-                    </button>
+                      <button type="button" className="btn bs bsm" onClick={() => setEditing(u)}>
+                        ✏️
+                      </button>
                   </td>
                 </tr>
               ))}

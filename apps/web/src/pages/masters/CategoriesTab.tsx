@@ -89,7 +89,7 @@ export function CategoriesTab({ factories, onChanged }: CategoriesTabProps) {
             </div>
           </div>
           <Link className="btn bs bsm" to="/capacity">
-            Capacity →
+            📊 Capacity
           </Link>
         </div>
       </div>

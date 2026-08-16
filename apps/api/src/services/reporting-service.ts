@@ -16,6 +16,8 @@ import {
   stageLabel,
   sumPaise,
   treesEarned,
+  fiscalYearBounds,
+  listFiscalYears,
   type ReportPeriod,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
@@ -23,7 +25,6 @@ import { clientScopeFilter, factoryInScope, isStaff } from '../lib/auth-context.
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
-import { getCategoryUsedKg } from './category-capacity.js';
 import { AppError } from '../lib/errors.js';
 
 const SLA_RECYCLE_DAYS = Number(process.env.SLA_RECYCLE_DAYS ?? 30);
@@ -285,7 +286,7 @@ export async function getReportsForActor(actor: SessionUser, siteId?: string, pe
   return { kind: 'client' as const, ...(await getImpactReport(actor, siteId, period)) };
 }
 
-export async function getCapacityReport(actor: SessionUser, factoryId: string) {
+export async function getCapacityReport(actor: SessionUser, factoryId: string, period?: ReportPeriod) {
   if (actor.role === 'factory' && !factoryInScope(actor, factoryId)) {
     throw new AppError('Access denied for this factory.');
   }
@@ -293,7 +294,9 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string) {
     throw new AppError('Capacity reports are for Urbeno staff only.');
   }
 
-  const fy = currentFY();
+  const resolved = period ?? parseReportPeriod({ period: 'fy' });
+  const range = capacityRange(resolved);
+  const factory = await prisma.factorySite.findUnique({ where: { id: factoryId } });
   const categories = await prisma.categoryMaster.findMany({
     where: { factoryId, active: true },
     orderBy: { entryId: 'asc' },
@@ -301,7 +304,7 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string) {
 
   const entries = await Promise.all(
     categories.map(async (cat) => {
-      const usedKg = await getCategoryUsedKg(factoryId, cat.entryId, new Date());
+      const usedKg = await usedKgInRange(factoryId, cat.entryId, range);
       const capKg = Number(cat.capacityTpa) * 1000;
       const pct = capKg > 0 ? (usedKg / capKg) * 100 : 0;
       return {
@@ -311,6 +314,7 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string) {
         activity: cat.activity,
         capacityTpa: cat.capacityTpa.toString(),
         usedKg,
+        remKg: Math.max(0, capKg - usedKg),
         capKg,
         pct,
         atRisk: capKg > 0 && pct >= 80 && usedKg <= capKg,
@@ -325,16 +329,57 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string) {
 
   return {
     factoryId,
-    fy: fy?.label ?? '',
+    factoryName: factory?.name ?? factoryId,
+    fy: resolved.kind === 'fy' ? resolved.fy ?? currentFY()?.label ?? '' : '',
+    periodLabel: periodLabel(resolved),
     stats: {
       authorized,
       processed,
       utilization: authorized > 0 ? (processed / authorized) * 100 : 0,
       atRisk: entries.filter((e) => e.atRisk || e.exceeded).length,
+      over: entries.filter((e) => e.exceeded).length,
+      warn: entries.filter((e) => e.atRisk).length,
     },
     entries,
     alerts: entries.filter((e) => e.atRisk || e.exceeded),
   };
+}
+
+function capacityRange(period: ReportPeriod): { start?: Date; end?: Date } {
+  if (period.kind === 'all') return {};
+  if (period.kind === 'fy') {
+    const label = period.fy || currentFY()?.label || '';
+    const fy = listFiscalYears(2020).find((f) => f.label === label) ?? currentFY();
+    return fy ? fiscalYearBounds(fy) : {};
+  }
+  if (period.kind === 'calendar') {
+    const y = period.year ?? new Date().getFullYear();
+    return { start: new Date(y, 0, 1), end: new Date(y, 11, 31, 23, 59, 59, 999) };
+  }
+  return {
+    start: period.from ? new Date(period.from) : undefined,
+    end: period.to ? new Date(`${period.to}T23:59:59.999`) : undefined,
+  };
+}
+
+async function usedKgInRange(
+  factoryId: string,
+  entryId: string,
+  range: { start?: Date; end?: Date },
+): Promise<number> {
+  const rows = await prisma.recyclingCategory.findMany({
+    where: {
+      entryId,
+      recycling: {
+        factoryId,
+        ...(range.start || range.end
+          ? { processedAt: { gte: range.start, lte: range.end } }
+          : {}),
+      },
+    },
+    select: { weightKg: true },
+  });
+  return rows.reduce((sum, row) => sum + Number(row.weightKg), 0);
 }
 
 export async function getHeroesReport(

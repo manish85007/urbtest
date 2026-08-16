@@ -77,7 +77,7 @@ export function FactoriesTab({ factories, users, onChanged }: FactoriesTabProps)
                     <td className="mono">{f.mrnCount ?? 0}</td>
                     <td>
                       <button type="button" className="btn bs bsm" onClick={() => setEditing(f)}>
-                        Edit
+                        ✏️
                       </button>
                     </td>
                   </tr>

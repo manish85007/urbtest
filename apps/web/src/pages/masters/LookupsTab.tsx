@@ -89,7 +89,7 @@ export function LookupsTab({ lookups, onChanged }: LookupsTabProps) {
                       </td>
                       <td>
                         <button type="button" className="btn bs bsm" onClick={() => setEditing({ def, row: r })}>
-                          Edit
+                          ✏️
                         </button>{' '}
                         <button
                           type="button"

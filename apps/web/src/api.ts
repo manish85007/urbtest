@@ -50,12 +50,16 @@ export interface RegisterReport {
 
 export interface CapacityReport {
   factoryId: string;
+  factoryName?: string;
   fy: string;
+  periodLabel?: string;
   stats: {
     authorized: number;
     processed: number;
     utilization: number;
     atRisk: number;
+    over?: number;
+    warn?: number;
   };
   entries: Array<{
     entryId: string;
@@ -64,12 +68,34 @@ export interface CapacityReport {
     activity: string;
     capacityTpa: string;
     usedKg: number;
+    remKg?: number;
     capKg: number;
     pct: number;
     atRisk: boolean;
     exceeded: boolean;
   }>;
   alerts: CapacityReport['entries'];
+}
+
+export interface AuditLogPage {
+  total: number;
+  filtered: number;
+  page: number;
+  pages: number;
+  limit: number;
+  rows: Array<{
+    id: string;
+    ts: string;
+    actorEmail: string;
+    actorName: string | null;
+    action: string;
+    entity: string;
+    entityId: string | null;
+    details: unknown;
+  }>;
+  actors: Array<{ email: string; name: string }>;
+  actions: string[];
+  entities: string[];
 }
 
 export interface HeroesPlanting {
@@ -586,21 +612,35 @@ export const dataApi = {
     api<DashboardReport>(
       `/reports/dashboard${qs({ siteId, ...(period ?? {}) })}`,
     ),
-  auditLog: (limit = 50, q?: string, entity?: string) => {
-    const params = new URLSearchParams({ limit: String(limit) });
-    if (q) params.set('q', q);
-    if (entity) params.set('entity', entity);
-    return api<Array<{
-      id: string;
-      ts: string;
-      actorEmail: string;
-      action: string;
-      entity: string;
-      entityId: string | null;
-    }>>(`/audit?${params}`);
+  auditLog: (filters?: {
+    limit?: number;
+    page?: number;
+    q?: string;
+    actor?: string;
+    action?: string;
+    entity?: string;
+    from?: string;
+    to?: string;
+    sort?: string;
+  }) => {
+    const params = new URLSearchParams();
+    const f = filters ?? {};
+    if (f.limit) params.set('limit', String(f.limit));
+    if (f.page) params.set('page', String(f.page));
+    if (f.q) params.set('q', f.q);
+    if (f.actor) params.set('actor', f.actor);
+    if (f.action) params.set('action', f.action);
+    if (f.entity) params.set('entity', f.entity);
+    if (f.from) params.set('from', f.from);
+    if (f.to) params.set('to', f.to);
+    if (f.sort) params.set('sort', f.sort);
+    const qs = params.toString();
+    return api<AuditLogPage>(`/audit${qs ? `?${qs}` : ''}`);
   },
-  capacity: (factoryId: string) =>
-    api<CapacityReport>(`/reports/capacity?factoryId=${encodeURIComponent(factoryId)}`),
+  capacity: (factoryId: string, period?: PeriodQuery) =>
+    api<CapacityReport>(
+      `/reports/capacity${qs({ factoryId, ...(period ?? {}) })}`,
+    ),
   heroes: (period?: PeriodQuery, clientId?: string) =>
     api<HeroesReport>(`/reports/heroes${qs({ ...(period ?? {}), clientId })}`),
   register: (type: RegisterType, period?: PeriodQuery, scope?: { clientId?: string; siteId?: string }) =>

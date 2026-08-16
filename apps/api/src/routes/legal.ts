@@ -7,7 +7,7 @@ import {
   getLegalStatus,
   listLegalDocuments,
 } from '../services/legal.js';
-import { prisma } from '../lib/prisma.js';
+import { listAudit } from '../services/audit.js';
 
 export async function legalRoutes(app: FastifyInstance) {
   app.get('/legal', async () => listLegalDocuments());
@@ -44,40 +44,32 @@ export async function auditRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
   app.get('/audit', { preHandler: requireAdmin }, async (request) => {
-    const { limit, entity, q } = request.query as {
+    const q = request.query as {
       limit?: string;
+      page?: string;
       entity?: string;
       q?: string;
+      actor?: string;
+      action?: string;
+      from?: string;
+      to?: string;
+      sort?: string;
     };
-    const take = Math.min(Number(limit ?? 50), 200);
-
-    const rows = await prisma.auditLog.findMany({
-      where: {
-        ...(entity ? { entity } : {}),
-        ...(q
-          ? {
-              OR: [
-                { action: { contains: q, mode: 'insensitive' } },
-                { actorEmail: { contains: q, mode: 'insensitive' } },
-                { entityId: { contains: q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { ts: 'desc' },
-      take,
-      select: {
-        id: true,
-        ts: true,
-        actorEmail: true,
-        action: true,
-        entity: true,
-        entityId: true,
-        details: true,
-      },
+    const sort = q.sort;
+    return listAudit({
+      q: q.q,
+      actor: q.actor,
+      action: q.action,
+      entity: q.entity,
+      from: q.from,
+      to: q.to,
+      sort:
+        sort === 'oldest' || sort === 'actor' || sort === 'action' || sort === 'newest'
+          ? sort
+          : 'newest',
+      page: q.page ? Number(q.page) : 1,
+      limit: q.limit ? Number(q.limit) : 100,
     });
-
-    return rows;
   });
 }
 

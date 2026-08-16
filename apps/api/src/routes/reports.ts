@@ -43,7 +43,11 @@ export async function reportsRoutes(app: FastifyInstance) {
     const { factoryId } = request.query as { factoryId?: string };
     if (!factoryId) return reply.badRequest('factoryId is required.');
     try {
-      return await getCapacityReport(request.user!, factoryId);
+      return await getCapacityReport(
+        request.user!,
+        factoryId,
+        periodFromQuery(request.query as Record<string, unknown>),
+      );
     } catch (err) {
       return handleErr(err, reply);
     }
