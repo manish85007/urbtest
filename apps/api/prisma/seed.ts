@@ -138,12 +138,6 @@ async function main() {
     });
   }
 
-  await prisma.idSequence.upsert({
-    where: { key: 'sub' },
-    update: {},
-    create: { key: 'sub', prefix: 'REQ-', pad: 5, nextValue: 46 },
-  });
-
   for (const seq of [
     { key: 'f6', prefix: 'F6-', pad: 5, nextValue: 120 },
     { key: 'dcod', prefix: 'DCOD-', pad: 6, nextValue: 340 },
@@ -155,7 +149,72 @@ async function main() {
     });
   }
 
-  console.log(`Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories`);
+  // Demo submissions for development / UAT
+  await prisma.submission.upsert({
+    where: { id: 'REQ-00046' },
+    update: {},
+    create: {
+      id: 'REQ-00046',
+      clientId: client.id,
+      siteId: site.id,
+      ref: 'PO-DEMO-001',
+      requestDate: new Date('2026-08-10'),
+      location: 'Tower B, Embassy Tech Village',
+      approxQty: 85,
+      approxWeight: 180,
+      notes: 'Demo request — awaiting acknowledgement',
+      createdBy: 'ramesh@techcorp.in',
+    },
+  });
+
+  const demoAck = await prisma.submission.upsert({
+    where: { id: 'REQ-00047' },
+    update: {},
+    create: {
+      id: 'REQ-00047',
+      clientId: client.id,
+      siteId: site.id,
+      ref: 'PO-DEMO-002',
+      requestDate: new Date('2026-08-12'),
+      location: 'Tower B loading bay',
+      approxQty: 40,
+      approxWeight: 95,
+      notes: 'Demo request — vehicles assigned',
+      createdBy: 'ramesh@techcorp.in',
+      acknowledgedAt: new Date('2026-08-13'),
+      acknowledgedBy: 'admin@urbeno.in',
+    },
+  });
+
+  const existingVeh = await prisma.vehicle.findFirst({
+    where: { submissionId: demoAck.id },
+  });
+  if (!existingVeh) {
+    await prisma.vehicle.create({
+      data: {
+        submissionId: demoAck.id,
+        registration: 'KA-01-DM-2026',
+        vehicleType: 'VT2',
+        logisticsPartner: 'LP1',
+        driverName: 'Demo Driver',
+        driverPhone: '+91 99001 00001',
+        expectedAt: new Date('2026-08-15'),
+        team: {
+          create: [{ name: 'Demo Supervisor', role: 'TR1', phone: '+91 99001 00002' }],
+        },
+      },
+    });
+  }
+
+  await prisma.idSequence.upsert({
+    where: { key: 'sub' },
+    update: { nextValue: 48 },
+    create: { key: 'sub', prefix: 'REQ-', pad: 5, nextValue: 48 },
+  });
+
+  console.log(
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, 2 demo requests`,
+  );
 }
 
 main()

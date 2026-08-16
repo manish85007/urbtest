@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { authApi, type SessionUser } from '../api';
 
 interface ShellProps {
@@ -9,6 +9,8 @@ interface ShellProps {
 }
 
 export function Shell({ user, onLogout, children }: ShellProps) {
+  const loc = useLocation();
+
   async function logout() {
     await authApi.logout();
     onLogout();
@@ -25,8 +27,11 @@ export function Shell({ user, onLogout, children }: ShellProps) {
           </div>
         </Link>
         <nav className="nav">
-          <Link to="/" className="on">
+          <Link to="/" className={loc.pathname === '/' ? 'on' : ''}>
             Dashboard
+          </Link>
+          <Link to="/requests/new" className={loc.pathname === '/requests/new' ? 'on' : ''}>
+            New request
           </Link>
         </nav>
         <div className="user-chip">

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { authApi, type SessionUser } from './api';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { NewRequestPage } from './pages/NewRequestPage';
+import { SubmissionDetailPage } from './pages/SubmissionDetailPage';
 import { Shell } from './components/Shell';
 
 export function App() {
@@ -29,6 +31,8 @@ export function App() {
     <Shell user={user} onLogout={() => setUser(null)}>
       <Routes>
         <Route path="/" element={<DashboardPage user={user} />} />
+        <Route path="/requests/new" element={<NewRequestPage user={user} />} />
+        <Route path="/requests/:id" element={<SubmissionDetailPage user={user} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

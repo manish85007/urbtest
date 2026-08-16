@@ -135,15 +135,6 @@ input {
   color: var(--muted);
 }
 
-.nav .on {
-  background: var(--green);
-  color: #fff;
-  border-radius: 7px;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.83rem;
-  font-weight: 600;
-}
-
 .user-chip {
   margin-left: auto;
   display: flex;
@@ -279,4 +270,158 @@ th {
   padding: 0.1rem 0.45rem;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.nav a {
+  padding: 0.35rem 0.65rem;
+  border-radius: 7px;
+  font-size: 0.83rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav a.on {
+  background: var(--green);
+  color: #fff;
+  font-weight: 600;
+}
+
+.f-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.f-row .h1 {
+  margin: 0;
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 640px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.fr2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.fr3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+@media (max-width: 700px) {
+  .fr2,
+  .fr3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+textarea {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  min-height: 70px;
+}
+
+select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+}
+
+.sub-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.sub-form h3 {
+  font-size: 0.95rem;
+  color: var(--green-dark);
+  margin-bottom: 0.6rem;
+}
+
+.list {
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.list li {
+  font-size: 0.88rem;
+}
+
+.click-row:hover {
+  background: var(--green-light);
+}
+
+.stat-value.sm {
+  font-size: 1.2rem;
+}
+
+.ok-msg {
+  color: var(--green-dark);
+  font-weight: 600;
+  font-size: 0.88rem;
+  margin: 0.5rem 0;
+}
+
+.badge.warn {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.prog {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 1rem;
+}
+
+.pstep {
+  flex: 1;
+  min-width: 72px;
+  padding: 0.35rem 0.25rem;
+  border-radius: 7px;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: #f2f1ec;
+  color: var(--muted);
+}
+
+.pstep.done {
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+
+.pstep.now {
+  background: var(--green);
+  color: #fff;
+}
+
+.pstep-n {
+  display: block;
+  font-size: 0.55rem;
+  opacity: 0.85;
 }

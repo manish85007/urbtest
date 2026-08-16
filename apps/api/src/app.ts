@@ -5,6 +5,7 @@ import sensible from '@fastify/sensible';
 import { authRoutes } from './routes/auth.js';
 import { submissionRoutes } from './routes/submissions.js';
 import { lifecycleRoutes } from './routes/lifecycle.js';
+import { mastersRoutes } from './routes/masters.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -27,6 +28,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(submissionRoutes);
   await app.register(lifecycleRoutes);
+  await app.register(mastersRoutes);
 
   return app;
 }

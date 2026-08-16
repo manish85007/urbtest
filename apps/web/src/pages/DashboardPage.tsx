@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { stageLabel } from '@urb-tectrack/shared';
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
 
@@ -27,7 +28,12 @@ export function DashboardPage({ user }: DashboardPageProps) {
 
   return (
     <div>
-      <h1 className="h1">Dashboard</h1>
+      <div className="f-row">
+        <h1 className="h1">Dashboard</h1>
+        <Link to="/requests/new" className="btn primary">
+          + New request
+        </Link>
+      </div>
       <p className="muted">Welcome back, {user.name}.</p>
 
       {error ? <p className="error">{error}</p> : null}
@@ -52,7 +58,10 @@ export function DashboardPage({ user }: DashboardPageProps) {
       <section className="card">
         <h2>Recent requests</h2>
         {subs.length === 0 ? (
-          <p className="muted">No requests yet. Phase 3 will wire the full 9-stage lifecycle.</p>
+          <p className="muted">
+            No requests yet.{' '}
+            <Link to="/requests/new">Raise the first pickup request</Link>.
+          </p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -68,8 +77,10 @@ export function DashboardPage({ user }: DashboardPageProps) {
               </thead>
               <tbody>
                 {subs.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.id}</td>
+                  <tr key={s.id} className="click-row">
+                    <td>
+                      <Link to={`/requests/${s.id}`}>{s.id}</Link>
+                    </td>
                     <td>{s.clientName}</td>
                     <td>{s.siteName}</td>
                     <td>
