@@ -880,6 +880,29 @@ export const emailsApi = {
       method: 'POST',
       body: JSON.stringify({ to }),
     }),
+  smtpSettings: () =>
+    api<{
+      enabled: boolean;
+      host: string;
+      port: number;
+      secure: boolean;
+      user: string;
+      passwordSet: boolean;
+      fromName: string;
+      fromEmail: string;
+    }>('/settings/email'),
+  saveSmtpSettings: (body: {
+    enabled?: boolean;
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    user?: string;
+    pass?: string;
+    fromName?: string;
+    fromEmail?: string;
+  }) => api<unknown>('/settings/email', { method: 'PUT', body: JSON.stringify(body) }),
+  testSmtp: (to: string) =>
+    api<{ ok: boolean }>('/settings/email/test', { method: 'POST', body: JSON.stringify({ to }) }),
 };
 
 export const filesApi = {
@@ -994,6 +1017,7 @@ export const lifecycleApi = {
       billingWeight?: number;
       deviationNote?: string;
       taxRatePct?: number;
+      billingMode?: string;
       invoiceFileId?: string;
       ewayFileId?: string;
     },

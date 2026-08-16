@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { legalApi } from '../api';
+import { COMPANY } from '../lib/company';
 
 export function LegalPage() {
   const { key } = useParams<{ key: string }>();
@@ -17,7 +18,7 @@ export function LegalPage() {
         version: '1.0',
         effectiveDate: '2026-04-01',
         body:
-          'For anything relating to a consignment, raise a query on the request concerned.\n\nPhone — +91 80 4123 4500\nEmail — operations@urbeno.in\n\nIf you cannot sign in, ask an Urbeno admin to reset your password, then change it from Profile.',
+          `For anything relating to a consignment, raise a query on the request concerned.\n\nPhone — ${COMPANY.phone}\nEmail — ${COMPANY.email}\nWhatsApp — ${COMPANY.waUrl}\n\nIf you cannot sign in, use Forgot password on the login screen for an email OTP, then change it from Profile.`,
       });
       setError('');
       return;

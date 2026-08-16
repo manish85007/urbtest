@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { attachSession, requireAdmin } from '../middleware/session.js';
 import { listEmailOutbox } from '../services/email.js';
 import {
@@ -8,9 +8,13 @@ import {
   sendCampaign,
   updateEmailTemplate,
 } from '../services/masters-write.js';
+import { getSmtpSettings, saveSmtpSettings, sendTestEmail, smtpPublicView } from '../services/settings.js';
 import { isAppError } from '../lib/errors.js';
 
 function handleErr(err: unknown, reply: { badRequest: (m: string) => unknown; status: (n: number) => { send: (b: unknown) => unknown } }) {
+  if (err instanceof ZodError) {
+    return reply.status(400).send({ message: err.issues[0]?.message ?? 'Invalid input.' });
+  }
   if (isAppError(err)) return reply.status(err.statusCode).send({ message: err.message });
   throw err;
 }
@@ -62,6 +66,38 @@ export async function emailsRoutes(app: FastifyInstance) {
       const { key } = request.params as { key: string };
       const body = z.object({ to: z.array(z.string().email()).min(1) }).parse(request.body);
       return await sendCampaign(request.user!, key, body.to);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.get('/settings/email', { preHandler: requireAdmin }, async () => smtpPublicView(await getSmtpSettings()));
+
+  app.put('/settings/email', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const body = z
+        .object({
+          enabled: z.boolean().optional(),
+          host: z.string().optional(),
+          port: z.number().int().positive().optional(),
+          secure: z.boolean().optional(),
+          user: z.string().optional(),
+          pass: z.string().optional(),
+          fromName: z.string().optional(),
+          fromEmail: z.string().optional(),
+        })
+        .parse(request.body);
+      return await saveSmtpSettings(body, request.user!.email);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.post('/settings/email/test', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const body = z.object({ to: z.string().email() }).parse(request.body);
+      await sendTestEmail(body.to);
+      return { ok: true };
     } catch (err) {
       return handleErr(err, reply);
     }

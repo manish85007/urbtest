@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
 import { hashPassword } from './auth.js';
-import { sendTransactionalEmail } from './email.js';
+import { processEmailQueue, sendTransactionalEmail } from './email.js';
 
 const RESET_MINS = Number(process.env.RESET_CODE_MINS ?? 15);
 
@@ -38,6 +38,7 @@ export async function requestPasswordReset(emailRaw: string): Promise<{ sent: tr
       expiry_minutes: RESET_MINS,
       support_email: process.env.URBENO_EMAIL ?? 'ops@urbeno.in',
     });
+    await processEmailQueue(5).catch(() => undefined);
     await auditLog({ actorEmail: email, action: 'auth.reset.request', entity: 'user', entityId: email });
     return { sent: true, ...(allowDemoCode() ? { demoCode: code } : {}) };
   }

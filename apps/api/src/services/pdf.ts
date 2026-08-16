@@ -1,4 +1,4 @@
-import { SUSTAINABILITY, type ReportPeriod } from '@urb-tectrack/shared';
+import { SUSTAINABILITY, getFY, type ReportPeriod } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { canSeeMrn, isStaff } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
@@ -222,27 +222,111 @@ export async function impactPdf(
   return { filename: `sustainability-${actor.clientId ?? 'portfolio'}.pdf`, buffer };
 }
 
-export async function methodologyPdf(): Promise<{ filename: string; buffer: Buffer }> {
+export async function methodologyPdf(actor?: SessionUser): Promise<{ filename: string; buffer: Buffer }> {
+  const S = SUSTAINABILITY;
+  const fy = getFY(new Date());
+  const daily = (S.co2PerTree / 365).toFixed(6);
+  const today = new Date().toISOString().slice(0, 10);
+
   const buffer = buildTextPdf(
-    'SUSTAINABILITY METHODOLOGY',
-    'Citation sheet for Urb TecTrack impact figures',
+    'SUSTAINABILITY METRICS — METHODOLOGY',
+    `MTH/${fy?.short ?? 'v1'}/v1 · How Urb TecTrack calculates every environmental figure it reports`,
     [
       {
-        heading: 'FACTORS',
+        heading: '1 · PURPOSE AND SCOPE',
         lines: [
-          `CO2e avoided: ${SUSTAINABILITY.co2PerKg} kg per kg e-waste. ${SUSTAINABILITY.cite.co2}`,
-          `Landfill diverted: ${SUSTAINABILITY.landfillRatio * 100}% of net weight. ${SUSTAINABILITY.cite.landfill}`,
-          `Tree equivalent: CO2e / ${SUSTAINABILITY.co2PerTree} kg per tree-year. ${SUSTAINABILITY.cite.tree}`,
-          `Water saved: ${SUSTAINABILITY.waterPerKg} kL per kg. ${SUSTAINABILITY.cite.water}`,
-          `Energy saved: ${SUSTAINABILITY.energyPerKg} kWh per kg. ${SUSTAINABILITY.cite.energy}`,
-          'Trees earned: 1 per tonne of closed, acknowledged recycling — Urbeno commitment.',
-          'Tree sequestration accrues daily from each planting date and is never added to avoided emissions.',
+          'This document sets out how every environmental figure shown in Urb TecTrack is derived, which source each conversion factor comes from, and what evidence sits behind it. It is written so that a client\'s sustainability team, an internal auditor, or an external assurance provider can reproduce any number we publish without needing access to our systems.',
+          'Two distinct effects are reported, and they are never added together:',
+          'A · Avoided impact from recycling — The emissions, landfill volume, water and energy that were NOT incurred because end-of-life equipment was recycled instead of landfilled and replaced with virgin manufacture. This is a counterfactual saving, recognised once, at the point the consignment completes its lifecycle.',
+          'B · Sequestration from trees planted — Carbon dioxide actually absorbed by trees planted under the Recycle Heroes programme. This is a physical removal that accrues day by day for as long as the tree stands. It is reported separately from (A) because combining an avoided emission with a removal would overstate the total.',
+        ],
+      },
+      {
+        heading: '2 · WHAT COUNTS, AND WHEN',
+        lines: [
+          'Only fully completed consignments are counted. A consignment enters the numbers when all of the following are true:',
+          'Weighed — Net weight recorded on a weighbridge at pickup, evidenced by a weighment slip photograph.',
+          'Received — Material receipt note (MRN) raised at the receiving facility, signed by driver, factory manager and security.',
+          'Processed — Recycling recorded against the facility\'s authorised categories, with a Form 6 manifest issued under Rule 12 of the E-Waste (Management) Rules, 2022.',
+          'Certified — A Certificate of Destruction issued and delivered to the client.',
+          'Acknowledged — The client has confirmed receipt of the certificate and closed the request in the portal.',
+          'Material still in transit, awaiting processing, or awaiting client acknowledgement is deliberately excluded. This is conservative by design: a number that has been certified and acknowledged can be defended; a number that is still moving cannot.',
+          'The weight used is the NET weighbridge figure (gross minus tare), not the client\'s declared estimate at the time of raising the request. Where one pickup is invoiced in parts, weight is apportioned across invoices in proportion to the item weights assigned to each.',
+        ],
+      },
+      {
+        heading: '3 · CONVERSION FACTORS',
+        table: {
+          headers: ['METRIC', 'FACTOR', 'UNIT', 'SOURCE'],
+          rows: [
+            ['CO2e avoided', String(S.co2PerKg), 'kg CO2e / kg', S.cite.co2],
+            ['Landfill diverted', `${(S.landfillRatio * 100).toFixed(0)}%`, 'of net weight', S.cite.landfill],
+            ['Tree sequestration', String(S.co2PerTree), 'kg CO2 / tree / yr', S.cite.tree],
+            ['Water saved', String(S.waterPerKg), 'kL / kg', S.cite.water],
+            ['Energy saved', String(S.energyPerKg), 'kWh / kg', S.cite.energy],
+            ['Trees earned', String(S.treesPerTonne), 'tree / tonne', 'Urbeno Recycle Heroes commitment'],
+          ],
+        },
+        lines: [
+          'These factors are published averages for mixed electronic waste. They are not Urbeno-specific measurements. Where a client requires India-specific or facility-specific factors for assurance purposes, we will substitute them and restate the figures — the calculation method does not change.',
+        ],
+      },
+      {
+        heading: '4 · FORMULAS',
+        lines: [
+          `CO2e avoided (recycling):  CO2e_kg  =  net_weight_kg  x  ${S.co2PerKg}`,
+          'Recognised once, on the date the client acknowledges closure.',
+          `Landfill diverted:  landfill_kg  =  net_weight_kg  x  ${S.landfillRatio}`,
+          `Water and energy saved:  water_kL = net_weight_kg x ${S.waterPerKg}     energy_kWh = net_weight_kg x ${S.energyPerKg}`,
+          `Trees earned:  trees_earned  =  floor( net_weight_kg / 1000 )  x  ${S.treesPerTonne}`,
+          'Rounded down. A part-tonne earns nothing until the next full tonne completes.',
+          `CO2 sequestered by trees (daily accrual):  CO2_kg  =  SUM over plantings of  ( trees  x  days_since_planting  x  ${daily} )`,
+          `Daily rate = ${S.co2PerTree} kg per tree per year divided by 365. A tree planted yesterday has banked one day of absorption, not a year of it. This is why the Recycle Heroes figure rises every day without any new activity.`,
+          `Tree-equivalent (illustrative only):  tree_years  =  CO2e_avoided_kg  /  ${S.co2PerTree}`,
+          'A comparison device to make an abstract tonnage tangible. It is NOT a claim that these trees exist. Trees actually planted are counted separately and evidenced with dated photographs.',
+        ],
+      },
+      {
+        heading: '5 · THE RECYCLE HEROES TREE LEDGER',
+        lines: [
+          `Trees are recorded in two categories and reported separately. Trees planted by Urbeno are those we plant against a client's completed tonnage, at the rate of ${S.treesPerTonne} tree per tonne. Trees logged as client CSR are those the client plants through its own programmes and records in the portal so that its Recycle Heroes page reflects the whole picture. Only the first category counts against what Urbeno owes.`,
+          'Each planting batch carries a planting date, count, species, location, and planting partner. Growth photographs are added over time, each carrying its own date and observation, producing a timeline that can be sampled during a CSR audit. Sequestration is calculated from the planting date of each batch independently, so batches planted in different years accrue at different totals.',
+          'Survival is not currently modelled. Where a sapling is replaced, the replacement is recorded as an observation on the growth timeline rather than as a new planting, so the count is not inflated.',
+        ],
+      },
+      {
+        heading: '6 · WHAT WE DO NOT CLAIM',
+        lines: [
+          '— We do not claim carbon credits, offsets, or any tradable instrument. Nothing in this report has been registered with a crediting body.',
+          '— We do not count material that is in progress, and we do not restate previous periods when factors are updated — a change of factor applies from the date of change and is disclosed.',
+          '— We do not combine avoided emissions with tree sequestration into a single headline number.',
+          '— We do not extrapolate beyond the reporting period, and we do not model future tree growth.',
+        ],
+      },
+      {
+        heading: '7 · EVIDENCE AND TRACEABILITY',
+        lines: [
+          'Every figure decomposes to individual consignments. For any number in any report, the underlying records — weighment slip, MRN, Form 6 manifest, Certificate of Destruction, closure acknowledgement and, for trees, the dated growth photographs — are retained in Urb TecTrack and can be produced on request. Compliance records are held for a minimum of five years and certificates for ten, in line with Rule 12(4) of the E-Waste (Management) Rules, 2022.',
+          'Where an assurance provider wishes to sample, we recommend selecting consignments at random from the Certificate Log report for the period and tracing each back through the portal. Every document referenced is downloadable.',
+          `Prepared by — ${CO.name} · ${CO.cpcb}`,
+          `Version / Date — v1 · ${today}`,
         ],
       },
     ],
-    `${CO.name} · Urb TecTrack methodology`,
+    `Sustainability methodology v1 · ${CO.name} · applies to all impact figures in Urb TecTrack`,
   );
-  return { filename: 'urb-tectrack-methodology.pdf', buffer };
+
+  if (actor) {
+    await auditLog({
+      actorEmail: actor.email,
+      actorId: actor.id,
+      action: 'pdf.methodology',
+      entity: 'report',
+      entityId: 'methodology',
+    });
+  }
+
+  return { filename: 'Urbeno-Sustainability-Methodology-v1.pdf', buffer };
 }
 
 export async function registerPdf(

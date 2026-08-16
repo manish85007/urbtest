@@ -3,6 +3,7 @@ import { getFY, formatMrnNumber } from './fiscal-year.js';
 import { invStage, subStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
+import { formatE164, isValidNational10, national10 } from './phone.js';
 
 describe('fiscal year', () => {
   it('uses April–March boundaries', () => {
@@ -46,5 +47,15 @@ describe('recovery', () => {
     expect(m.fe + m.nfe + m.pl + m.pcb).toBe(100);
     expect(weightsBalance(100, 100)).toBe(true);
     expect(weightsBalance(100, 99)).toBe(false);
+  });
+});
+
+describe('phone', () => {
+  it('freezes a 10-digit national number with +91', () => {
+    expect(national10('9900112233')).toBe('9900112233');
+    expect(national10('+91 99001 12233')).toBe('9900112233');
+    expect(isValidNational10('9900112233')).toBe(true);
+    expect(formatE164('9900112233')).toBe('+919900112233');
+    expect(isValidNational10('990011')).toBe(false);
   });
 });

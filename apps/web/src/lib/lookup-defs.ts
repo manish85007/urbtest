@@ -67,6 +67,17 @@ export const LOOKUP_DEFS: LookupDef[] = [
   },
 ];
 
+export const LOOKUP_CATEGORY_ALIAS: Record<string, string> = {
+  vehTypes: 'vehicleType',
+  teamRoles: 'teamRole',
+  payModes: 'paymentMode',
+  taxRates: 'taxRate',
+};
+
+export function canonicalLookupCategory(category: string): string {
+  return LOOKUP_CATEGORY_ALIAS[category] ?? category;
+}
+
 export function validClientCode(code: string, takenIds: string[]): string | null {
   const c = String(code || '').trim().toUpperCase();
   if (!c) return null;

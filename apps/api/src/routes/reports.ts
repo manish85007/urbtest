@@ -198,7 +198,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   });
 
   app.get('/reports/methodology.pdf', { preHandler: requireAuth }, async (request, reply) => {
-    const { filename, buffer } = await methodologyPdf();
+    const { filename, buffer } = await methodologyPdf(request.user!);
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `attachment; filename="${filename}"`)

@@ -6,6 +6,7 @@ import { navItems } from '../lib/nav';
 import { LogoIcon } from './BrandMark';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
+import { COMPANY } from '../lib/company';
 
 interface ShellProps {
   user: SessionUser;
@@ -92,6 +93,11 @@ export function Shell({ user, onLogout, children }: ShellProps) {
         </div>
       </header>
       <main className="wrap">{children}</main>
+      {user.role === 'client' ? (
+        <a className="wa-fab" href={COMPANY.waUrl} target="_blank" rel="noreferrer">
+          💬 WhatsApp
+        </a>
+      ) : null}
       <footer className="foot">
         <div className="foot-in">
           <div className="foot-l">
@@ -102,6 +108,9 @@ export function Shell({ user, onLogout, children }: ShellProps) {
             </span>
           </div>
           <div className="foot-r">
+            <a href={COMPANY.waUrl} target="_blank" rel="noreferrer">
+              WhatsApp
+            </a>
             <Link to="/legal/terms">Terms of Use</Link>
             <Link to="/legal/privacy">Privacy &amp; Data</Link>
             <Link to="/legal/compliance">Compliance Notice</Link>

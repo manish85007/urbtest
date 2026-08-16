@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
 import { dataApi, type LookupRow } from '../../api';
 import { Modal } from '../../components/Modal';
-import { LOOKUP_DEFS, type LookupCol, type LookupDef } from '../../lib/lookup-defs';
+import {
+  LOOKUP_DEFS,
+  canonicalLookupCategory,
+  type LookupCol,
+  type LookupDef,
+} from '../../lib/lookup-defs';
 
 interface LookupsTabProps {
   lookups: LookupRow[];
@@ -20,16 +25,17 @@ export function LookupsTab({ lookups, onChanged }: LookupsTabProps) {
   const grouped = useMemo(() => {
     const map = new Map<string, LookupRow[]>();
     for (const row of lookups) {
-      const list = map.get(row.category) ?? [];
+      const key = canonicalLookupCategory(row.category);
+      const list = map.get(key) ?? [];
       list.push(row);
-      map.set(row.category, list);
+      map.set(key, list);
     }
     return map;
   }, [lookups]);
 
   async function toggle(row: LookupRow, on: boolean) {
     await dataApi.upsertLookup({
-      category: row.category,
+      category: canonicalLookupCategory(row.category),
       id: row.id,
       label: row.label,
       active: on,
@@ -104,7 +110,20 @@ export function LookupsTab({ lookups, onChanged }: LookupsTabProps) {
                 </tbody>
               </table>
             </div>
-            {def.note ? <div className="note-box">{def.note}</div> : null}
+            {def.note ? (
+              <div
+                style={{
+                  marginTop: '.5rem',
+                  padding: '.5rem .75rem',
+                  background: 'var(--g5)',
+                  borderRadius: 8,
+                  fontSize: '.78rem',
+                  color: 'var(--g2)',
+                }}
+              >
+                {def.note}
+              </div>
+            ) : null}
           </div>
         );
       })}
@@ -173,6 +192,10 @@ function LookupModal({
     }
   }
 
+  const numberKeys = new Set(
+    def.cols.filter((c) => c.kind === 'number' || c.k === 'gst' || c.k === 'rate' || c.k === 'days').map((c) => c.k),
+  );
+
   return (
     <Modal
       title={row ? `Edit — ${def.name}` : `Add — ${def.name}`}
@@ -190,15 +213,19 @@ function LookupModal({
     >
       {error ? <p className="error">{error}</p> : null}
       {def.cols.map((c) => (
-        <label key={c.k}>
-          {c.h}
-          {c.required ? ' *' : ''}
+        <div className="fg" key={c.k}>
+          <label htmlFor={`lk-${c.k}`}>
+            {c.h}
+            {c.required ? ' *' : ''}
+          </label>
           <input
-            type={c.kind === 'number' ? 'number' : 'text'}
+            id={`lk-${c.k}`}
+            type={numberKeys.has(c.k) ? 'number' : 'text'}
+            step={numberKeys.has(c.k) ? 'any' : undefined}
             value={values[c.k] ?? ''}
             onChange={(e) => setValues((v) => ({ ...v, [c.k]: e.target.value }))}
           />
-        </label>
+        </div>
       ))}
     </Modal>
   );

@@ -87,7 +87,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <form onSubmit={sendCode}>
               <div style={{ fontWeight: 700, color: 'var(--g2)', marginBottom: '.5rem' }}>Reset your password</div>
               <p className="dim" style={{ fontSize: '.8rem', marginBottom: '.7rem' }}>
-                Enter your email and we&apos;ll send a 6-digit code, valid for 15 minutes.
+                Enter your email and we&apos;ll send a 6-digit OTP to that address. The code is valid for 15 minutes.
               </p>
               <div className="fg">
                 <label>Email</label>
@@ -95,7 +95,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </div>
               {error ? <div style={{ color: 'var(--rd)', fontSize: '.8rem', marginBottom: '.5rem' }}>{error}</div> : null}
               <button className="btn bp" style={{ width: '100%', justifyContent: 'center' }} type="submit" disabled={busy}>
-                Send Code
+                Send email OTP
               </button>
               <div className="forgot">
                 <a onClick={() => setReset(false)}>← Back to sign in</a>
@@ -105,7 +105,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <form onSubmit={setPasswordFromCode}>
               <div style={{ fontWeight: 700, color: 'var(--g2)', marginBottom: '.5rem' }}>Enter the code</div>
               <p className="dim" style={{ fontSize: '.8rem', marginBottom: '.5rem' }}>
-                If an account exists for <b>{email}</b>, a 6-digit code is on its way. It expires in 15 minutes.
+                If an account exists for <b>{email}</b>, a 6-digit email OTP is on its way. It expires in 15 minutes.
               </p>
               {demoCode ? (
                 <div
@@ -126,7 +126,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
               ) : null}
               <div className="fg">
-                <label>6-digit code</label>
+                <label>6-digit email OTP</label>
                 <input
                   className="mono"
                   maxLength={6}

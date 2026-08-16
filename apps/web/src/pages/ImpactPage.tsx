@@ -36,7 +36,7 @@ export function ImpactPage() {
         <div className="spacer" />
         <PeriodPicker value={period} onChange={setPeriod} />
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
-          Methodology PDF
+          📄 How these numbers are built
         </a>
         <a
           className="btn bs"

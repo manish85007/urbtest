@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi, type SessionUser } from '../api';
+import { COMPANY } from '../lib/company';
 
 interface ProfilePageProps {
   user: SessionUser;
@@ -118,9 +119,26 @@ export function ProfilePage({ user }: ProfilePageProps) {
             <p className="dim" style={{ fontSize: '.85rem', margin: '.5rem 0' }}>
               For a consignment, raise a query on the request. For account access, ask your Urbeno contact.
             </p>
-            <p style={{ fontSize: '.85rem' }}>
-              <a href="mailto:operations@urbeno.in">operations@urbeno.in</a>
-            </p>
+            <div style={{ fontSize: '.84rem', lineHeight: 1.7 }}>
+              <div>
+                📞{' '}
+                <a href={`tel:${COMPANY.phoneTel}`} style={{ color: 'var(--g)' }}>
+                  {COMPANY.phone}
+                </a>
+              </div>
+              <div>
+                ✉️{' '}
+                <a href={`mailto:${COMPANY.email}`} style={{ color: 'var(--g)' }}>
+                  {COMPANY.email}
+                </a>
+              </div>
+              <div>
+                💬{' '}
+                <a href={COMPANY.waUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--g)' }}>
+                  WhatsApp support
+                </a>
+              </div>
+            </div>
             <div style={{ marginTop: '.8rem', display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
               <Link to="/legal/terms">Terms of Use</Link>
               <Link to="/legal/privacy">Privacy &amp; Data</Link>

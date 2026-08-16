@@ -51,7 +51,7 @@ export function toLookupRow(r: { id: string; category: string; data: unknown; ac
     days: num(data, 'days'),
     code: str(data, 'code', 'cd'),
     phone: str(data, 'phone', 'ph'),
-    gstin: str(data, 'gstin'),
+    gstin: str(data, 'gstin') || (typeof data.gst === 'string' ? data.gst : undefined),
     transporterId: str(data, 'transporterId', 'trId'),
     address: str(data, 'address', 'addr'),
     gst: num(data, 'gst'),

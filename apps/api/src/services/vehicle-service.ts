@@ -1,3 +1,4 @@
+import { isValidNational10, national10, formatE164, countryCodeOf } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { roundKg, toKg } from '../lib/decimal.js';
@@ -52,10 +53,13 @@ export async function addVehicle(
     throw new AppError('Every vehicle needs at least one team member with name, role and phone.');
   }
 
+  const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
+
   for (const member of input.team) {
     if (!member.name?.trim() || !member.role?.trim() || !member.phone?.trim()) {
       throw new AppError('Every team member needs a name, role and phone.');
     }
+    requireMobile(member.phone, 'Team member phone');
   }
 
   const vehicle = await prisma.vehicle.create({
@@ -65,13 +69,13 @@ export async function addVehicle(
       vehicleType: input.vehicleType,
       logisticsPartner: input.logisticsPartner ?? null,
       driverName: input.driverName.trim(),
-      driverPhone: input.driverPhone.trim(),
+      driverPhone,
       expectedAt: input.expectedAt ? new Date(input.expectedAt) : null,
       team: {
         create: input.team.map((m) => ({
           name: m.name.trim(),
           role: m.role.trim(),
-          phone: m.phone.trim(),
+          phone: requireMobile(m.phone, 'Team member phone'),
         })),
       },
     },
@@ -184,4 +188,11 @@ export async function recordWeighment(
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);
   return { weighment, submission: withDerivedStages(refreshed) };
+}
+
+function requireMobile(raw: string, label: string): string {
+  if (!isValidNational10(raw)) {
+    throw new AppError(`${label} must be a 10-digit mobile number.`);
+  }
+  return formatE164(national10(raw), countryCodeOf(raw));
 }

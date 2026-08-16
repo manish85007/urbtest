@@ -65,7 +65,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
         </div>
         <div className="spacer" />
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
-          📄 Methodology
+          📄 How these numbers are built
         </a>
         <button type="button" className="btn bp" onClick={() => setPlantOpen(true)}>
           + Log Our Own Planting
@@ -304,7 +304,7 @@ function HeroesAdmin() {
         </div>
         <div className="spacer" />
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
-          📄 Methodology
+          📄 Download the methodology document
         </a>
         <button type="button" className="btn bp" onClick={() => setPlantFor(null)}>
           + Record Planting

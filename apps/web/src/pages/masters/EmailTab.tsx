@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { mergeTemplate } from '@urb-tectrack/shared';
 import { adminApi, emailsApi } from '../../api';
 import { Modal } from '../../components/Modal';
@@ -66,7 +66,7 @@ interface EmailTabProps {
 }
 
 export function EmailTab({ templates, outbox, onChanged }: EmailTabProps) {
-  const [emTab, setEmTab] = useState<'templates' | 'outbox'>('templates');
+  const [emTab, setEmTab] = useState<'templates' | 'outbox' | 'smtp'>('templates');
   const [q, setQ] = useState('');
   const [preview, setPreview] = useState<Template | null>(null);
   const [edit, setEdit] = useState<Template | null | 'new'>(null);
@@ -103,6 +103,9 @@ export function EmailTab({ templates, outbox, onChanged }: EmailTabProps) {
           <button type="button" className={`inv-tab ${emTab === 'outbox' ? 'on' : ''}`} onClick={() => setEmTab('outbox')}>
             Outbox
           </button>
+          <button type="button" className={`inv-tab ${emTab === 'smtp' ? 'on' : ''}`} onClick={() => setEmTab('smtp')}>
+            Outgoing mail
+          </button>
         </div>
         <div style={{ padding: '.7rem .3rem 0' }}>
           {emTab === 'templates' ? (
@@ -126,7 +129,7 @@ export function EmailTab({ templates, outbox, onChanged }: EmailTabProps) {
                 </div>
               )}
             </>
-          ) : (
+          ) : emTab === 'outbox' ? (
             <>
               <label style={{ maxWidth: 340 }}>
                 Search sent mail
@@ -171,6 +174,8 @@ export function EmailTab({ templates, outbox, onChanged }: EmailTabProps) {
                 </div>
               )}
             </>
+          ) : (
+            <SmtpSettingsForm onChanged={onChanged} />
           )}
         </div>
       </div>
@@ -408,4 +413,134 @@ function SendModal({
 async function onChangedJob(fn: () => Promise<unknown>, success: string, onChanged: (msg: string) => void) {
   await fn();
   onChanged(success);
+}
+
+function SmtpSettingsForm({ onChanged }: { onChanged: (msg: string) => void }) {
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState('587');
+  const [secure, setSecure] = useState(false);
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [fromName, setFromName] = useState('Urb TecTrack');
+  const [fromEmail, setFromEmail] = useState('ops@urbeno.in');
+  const [enabled, setEnabled] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    emailsApi
+      .smtpSettings()
+      .then((s) => {
+        setEnabled(s.enabled);
+        setHost(s.host);
+        setPort(String(s.port));
+        setSecure(s.secure);
+        setUser(s.user);
+        setFromName(s.fromName);
+        setFromEmail(s.fromEmail);
+        setPasswordSet(s.passwordSet);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load mail settings'));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await emailsApi.saveSmtpSettings({
+        enabled,
+        host,
+        port: Number(port) || 587,
+        secure,
+        user,
+        pass: pass || undefined,
+        fromName,
+        fromEmail,
+      });
+      setPass('');
+      if (pass) setPasswordSet(true);
+      onChanged('Outgoing mail settings saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function test() {
+    setBusy(true);
+    setError('');
+    try {
+      await emailsApi.testSmtp(testTo);
+      onChanged(`Test email sent to ${testTo}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Test send failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)}>
+      <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--g2)', marginBottom: '.35rem' }}>
+        Outgoing mail (SMTP)
+      </div>
+      <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.7rem', maxWidth: 640 }}>
+        Used for password-reset OTPs, request acknowledgements, certificates and payment reminders. Leave disabled to
+        log mail to the server console in development.
+      </p>
+      {error ? <p className="error">{error}</p> : null}
+      <label style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.7rem' }}>
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        Send outgoing mail through this SMTP server
+      </label>
+      <div className="fr2">
+        <div className="fg">
+          <label>SMTP host</label>
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="smtp.example.com" />
+        </div>
+        <div className="fg">
+          <label>Port</label>
+          <input type="number" value={port} onChange={(e) => setPort(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label>Username</label>
+          <input value={user} onChange={(e) => setUser(e.target.value)} autoComplete="off" />
+        </div>
+        <div className="fg">
+          <label>Password {passwordSet ? <span className="hint">saved — leave blank to keep</span> : null}</label>
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
+        </div>
+        <div className="fg">
+          <label>From name</label>
+          <input value={fromName} onChange={(e) => setFromName(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label>From email</label>
+          <input type="email" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
+        </div>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.8rem' }}>
+        <input type="checkbox" checked={secure} onChange={(e) => setSecure(e.target.checked)} />
+        Implicit TLS (port 465). Leave off for STARTTLS on 587.
+      </label>
+      <button type="submit" className="btn bp" disabled={busy}>
+        Save outgoing mail
+      </button>
+      <div className="fr2" style={{ marginTop: '1rem', maxWidth: 520 }}>
+        <div className="fg">
+          <label>Send a test to</label>
+          <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@company.com" />
+        </div>
+        <div className="fg" style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <button type="button" className="btn bs" disabled={busy || !testTo} onClick={() => void test()}>
+            Send test email
+          </button>
+        </div>
+      </div>
+    </form>
+  );
 }

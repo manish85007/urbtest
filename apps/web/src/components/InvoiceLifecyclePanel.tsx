@@ -147,9 +147,9 @@ export function InvoiceLifecyclePanel({
             )}
           </div>
           <div className="tile">
-            <div className="tile-l">Mode</div>
+            <div className="tile-l">Billing direction</div>
             <div className="tile-v">
-              {invoice.billingMode === 'client' ? 'Client invoices' : 'Urbeno invoices'}
+              {invoice.billingMode === 'client' ? 'Client → Urbeno' : 'Urbeno → Client'}
             </div>
           </div>
         </div>
