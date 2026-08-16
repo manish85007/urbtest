@@ -8,4 +8,6 @@ build/
 .DS_Store
 coverage/
 .turbo/
+uploads/
+apps/api/uploads/
 apps/api/prisma/migrations/**/migration_lock.toml

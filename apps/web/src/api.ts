@@ -130,6 +130,31 @@ export const dataApi = {
     api<CategorySummary[]>(`/factories/${factoryId}/categories`),
 };
 
+export const filesApi = {
+  upload: async (file: File, kind: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('kind', kind);
+    const res = await fetch(`${base}/files`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message ?? 'Upload failed');
+    }
+    return res.json() as Promise<{
+      id: string;
+      name: string;
+      mimeType: string;
+      sizeBytes: number;
+      kind: string;
+    }>;
+  },
+  url: (id: string) => `${base}/files/${id}`,
+};
+
 export const lifecycleApi = {
   createSubmission: (body: {
     clientId: string;

@@ -26,6 +26,7 @@ import {
 } from '../lib/access.js';
 import { deriveInvoiceStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
+import { assertFilesExist } from './file-service.js';
 import { sendTransactionalEmail } from './email.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
 
@@ -402,6 +403,7 @@ export async function uploadCertificate(
   if (!certNo) throw new AppError('Certificate number is required.');
   if (!input.certDate) throw new AppError('Certificate date is required.');
   if (!input.fileId) throw new AppError('Attach the signed Certificate of Destruction PDF.');
+  await assertFilesExist([input.fileId], ['certificate']);
 
   const dupe = await prisma.certificate.findFirst({
     where: { certNo, NOT: { invoiceId } },

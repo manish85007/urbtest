@@ -452,3 +452,37 @@ select {
   font-size: 0.82rem;
   margin: 0.2rem 0;
 }
+
+.btn.ghost.sm {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+}
+
+.file-upload {
+  margin: 0.5rem 0;
+}
+
+.file-upload-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.35rem 0 0;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.2rem;
+}
+
+.error.sm {
+  font-size: 0.82rem;
+}

@@ -6,6 +6,7 @@ import { submissionInclude } from '../lib/db-helpers.js';
 import { loadSubmissionForActor, requireStaff } from '../lib/access.js';
 import { withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
+import { assertFilesExist } from './file-service.js';
 
 export interface TeamMemberInput {
   name: string;
@@ -118,6 +119,7 @@ export async function recordWeighment(
     if (!input.pickupPhotoIds?.length) {
       throw new AppError('At least one pickup photo is still required for a manual weighment.');
     }
+    await assertFilesExist(input.pickupPhotoIds, ['pickPhoto']);
     data = {
       manual: true,
       grossKg: null,
@@ -146,6 +148,8 @@ export async function recordWeighment(
     if (!input.pickupPhotoIds?.length) {
       throw new AppError('At least one pickup photo is required.');
     }
+    await assertFilesExist(input.slipPhotoIds, ['weighPhoto']);
+    await assertFilesExist(input.pickupPhotoIds, ['pickPhoto']);
     const gross = toKg(input.gross);
     const tare = toKg(input.tare);
     if (!(gross > tare)) throw new AppError('Gross weight must be greater than tare weight.');

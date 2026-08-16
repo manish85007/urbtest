@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { dataApi, lifecycleApi, type SessionUser, type SubmissionDetail } from '../api';
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
+import { FileUpload } from '../components/FileUpload';
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const { id } = useParams<{ id: string }>();
@@ -260,9 +261,9 @@ function WeighForm({
   const [gross, setGross] = useState('');
   const [tare, setTare] = useState('');
   const [slip, setSlip] = useState('');
+  const [slipPhotos, setSlipPhotos] = useState<string[]>([]);
+  const [pickupPhotos, setPickupPhotos] = useState<string[]>([]);
   const today = new Date().toISOString().slice(0, 10);
-  const placeholderPhoto = ['demo-slip-photo'];
-  const placeholderPickup = ['demo-pickup-photo'];
 
   return (
     <form
@@ -274,13 +275,32 @@ function WeighForm({
           gross: Number(gross),
           tare: Number(tare),
           slipNumber: slip,
-          slipPhotoIds: placeholderPhoto,
-          pickupPhotoIds: placeholderPickup,
+          slipPhotoIds: slipPhotos,
+          pickupPhotoIds: pickupPhotos,
         });
       }}
     >
       <h3>Weigh {vehicle.registration}</h3>
-      <p className="hint">Photos use placeholder IDs until file upload (Phase 4) is wired.</p>
+      <FileUpload
+        kind="weighPhoto"
+        label="Weighment slip photos"
+        hint="At least 1 photo · max 5 MB each · JPG/PNG"
+        accept="image/jpeg,image/png,image/webp"
+        required
+        disabled={disabled}
+        value={slipPhotos}
+        onChange={setSlipPhotos}
+      />
+      <FileUpload
+        kind="pickPhoto"
+        label="Pickup photos"
+        hint="At least 1 photo · max 5 MB each · JPG/PNG"
+        accept="image/jpeg,image/png,image/webp"
+        required
+        disabled={disabled}
+        value={pickupPhotos}
+        onChange={setPickupPhotos}
+      />
       <div className="fr3">
         <label>
           Gross (kg)
@@ -295,7 +315,7 @@ function WeighForm({
           <input value={slip} onChange={(e) => setSlip(e.target.value)} required />
         </label>
       </div>
-      <button type="submit" className="btn primary" disabled={disabled}>
+      <button type="submit" className="btn primary" disabled={disabled || !slipPhotos.length || !pickupPhotos.length}>
         Record weighment
       </button>
     </form>

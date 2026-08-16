@@ -6,6 +6,7 @@ import {
   type InvoiceDetail,
   type SessionUser,
 } from '../api';
+import { FileUpload } from './FileUpload';
 
 interface InvoiceLifecyclePanelProps {
   invoice: InvoiceDetail;
@@ -224,22 +225,33 @@ function CertificateForm({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [certNo, setCertNo] = useState(`URB/COD/${Date.now().toString().slice(-6)}`);
+  const [fileId, setFileId] = useState('');
 
   return (
     <form
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ certNo, certDate: today, fileId: 'demo-certificate-pdf', department: '' });
+        if (!fileId) return;
+        onSubmit({ certNo, certDate: today, fileId: fileId, department: '' });
       }}
     >
       <h3>Upload Certificate of Destruction</h3>
-      <p className="hint">PDF uses placeholder file ID until Phase 4 upload is wired.</p>
       <label>
         Certificate no.
         <input value={certNo} onChange={(e) => setCertNo(e.target.value)} required />
       </label>
-      <button type="submit" className="btn primary" disabled={disabled}>
+      <FileUpload
+        kind="certificate"
+        label="Certificate PDF"
+        hint="PDF only · max 5 MB"
+        accept="application/pdf"
+        required
+        disabled={disabled}
+        value={fileId ? [fileId] : []}
+        onChange={(ids) => setFileId(ids[0] ?? '')}
+      />
+      <button type="submit" className="btn primary" disabled={disabled || !fileId}>
         Upload &amp; email certificate
       </button>
     </form>
