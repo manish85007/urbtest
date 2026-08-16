@@ -5,7 +5,6 @@ import { nextSequence, submissionInclude } from '../lib/db-helpers.js';
 import {
   loadSubmissionForActor,
   requireAdmin,
-  requireStaff,
 } from '../lib/access.js';
 import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
@@ -239,6 +238,8 @@ export interface UpdateSubmissionInput {
   ref?: string;
   bomFileId?: string | null;
   items?: SubmissionLineInput[];
+  siteId?: string;
+  requestDate?: string;
 }
 
 export async function updateSubmission(
@@ -249,10 +250,15 @@ export async function updateSubmission(
   const sub = await loadSubmissionForActor(submissionId, actor);
   const stage = deriveSubmissionStage(sub);
 
-  if (stage !== 1) {
-    throw new AppError('Only a new request can be edited.');
+  if (sub.closedAt) {
+    throw new AppError('A closed request cannot be edited.');
   }
-  if (actor.role === 'client') {
+  if (actor.role === 'admin') {
+    requireAdmin(actor);
+  } else if (actor.role === 'client') {
+    if (stage !== 1) {
+      throw new AppError('Only a new request can be edited.');
+    }
     if (actor.clientId !== sub.clientId) {
       throw new AppError('You can only edit your own requests.');
     }
@@ -260,7 +266,14 @@ export async function updateSubmission(
       throw new AppError('This request has not been sent back for changes.');
     }
   } else {
-    requireStaff(actor);
+    throw new AppError('You cannot edit this request.');
+  }
+
+  if (input.siteId && input.siteId !== sub.siteId) {
+    const site = await prisma.site.findFirst({
+      where: { id: input.siteId, clientId: sub.clientId, active: true },
+    });
+    if (!site) throw new AppError('Site not found for this client.');
   }
 
   if (input.bomFileId) await assertFilesExist([input.bomFileId], ['bom']);
@@ -278,6 +291,8 @@ export async function updateSubmission(
       notes: input.notes !== undefined ? input.notes.trim() || null : undefined,
       ref: input.ref !== undefined ? input.ref.trim() || null : undefined,
       bomFileId: input.bomFileId !== undefined ? input.bomFileId : undefined,
+      siteId: input.siteId,
+      requestDate: input.requestDate ? new Date(input.requestDate) : undefined,
       rejectNote: actor.role === 'client' ? null : undefined,
       rejectAt: actor.role === 'client' ? null : undefined,
       ...(nextItems

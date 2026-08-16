@@ -388,7 +388,10 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             disabled={busy}
             resubmit={showResubmit}
             onSave={(body) =>
-              act(() => lifecycleApi.updateSubmission(sub.id, body), 'Request updated and sent back to Urbeno.')
+              act(
+                () => lifecycleApi.updateSubmission(sub.id, body),
+                showResubmit ? 'Request updated and sent back to Urbeno.' : 'Request updated.',
+              )
             }
           />
         </Modal>
@@ -412,7 +415,8 @@ function RequestCard({
 }) {
   const isClient = user.role === 'client';
   const isAdmin = user.role === 'admin';
-  const canEdit = sub.derivedStage === 1 && (isAdmin || (isClient && !!sub.rejectNote));
+  const closed = !!sub.closedAt;
+  const canEdit = !closed && (isAdmin || (isClient && sub.derivedStage === 1 && !!sub.rejectNote));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
 
   return (
@@ -1051,9 +1055,14 @@ function EditRequestForm({
     approxWeight?: number;
     notes?: string;
     ref?: string;
+    siteId?: string;
+    requestDate?: string;
     items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
   }) => void;
 }) {
+  const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [siteId, setSiteId] = useState(sub.siteId);
+  const [requestDate, setRequestDate] = useState(sub.requestDate.slice(0, 10));
   const [location, setLocation] = useState(sub.location ?? '');
   const [approxQty, setApproxQty] = useState(String(sub.approxQty));
   const [approxWeight, setApproxWeight] = useState(String(sub.approxWeight));
@@ -1070,6 +1079,10 @@ function EditRequestForm({
       : [{ ...EMPTY_LINE }],
   );
 
+  useEffect(() => {
+    dataApi.sites(sub.clientId, true).then(setSites).catch(() => setSites([]));
+  }, [sub.clientId]);
+
   return (
     <form
       id={formId}
@@ -1078,6 +1091,8 @@ function EditRequestForm({
         e.preventDefault();
         const named = namedDraftLines(items);
         onSave({
+          siteId,
+          requestDate,
           location,
           approxQty: Number(approxQty),
           approxWeight: Number(approxWeight),
@@ -1087,12 +1102,22 @@ function EditRequestForm({
         });
       }}
     >
-      <p className="dim" style={{ fontSize: '.83rem', marginBottom: '.8rem' }}>
+      <p className="dim" style={{ fontSize: '.8rem', marginBottom: '.8rem' }}>
         {resubmit
-          ? 'Update the details Urbeno asked for and send the request back.'
+          ? 'You can edit this request until Urbeno acknowledges it.'
           : 'Admin edit — all changes are audit-logged.'}
       </p>
       <div className="fr2">
+        <div className="fg">
+          <label htmlFor="er-site">Site</label>
+          <select id="er-site" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+            {(sites.length ? sites : [{ id: sub.siteId, name: sub.site.name, code: sub.site.code }]).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="fg">
           <label htmlFor="er-loc">Pickup Location</label>
           <input id="er-loc" value={location} onChange={(e) => setLocation(e.target.value)} />
@@ -1100,6 +1125,10 @@ function EditRequestForm({
         <div className="fg">
           <label htmlFor="er-ref">PO / Reference</label>
           <input id="er-ref" value={ref} onChange={(e) => setRef(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label htmlFor="er-date">Request Date</label>
+          <input id="er-date" type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} />
         </div>
         <div className="fg">
           <label htmlFor="er-qty">Approx. Quantity</label>

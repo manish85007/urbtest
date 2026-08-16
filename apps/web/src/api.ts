@@ -435,6 +435,7 @@ export interface SubmissionDetail {
   createdAt?: string;
   acknowledgedAt: string | null;
   acknowledgedBy?: string | null;
+  closedAt?: string | null;
   derivedStage: number;
   client: { id: string; name: string; payTermsDays?: number };
   site: {
@@ -973,6 +974,8 @@ export const lifecycleApi = {
       ref?: string;
       bomFileId?: string | null;
       items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
+      siteId?: string;
+      requestDate?: string;
     },
   ) =>
     api<SubmissionDetail>(`/submissions/${id}`, {

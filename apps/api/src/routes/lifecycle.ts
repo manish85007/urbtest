@@ -136,6 +136,8 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           ref: z.string().optional(),
           bomFileId: z.string().nullable().optional(),
           items: z.array(lineItemSchema).optional(),
+          siteId: z.string().min(1).optional(),
+          requestDate: z.string().optional(),
         })
         .parse(request.body);
       return await updateSubmission(request.user!, id, body);
