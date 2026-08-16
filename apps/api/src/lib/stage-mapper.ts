@@ -1,0 +1,36 @@
+import { invStage, subStage } from '@urb-tectrack/shared';
+import type { SubmissionFull } from './db-helpers.js';
+
+export function deriveSubmissionStage(sub: SubmissionFull): number {
+  return subStage({
+    acknowledged: !!sub.acknowledgedAt,
+    hasVehicles: sub.vehicles.length > 0,
+    allVehiclesWeighed: sub.vehicles.length > 0 && sub.vehicles.every((v) => !!v.weighment),
+    invoices: sub.invoices.map((inv) => ({
+      closedAt: inv.closedAt,
+      hasCertificate: inv.certificates.length > 0,
+      hasRecycling: !!inv.recycling,
+      hasMrn: !!inv.mrn,
+    })),
+  });
+}
+
+export function deriveInvoiceStage(inv: SubmissionFull['invoices'][number]): number {
+  return invStage({
+    closedAt: inv.closedAt,
+    hasCertificate: inv.certificates.length > 0,
+    hasRecycling: !!inv.recycling,
+    hasMrn: !!inv.mrn,
+  });
+}
+
+export function withDerivedStages(sub: SubmissionFull) {
+  return {
+    ...sub,
+    derivedStage: deriveSubmissionStage(sub),
+    invoices: sub.invoices.map((inv) => ({
+      ...inv,
+      derivedStage: deriveInvoiceStage(inv),
+    })),
+  };
+}

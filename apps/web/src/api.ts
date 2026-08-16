@@ -1,0 +1,385 @@
+const base = import.meta.env.VITE_API_URL ?? '/api';
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${base}${path}`, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    ...init,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message ?? 'Request failed');
+  }
+  return res.json() as Promise<T>;
+}
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'factory' | 'client';
+  clientId: string | null;
+}
+
+export interface ClientSummary {
+  id: string;
+  name: string;
+  city: string | null;
+}
+
+export interface SiteSummary {
+  id: string;
+  code: string;
+  name: string;
+  address: string | null;
+}
+
+export interface CategorySummary {
+  id: number;
+  entryId: string;
+  description: string;
+  groupCode: string;
+  capacityTpa: string;
+}
+
+export interface FactorySummary {
+  id: string;
+  name: string;
+  city: string | null;
+}
+
+export interface SubmissionSummary {
+  id: string;
+  clientId: string;
+  clientName: string;
+  siteId: string;
+  siteName: string;
+  requestDate: string;
+  approxWeight: string;
+  stage: number;
+  invoiceCount: number;
+}
+
+export interface VehicleDetail {
+  id: string;
+  registration: string;
+  vehicleType: string;
+  driverName: string;
+  driverPhone: string;
+  team: Array<{ name: string; role: string; phone: string }>;
+  weighment: {
+    netKg: string;
+    manual: boolean;
+    slipNumber: string | null;
+  } | null;
+}
+
+export interface InvoiceDetail {
+  id: string;
+  invoiceNo: string;
+  billingWeight: string;
+  totalPaise: string;
+  derivedStage: number;
+  closedAt: string | null;
+  mrn: { mrnNo: string; factoryId: string } | null;
+  recycling: { form6No: string } | null;
+  certificates: Array<{ certNo: string }>;
+  payments: Array<{ amountPaise: string }>;
+}
+
+export interface SubmissionDetail {
+  id: string;
+  clientId: string;
+  siteId: string;
+  ref: string | null;
+  requestDate: string;
+  location: string | null;
+  approxQty: number;
+  approxWeight: string;
+  notes: string | null;
+  createdBy: string;
+  acknowledgedAt: string | null;
+  derivedStage: number;
+  client: { id: string; name: string };
+  site: { id: string; name: string; code: string };
+  vehicles: VehicleDetail[];
+  invoices: InvoiceDetail[];
+}
+
+export interface QueueItem {
+  submissionId: string;
+  invoiceId: string;
+  invoiceNo: string;
+  clientName: string;
+}
+
+export interface StaffDashboardReport {
+  kind: 'staff';
+  stats: {
+    newRequests: number;
+    openRequests: number;
+    openInvoices: number;
+    pendingPayments: number;
+    fyNetKg: number;
+    fyLabel: string;
+  };
+  newRequests: Array<{
+    id: string;
+    clientName: string;
+    siteName: string;
+    approxWeight: number;
+    approxQty: number;
+    requestDate: string;
+    ref: string | null;
+  }>;
+  overdue: Array<{
+    submissionId: string;
+    invoiceNo: string;
+    clientName: string;
+    outstandingPaise: string;
+    overdueDays: number;
+    reminders: number;
+  }>;
+  slaAtRisk: Array<{
+    submissionId: string;
+    invoiceNo: string;
+    clientName: string;
+    receivedDate: string;
+    daysUsed: number;
+    slaDays: number;
+    stateLabel: string;
+  }>;
+  queues: {
+    awaitingMrn: QueueItem[];
+    awaitingRecycling: QueueItem[];
+    awaitingCod: QueueItem[];
+    awaitingClose: QueueItem[];
+  };
+}
+
+export interface ClientDashboardReport {
+  kind: 'client';
+  period: { fy: string };
+  impact: {
+    kg: number;
+    tonnes: number;
+    co2: number;
+    landfill: number;
+    trees: number;
+    water: number;
+    energy: number;
+    invoices: number;
+    submissions: number;
+  };
+  treesEarned: number;
+  pendingClose: Array<{
+    submissionId: string;
+    invoiceNo: string;
+    certificates: string[];
+    issuedAt: string | null;
+  }>;
+}
+
+export type DashboardReport = StaffDashboardReport | ClientDashboardReport;
+
+export const authApi = {
+  login: (email: string, password: string) =>
+    api<{ user: SessionUser }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+  me: () => api<{ user: SessionUser }>('/auth/me'),
+  legalStatus: () =>
+    api<{
+      compliant: boolean;
+      pending: Array<{ key: string; version: string; title: string }>;
+    }>('/auth/legal-status'),
+  acceptLegal: (keys: string[]) =>
+    api<{ compliant: boolean }>('/auth/accept-legal', {
+      method: 'POST',
+      body: JSON.stringify({ keys }),
+    }),
+};
+
+export const legalApi = {
+  list: () =>
+    api<Array<{ key: string; version: string; title: string; effectiveDate: string }>>('/legal'),
+  document: (key: string) =>
+    api<{ key: string; version: string; title: string; body: string; effectiveDate: string }>(
+      `/legal/${key}`,
+    ),
+};
+
+export const dataApi = {
+  submissions: () => api<SubmissionSummary[]>('/submissions'),
+  submission: (id: string) => api<SubmissionDetail>(`/submissions/${id}`),
+  dashboard: () =>
+    api<{ openRequests: number; openInvoices: number; activeClients: number }>(
+      '/health/dashboard',
+    ),
+  clients: () => api<ClientSummary[]>('/clients'),
+  sites: (clientId: string) => api<SiteSummary[]>(`/clients/${clientId}/sites`),
+  factories: () => api<FactorySummary[]>('/factories'),
+  categories: (factoryId: string) =>
+    api<CategorySummary[]>(`/factories/${factoryId}/categories`),
+  reportsDashboard: (siteId?: string) =>
+    api<DashboardReport>(siteId ? `/reports/dashboard?siteId=${siteId}` : '/reports/dashboard'),
+  auditLog: (limit = 50) => api<Array<{
+    id: string;
+    ts: string;
+    actorEmail: string;
+    action: string;
+    entity: string;
+    entityId: string | null;
+  }>>(`/audit?limit=${limit}`),
+};
+
+export const filesApi = {
+  upload: async (file: File, kind: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('kind', kind);
+    const res = await fetch(`${base}/files`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message ?? 'Upload failed');
+    }
+    return res.json() as Promise<{
+      id: string;
+      name: string;
+      mimeType: string;
+      sizeBytes: number;
+      kind: string;
+    }>;
+  },
+  url: (id: string) => `${base}/files/${id}`,
+};
+
+export const lifecycleApi = {
+  createSubmission: (body: {
+    clientId: string;
+    siteId: string;
+    requestDate: string;
+    location?: string;
+    approxQty?: number;
+    approxWeight?: number;
+    notes?: string;
+    ref?: string;
+  }) => api<SubmissionDetail>('/submissions', { method: 'POST', body: JSON.stringify(body) }),
+
+  acknowledge: (id: string) =>
+    api<SubmissionDetail>(`/submissions/${id}/acknowledge`, { method: 'POST' }),
+
+  reject: (id: string, reason: string) =>
+    api<SubmissionDetail>(`/submissions/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  addVehicle: (
+    submissionId: string,
+    body: {
+      registration: string;
+      vehicleType: string;
+      driverName: string;
+      driverPhone: string;
+      team: Array<{ name: string; role: string; phone: string }>;
+    },
+  ) =>
+    api<{ submission: SubmissionDetail }>(`/submissions/${submissionId}/vehicles`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  weigh: (
+    vehicleId: string,
+    body: {
+      manual?: boolean;
+      gross?: number;
+      tare?: number;
+      net?: number;
+      slipNumber?: string;
+      reason?: string;
+      weighedAt: string;
+      slipPhotoIds?: string[];
+      pickupPhotoIds?: string[];
+    },
+  ) =>
+    api<{ submission: SubmissionDetail }>(`/vehicles/${vehicleId}/weighment`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createInvoice: (
+    submissionId: string,
+    body: {
+      invoiceNo: string;
+      invoiceDate: string;
+      taxableAmount: number;
+      ewayBillNo: string;
+      ewayBillDate: string;
+      vehicleIds?: string[];
+      billingWeight?: number;
+      deviationNote?: string;
+    },
+  ) =>
+    api<SubmissionDetail>(`/submissions/${submissionId}/invoices`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  addPayment: (invoiceId: string, body: { utr: string; amount: number; paidAt: string; mode: string }) =>
+    api<unknown>(`/invoices/${invoiceId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createMrn: (
+    invoiceId: string,
+    body: {
+      factoryId: string;
+      receivedAt: string;
+      driverSign?: string;
+      managerSign?: string;
+      securitySign?: string;
+      note?: string;
+    },
+  ) =>
+    api<{ mrnNo: string }>(`/invoices/${invoiceId}/mrn`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createRecycling: (
+    invoiceId: string,
+    body: {
+      processedAt: string;
+      factoryId?: string;
+      categories: Array<{ entryId: string; groupCode: string; weightKg: number }>;
+    },
+  ) =>
+    api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  uploadCertificate: (
+    invoiceId: string,
+    body: { certNo: string; certDate: string; fileId: string; department?: string },
+  ) =>
+    api<{ certNo: string }>(`/invoices/${invoiceId}/certificates`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  closeInvoice: (invoiceId: string, body?: { rating?: number; note?: string; forced?: boolean }) =>
+    api<unknown>(`/invoices/${invoiceId}/close`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+};

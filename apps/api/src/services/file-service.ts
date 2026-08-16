@@ -1,0 +1,107 @@
+import type { FileKind, Prisma } from '@prisma/client';
+import type { SessionUser } from '../lib/auth-context.js';
+import { AppError } from '../lib/errors.js';
+import { isMimeAllowed, maxBytesForKind, maxMbForKind } from '../lib/file-limits.js';
+import { prisma } from '../lib/prisma.js';
+import { getStorage } from '../lib/storage.js';
+import { auditLog } from './audit.js';
+
+export interface UploadInput {
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  buffer: Buffer;
+  kind: FileKind;
+  context?: Record<string, unknown>;
+}
+
+export async function uploadFile(actor: SessionUser, input: UploadInput) {
+  const name = input.filename.trim();
+  if (!name) throw new AppError('File name is required.');
+
+  const maxBytes = maxBytesForKind(input.kind);
+  if (input.sizeBytes > maxBytes) {
+    const mb = (input.sizeBytes / (1024 * 1024)).toFixed(1);
+    throw new AppError(
+      `${name} is ${mb} MB — limit for this upload is ${maxMbForKind(input.kind)} MB.`,
+    );
+  }
+
+  if (!isMimeAllowed(input.kind, input.mimeType)) {
+    throw new AppError(`File type ${input.mimeType || 'unknown'} is not allowed for ${input.kind}.`);
+  }
+
+  const record = await prisma.storedFile.create({
+    data: {
+      name,
+      mimeType: input.mimeType || 'application/octet-stream',
+      sizeBytes: input.sizeBytes,
+      kind: input.kind,
+      storageKey: 'pending',
+      uploadedBy: actor.email,
+      context: (input.context ?? undefined) as Prisma.InputJsonValue | undefined,
+    },
+  });
+
+  const storageKey = `${record.id}/${sanitizeFilename(name)}`;
+  await getStorage().save(storageKey, input.buffer);
+
+  await prisma.storedFile.update({
+    where: { id: record.id },
+    data: { storageKey },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'file.upload',
+    entity: 'file',
+    entityId: record.id,
+    details: { name, kind: input.kind, size: input.sizeBytes, ...input.context },
+  });
+
+  return {
+    id: record.id,
+    name: record.name,
+    mimeType: record.mimeType,
+    sizeBytes: record.sizeBytes,
+    kind: record.kind,
+    createdAt: record.createdAt.toISOString(),
+  };
+}
+
+export async function readFileBlob(actor: SessionUser, fileId: string) {
+  const file = await prisma.storedFile.findUnique({ where: { id: fileId } });
+  if (!file) throw new AppError('File not found.', 404);
+
+  const blob = await getStorage().read(file.storageKey);
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'file.download',
+    entity: 'file',
+    entityId: file.id,
+    details: { name: file.name },
+  });
+
+  return { file, buffer: blob.buffer };
+}
+
+export async function assertFilesExist(fileIds: string[], kinds?: FileKind[]) {
+  if (!fileIds.length) return;
+  const unique = [...new Set(fileIds)];
+  const files = await prisma.storedFile.findMany({ where: { id: { in: unique } } });
+  if (files.length !== unique.length) {
+    throw new AppError('One or more attached files were not found. Upload them first.');
+  }
+  if (kinds?.length) {
+    const bad = files.filter((f) => !kinds.includes(f.kind));
+    if (bad.length) {
+      throw new AppError(`Invalid file type for this upload (${bad.map((f) => f.name).join(', ')}).`);
+    }
+  }
+}
+
+function sanitizeFilename(name: string) {
+  return name.replace(/[^\w.\-()+ ]/g, '_').slice(0, 180);
+}

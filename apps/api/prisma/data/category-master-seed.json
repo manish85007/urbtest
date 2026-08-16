@@ -1,0 +1,2522 @@
+[
+  {
+    "id": 1,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW1",
+    "desc": "Centralized data processing: Mainframes, Minicomputers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 131.0,
+    "active": true
+  },
+  {
+    "id": 2,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW2",
+    "desc": "Personal Computing: Personal Computers (CPU with input/output devices)",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 260.0,
+    "active": true
+  },
+  {
+    "id": 3,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW3",
+    "desc": "Personal Computing: Laptop Computers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 270.0,
+    "active": true
+  },
+  {
+    "id": 4,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW4",
+    "desc": "Personal Computing: Notebook Computers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 86.0,
+    "active": true
+  },
+  {
+    "id": 5,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW5",
+    "desc": "Personal Computing: Notepad Computers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 74.0,
+    "active": true
+  },
+  {
+    "id": 6,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW6",
+    "desc": "Printers including cartridges",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 74.0,
+    "active": true
+  },
+  {
+    "id": 7,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW7",
+    "desc": "Copying Equipment",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 11.0,
+    "active": true
+  },
+  {
+    "id": 8,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW8",
+    "desc": "Electrical and Electronic Typewriters",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 14.0,
+    "active": true
+  },
+  {
+    "id": 9,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW9",
+    "desc": "User terminal and Systems",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 4.6,
+    "active": true
+  },
+  {
+    "id": 10,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW10",
+    "desc": "Facsimile",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.4,
+    "active": true
+  },
+  {
+    "id": 11,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW11",
+    "desc": "Telex",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.4,
+    "active": true
+  },
+  {
+    "id": 12,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW12",
+    "desc": "Telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 22.0,
+    "active": true
+  },
+  {
+    "id": 13,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW13",
+    "desc": "Pay telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 7.0,
+    "active": true
+  },
+  {
+    "id": 14,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW14",
+    "desc": "Cordless telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 11.0,
+    "active": true
+  },
+  {
+    "id": 15,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW15",
+    "desc": "Cellular telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 21.0,
+    "active": true
+  },
+  {
+    "id": 16,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW16",
+    "desc": "Answering System",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 8.6,
+    "active": true
+  },
+  {
+    "id": 17,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW17",
+    "desc": "Products/equipment of transmitting sound, images or other info by telecom",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 18,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW18",
+    "desc": "BTS (all components excluding structure of tower)",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 19,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW19",
+    "desc": "Tablets, I-PAD",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 20,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW20",
+    "desc": "Phablets",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.0,
+    "active": true
+  },
+  {
+    "id": 21,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW21",
+    "desc": "Scanners",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 22,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW22",
+    "desc": "Routers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 2.0,
+    "active": true
+  },
+  {
+    "id": 23,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW23",
+    "desc": "GPS",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.0,
+    "active": true
+  },
+  {
+    "id": 24,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW24",
+    "desc": "UPS",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 25,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW25",
+    "desc": "Inverter",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 26,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW26",
+    "desc": "Modems",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 27,
+    "facId": "URB-BLR",
+    "entryId": "REC-ITEW27",
+    "desc": "Electronic data storage devices",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 28,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW1",
+    "desc": "Television sets (LCD/LED)",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 100.0,
+    "active": true
+  },
+  {
+    "id": 29,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW2",
+    "desc": "Refrigerator",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 30,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW3",
+    "desc": "Washing Machine",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 31,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW4",
+    "desc": "Air-Conditioners excluding centralised AC plants",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 100.0,
+    "active": true
+  },
+  {
+    "id": 32,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW5",
+    "desc": "Fluorescent and other Mercury containing lamps",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 33,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW6",
+    "desc": "Screen, Electronic Photo frames, Electronic Display Panel, Monitors",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 34,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW7",
+    "desc": "Radio sets",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 35,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW8",
+    "desc": "Set top Boxes",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 36,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW9",
+    "desc": "Video Cameras",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 37,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW10",
+    "desc": "Video Recorders",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 38,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW11",
+    "desc": "Hi-Fi Recorders",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 39,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW12",
+    "desc": "Audio Amplifiers",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 40,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW13",
+    "desc": "Other recording/reproducing sound or image equipment (telecom)",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 41,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW14",
+    "desc": "Solar panels/cells, Photovoltaic panels/cells/modules",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 42,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW15",
+    "desc": "Luminaires for fluorescent lamps (excl. households)",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 43,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW16",
+    "desc": "High intensity discharge lamps incl. pressure sodium & metal halide",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 44,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW17",
+    "desc": "Low pressure sodium lamps",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 45,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW18",
+    "desc": "Other lighting equipment excluding filament bulbs",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 46,
+    "facId": "URB-BLR",
+    "entryId": "REC-CEEW19",
+    "desc": "Digital camera",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.6,
+    "active": true
+  },
+  {
+    "id": 47,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW1",
+    "desc": "Large cooling appliances",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 48,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW2",
+    "desc": "Freezers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 49,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW3",
+    "desc": "Other large appliances for refrigeration/conservation/storage of food",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 50,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW4",
+    "desc": "Clothes dryers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 2.0,
+    "active": true
+  },
+  {
+    "id": 51,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW5",
+    "desc": "Dish Washing Machines",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 2.0,
+    "active": true
+  },
+  {
+    "id": 52,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW6",
+    "desc": "Electric cookers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 53,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW7",
+    "desc": "Electric stoves",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 54,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW8",
+    "desc": "Electric hot plates",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 55,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW9",
+    "desc": "Microwaves, Microwave Oven",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 56,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW10",
+    "desc": "Other large appliances for cooking/processing food",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 57,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW11",
+    "desc": "Electric heating appliances",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 58,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW12",
+    "desc": "Electric radiators",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 59,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW13",
+    "desc": "Other large appliances for heating rooms/beds/seating furniture",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 60,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW14",
+    "desc": "Electric fans",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 61,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW15",
+    "desc": "Other fanning/exhaust ventilation/conditioning equipment",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 62,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW16",
+    "desc": "Vacuum cleaners",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 63,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW17",
+    "desc": "Carpet sweepers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 64,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW18",
+    "desc": "Other appliances for cleaning",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 65,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW19",
+    "desc": "Appliances for sewing/knitting/weaving/textile processing",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 66,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW20",
+    "desc": "Iron and other appliances for ironing/mangling/clothing care",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 67,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW21",
+    "desc": "Grinders, coffee machines, equipment for opening/sealing containers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 68,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW22",
+    "desc": "Smoke detector",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 69,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW23",
+    "desc": "Heating Regulators",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 70,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW24",
+    "desc": "Thermostats",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 71,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW25",
+    "desc": "Automatic dispensers for hot drinks",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 72,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW26",
+    "desc": "Automatic dispensers for hot/cold bottles or cans",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 73,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW27",
+    "desc": "Automatic dispensers for solid products",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 74,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW28",
+    "desc": "Automatic dispensers for money",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 75,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW29",
+    "desc": "All appliances delivering automatically all kinds of products",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 76,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW30",
+    "desc": "Indoor air purifier",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 77,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW31",
+    "desc": "Hair dryer",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 78,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW32",
+    "desc": "Electric shaver",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 79,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW33",
+    "desc": "Electric kettle",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 80,
+    "facId": "URB-BLR",
+    "entryId": "REC-LSEEW34",
+    "desc": "Electronic display panels/board/visual display unit",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 81,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW1",
+    "desc": "Drills",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 82,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW2",
+    "desc": "Saws",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 83,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW3",
+    "desc": "Sewing Machines",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 84,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW4",
+    "desc": "Equipment for turning/milling/sanding/grinding/cutting/drilling/punching/bending wood, metal etc.",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 85,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW5",
+    "desc": "Tools for riveting/nailing/screwing/removing rivets, nails, screws",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 86,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW6",
+    "desc": "Tools for welding, soldering or similar use",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 87,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW7",
+    "desc": "Equipment for spraying, spreading, dispersing liquid/gaseous substance",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 88,
+    "facId": "URB-BLR",
+    "entryId": "REC-EETW8",
+    "desc": "Tools for mowing or other gardening activities",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 89,
+    "facId": "URB-BLR",
+    "entryId": "REC-TLSEW1",
+    "desc": "Electrical trains or car racing sets",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 90,
+    "facId": "URB-BLR",
+    "entryId": "REC-TLSEW2",
+    "desc": "Hand-held video games consoles",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 91,
+    "facId": "URB-BLR",
+    "entryId": "REC-TLSEW3",
+    "desc": "Video games",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 92,
+    "facId": "URB-BLR",
+    "entryId": "REC-TLSEW4",
+    "desc": "Computers for biking, diving, running, rowing etc.",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 93,
+    "facId": "URB-BLR",
+    "entryId": "REC-TLSEW5",
+    "desc": "Sports equipment with electric or electronic components",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 94,
+    "facId": "URB-BLR",
+    "entryId": "REC-TLSEW6",
+    "desc": "Coin slot machines",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 95,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW1",
+    "desc": "Radiotherapy equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 96,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW2",
+    "desc": "Cardiology equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 97,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW3",
+    "desc": "Dialysis equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 98,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW4",
+    "desc": "Pulmonary ventilators and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 99,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW5",
+    "desc": "Nuclear Medicine Equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 100,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW6",
+    "desc": "Laboratory equipment for in vitro diagnosis and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 101,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW7",
+    "desc": "Analysers and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 102,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW8",
+    "desc": "MRI, PET Scanner, CT Scanner & Ultrasound Equipment with accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 103,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW9",
+    "desc": "Fertilization tests equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 104,
+    "facId": "URB-BLR",
+    "entryId": "REC-MDW10",
+    "desc": "Other electric appliances/equipment/kits (incl. Mobiles, Tablets) for medical monitoring/screening",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 105,
+    "facId": "URB-BLR",
+    "entryId": "REC-LIW1",
+    "desc": "Gas analyser",
+    "groupCode": "LIW",
+    "activity": "Recycling",
+    "capacityTPA": 3.0,
+    "active": true
+  },
+  {
+    "id": 106,
+    "facId": "URB-BLR",
+    "entryId": "REC-LIW2",
+    "desc": "Equipment having electrical and electronic components",
+    "groupCode": "LIW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 107,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW1",
+    "desc": "Mainframes, Minicomputers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 108,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW2",
+    "desc": "Personal Computers (CPU with input/output devices)",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 109,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW3",
+    "desc": "Laptop Computers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 150.0,
+    "active": true
+  },
+  {
+    "id": 110,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW4",
+    "desc": "Notebook Computers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 150.0,
+    "active": true
+  },
+  {
+    "id": 111,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW5",
+    "desc": "Notepad Computers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 110.0,
+    "active": true
+  },
+  {
+    "id": 112,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW6",
+    "desc": "Printers including cartridges",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 113,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW19",
+    "desc": "Tablets, I-PAD",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 114,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW21",
+    "desc": "Scanners",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 115,
+    "facId": "URB-BLR",
+    "entryId": "REF-ITEW27",
+    "desc": "Electronic data storage devices",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 116,
+    "facId": "URB-BLR",
+    "entryId": "REF-CEEW1",
+    "desc": "Television sets (LCD/LED)",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 117,
+    "facId": "URB-BLR",
+    "entryId": "REF-CEEW2",
+    "desc": "Refrigerator",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 118,
+    "facId": "URB-BLR",
+    "entryId": "REF-CEEW3",
+    "desc": "Washing Machine",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 119,
+    "facId": "URB-BLR",
+    "entryId": "REF-CEEW4",
+    "desc": "Air-Conditioners excluding centralised AC plants",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 120,
+    "facId": "URB-BLR",
+    "entryId": "REF-CEEW6",
+    "desc": "Screen, Electronic Photo frames, Electronic Display Panel, Monitors",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 121,
+    "facId": "URB-BLR",
+    "entryId": "REF-LSEEW1",
+    "desc": "Large cooling appliances",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 122,
+    "facId": "URB-BLR",
+    "entryId": "REF-LSEEW2",
+    "desc": "Freezers",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 123,
+    "facId": "URB-BLR",
+    "entryId": "REF-LSEEW3",
+    "desc": "Other large appliances for refrigeration/conservation/storage of food",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 124,
+    "facId": "URB-BLR",
+    "entryId": "REF-LSEEW4",
+    "desc": "Clothes dryers",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 125,
+    "facId": "URB-BLR",
+    "entryId": "REF-LSEEW5",
+    "desc": "Dish Washing Machines",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 126,
+    "facId": "URB-BLR",
+    "entryId": "REF-LSEEW9",
+    "desc": "Microwaves, Microwave Oven",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1001,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW1",
+    "desc": "Centralized data processing: Mainframes, Minicomputers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 131.0,
+    "active": true
+  },
+  {
+    "id": 1002,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW2",
+    "desc": "Personal Computing: Personal Computers (CPU with input/output devices)",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 260.0,
+    "active": true
+  },
+  {
+    "id": 1003,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW3",
+    "desc": "Personal Computing: Laptop Computers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 270.0,
+    "active": true
+  },
+  {
+    "id": 1004,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW4",
+    "desc": "Personal Computing: Notebook Computers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 86.0,
+    "active": true
+  },
+  {
+    "id": 1005,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW5",
+    "desc": "Personal Computing: Notepad Computers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 74.0,
+    "active": true
+  },
+  {
+    "id": 1006,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW6",
+    "desc": "Printers including cartridges",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 74.0,
+    "active": true
+  },
+  {
+    "id": 1007,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW7",
+    "desc": "Copying Equipment",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 11.0,
+    "active": true
+  },
+  {
+    "id": 1008,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW8",
+    "desc": "Electrical and Electronic Typewriters",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 14.0,
+    "active": true
+  },
+  {
+    "id": 1009,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW9",
+    "desc": "User terminal and Systems",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 4.6,
+    "active": true
+  },
+  {
+    "id": 1010,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW10",
+    "desc": "Facsimile",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.4,
+    "active": true
+  },
+  {
+    "id": 1011,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW11",
+    "desc": "Telex",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.4,
+    "active": true
+  },
+  {
+    "id": 1012,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW12",
+    "desc": "Telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 22.0,
+    "active": true
+  },
+  {
+    "id": 1013,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW13",
+    "desc": "Pay telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 7.0,
+    "active": true
+  },
+  {
+    "id": 1014,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW14",
+    "desc": "Cordless telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 11.0,
+    "active": true
+  },
+  {
+    "id": 1015,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW15",
+    "desc": "Cellular telephones",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 21.0,
+    "active": true
+  },
+  {
+    "id": 1016,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW16",
+    "desc": "Answering System",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 8.6,
+    "active": true
+  },
+  {
+    "id": 1017,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW17",
+    "desc": "Products/equipment of transmitting sound, images or other info by telecom",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 1018,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW18",
+    "desc": "BTS (all components excluding structure of tower)",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1019,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW19",
+    "desc": "Tablets, I-PAD",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 1020,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW20",
+    "desc": "Phablets",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.0,
+    "active": true
+  },
+  {
+    "id": 1021,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW21",
+    "desc": "Scanners",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1022,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW22",
+    "desc": "Routers",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 2.0,
+    "active": true
+  },
+  {
+    "id": 1023,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW23",
+    "desc": "GPS",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 3.0,
+    "active": true
+  },
+  {
+    "id": 1024,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW24",
+    "desc": "UPS",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 1025,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW25",
+    "desc": "Inverter",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1026,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW26",
+    "desc": "Modems",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 1027,
+    "facId": "URB-KGF",
+    "entryId": "REC-ITEW27",
+    "desc": "Electronic data storage devices",
+    "groupCode": "ITEW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1028,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW1",
+    "desc": "Television sets (LCD/LED)",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 100.0,
+    "active": true
+  },
+  {
+    "id": 1029,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW2",
+    "desc": "Refrigerator",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 1030,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW3",
+    "desc": "Washing Machine",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 1031,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW4",
+    "desc": "Air-Conditioners excluding centralised AC plants",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 100.0,
+    "active": true
+  },
+  {
+    "id": 1032,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW5",
+    "desc": "Fluorescent and other Mercury containing lamps",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 1033,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW6",
+    "desc": "Screen, Electronic Photo frames, Electronic Display Panel, Monitors",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1034,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW7",
+    "desc": "Radio sets",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1035,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW8",
+    "desc": "Set top Boxes",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1036,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW9",
+    "desc": "Video Cameras",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1037,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW10",
+    "desc": "Video Recorders",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1038,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW11",
+    "desc": "Hi-Fi Recorders",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1039,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW12",
+    "desc": "Audio Amplifiers",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1040,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW13",
+    "desc": "Other recording/reproducing sound or image equipment (telecom)",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1041,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW14",
+    "desc": "Solar panels/cells, Photovoltaic panels/cells/modules",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 1042,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW15",
+    "desc": "Luminaires for fluorescent lamps (excl. households)",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1043,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW16",
+    "desc": "High intensity discharge lamps incl. pressure sodium & metal halide",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1044,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW17",
+    "desc": "Low pressure sodium lamps",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1045,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW18",
+    "desc": "Other lighting equipment excluding filament bulbs",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1046,
+    "facId": "URB-KGF",
+    "entryId": "REC-CEEW19",
+    "desc": "Digital camera",
+    "groupCode": "CEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.6,
+    "active": true
+  },
+  {
+    "id": 1047,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW1",
+    "desc": "Large cooling appliances",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 1048,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW2",
+    "desc": "Freezers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 25.0,
+    "active": true
+  },
+  {
+    "id": 1049,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW3",
+    "desc": "Other large appliances for refrigeration/conservation/storage of food",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 5.0,
+    "active": true
+  },
+  {
+    "id": 1050,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW4",
+    "desc": "Clothes dryers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 2.0,
+    "active": true
+  },
+  {
+    "id": 1051,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW5",
+    "desc": "Dish Washing Machines",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 2.0,
+    "active": true
+  },
+  {
+    "id": 1052,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW6",
+    "desc": "Electric cookers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1053,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW7",
+    "desc": "Electric stoves",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1054,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW8",
+    "desc": "Electric hot plates",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1055,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW9",
+    "desc": "Microwaves, Microwave Oven",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1056,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW10",
+    "desc": "Other large appliances for cooking/processing food",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1057,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW11",
+    "desc": "Electric heating appliances",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1058,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW12",
+    "desc": "Electric radiators",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1059,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW13",
+    "desc": "Other large appliances for heating rooms/beds/seating furniture",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1060,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW14",
+    "desc": "Electric fans",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1061,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW15",
+    "desc": "Other fanning/exhaust ventilation/conditioning equipment",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1062,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW16",
+    "desc": "Vacuum cleaners",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1063,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW17",
+    "desc": "Carpet sweepers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1064,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW18",
+    "desc": "Other appliances for cleaning",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1065,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW19",
+    "desc": "Appliances for sewing/knitting/weaving/textile processing",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1066,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW20",
+    "desc": "Iron and other appliances for ironing/mangling/clothing care",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1067,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW21",
+    "desc": "Grinders, coffee machines, equipment for opening/sealing containers",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1068,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW22",
+    "desc": "Smoke detector",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1069,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW23",
+    "desc": "Heating Regulators",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1070,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW24",
+    "desc": "Thermostats",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1071,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW25",
+    "desc": "Automatic dispensers for hot drinks",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1072,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW26",
+    "desc": "Automatic dispensers for hot/cold bottles or cans",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1073,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW27",
+    "desc": "Automatic dispensers for solid products",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1074,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW28",
+    "desc": "Automatic dispensers for money",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1075,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW29",
+    "desc": "All appliances delivering automatically all kinds of products",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1076,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW30",
+    "desc": "Indoor air purifier",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1077,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW31",
+    "desc": "Hair dryer",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1078,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW32",
+    "desc": "Electric shaver",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1079,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW33",
+    "desc": "Electric kettle",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1080,
+    "facId": "URB-KGF",
+    "entryId": "REC-LSEEW34",
+    "desc": "Electronic display panels/board/visual display unit",
+    "groupCode": "LSEEW",
+    "activity": "Recycling",
+    "capacityTPA": 1.0,
+    "active": true
+  },
+  {
+    "id": 1081,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW1",
+    "desc": "Drills",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1082,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW2",
+    "desc": "Saws",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1083,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW3",
+    "desc": "Sewing Machines",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1084,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW4",
+    "desc": "Equipment for turning/milling/sanding/grinding/cutting/drilling/punching/bending wood, metal etc.",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1085,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW5",
+    "desc": "Tools for riveting/nailing/screwing/removing rivets, nails, screws",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1086,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW6",
+    "desc": "Tools for welding, soldering or similar use",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1087,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW7",
+    "desc": "Equipment for spraying, spreading, dispersing liquid/gaseous substance",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.5,
+    "active": true
+  },
+  {
+    "id": 1088,
+    "facId": "URB-KGF",
+    "entryId": "REC-EETW8",
+    "desc": "Tools for mowing or other gardening activities",
+    "groupCode": "EETW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1089,
+    "facId": "URB-KGF",
+    "entryId": "REC-TLSEW1",
+    "desc": "Electrical trains or car racing sets",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1090,
+    "facId": "URB-KGF",
+    "entryId": "REC-TLSEW2",
+    "desc": "Hand-held video games consoles",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1091,
+    "facId": "URB-KGF",
+    "entryId": "REC-TLSEW3",
+    "desc": "Video games",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1092,
+    "facId": "URB-KGF",
+    "entryId": "REC-TLSEW4",
+    "desc": "Computers for biking, diving, running, rowing etc.",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1093,
+    "facId": "URB-KGF",
+    "entryId": "REC-TLSEW5",
+    "desc": "Sports equipment with electric or electronic components",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1094,
+    "facId": "URB-KGF",
+    "entryId": "REC-TLSEW6",
+    "desc": "Coin slot machines",
+    "groupCode": "TLSEW",
+    "activity": "Recycling",
+    "capacityTPA": 0.2,
+    "active": true
+  },
+  {
+    "id": 1095,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW1",
+    "desc": "Radiotherapy equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1096,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW2",
+    "desc": "Cardiology equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1097,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW3",
+    "desc": "Dialysis equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1098,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW4",
+    "desc": "Pulmonary ventilators and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1099,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW5",
+    "desc": "Nuclear Medicine Equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1100,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW6",
+    "desc": "Laboratory equipment for in vitro diagnosis and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1101,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW7",
+    "desc": "Analysers and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1102,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW8",
+    "desc": "MRI, PET Scanner, CT Scanner & Ultrasound Equipment with accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1103,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW9",
+    "desc": "Fertilization tests equipment and accessories",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1104,
+    "facId": "URB-KGF",
+    "entryId": "REC-MDW10",
+    "desc": "Other electric appliances/equipment/kits (incl. Mobiles, Tablets) for medical monitoring/screening",
+    "groupCode": "MDW",
+    "activity": "Recycling",
+    "capacityTPA": 4.0,
+    "active": true
+  },
+  {
+    "id": 1105,
+    "facId": "URB-KGF",
+    "entryId": "REC-LIW1",
+    "desc": "Gas analyser",
+    "groupCode": "LIW",
+    "activity": "Recycling",
+    "capacityTPA": 3.0,
+    "active": true
+  },
+  {
+    "id": 1106,
+    "facId": "URB-KGF",
+    "entryId": "REC-LIW2",
+    "desc": "Equipment having electrical and electronic components",
+    "groupCode": "LIW",
+    "activity": "Recycling",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1107,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW1",
+    "desc": "Mainframes, Minicomputers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 1108,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW2",
+    "desc": "Personal Computers (CPU with input/output devices)",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 200.0,
+    "active": true
+  },
+  {
+    "id": 1109,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW3",
+    "desc": "Laptop Computers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 150.0,
+    "active": true
+  },
+  {
+    "id": 1110,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW4",
+    "desc": "Notebook Computers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 150.0,
+    "active": true
+  },
+  {
+    "id": 1111,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW5",
+    "desc": "Notepad Computers",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 110.0,
+    "active": true
+  },
+  {
+    "id": 1112,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW6",
+    "desc": "Printers including cartridges",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 1113,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW19",
+    "desc": "Tablets, I-PAD",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1114,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW21",
+    "desc": "Scanners",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1115,
+    "facId": "URB-KGF",
+    "entryId": "REF-ITEW27",
+    "desc": "Electronic data storage devices",
+    "groupCode": "ITEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1116,
+    "facId": "URB-KGF",
+    "entryId": "REF-CEEW1",
+    "desc": "Television sets (LCD/LED)",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 1117,
+    "facId": "URB-KGF",
+    "entryId": "REF-CEEW2",
+    "desc": "Refrigerator",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 1118,
+    "facId": "URB-KGF",
+    "entryId": "REF-CEEW3",
+    "desc": "Washing Machine",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 1119,
+    "facId": "URB-KGF",
+    "entryId": "REF-CEEW4",
+    "desc": "Air-Conditioners excluding centralised AC plants",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 1120,
+    "facId": "URB-KGF",
+    "entryId": "REF-CEEW6",
+    "desc": "Screen, Electronic Photo frames, Electronic Display Panel, Monitors",
+    "groupCode": "CEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 50.0,
+    "active": true
+  },
+  {
+    "id": 1121,
+    "facId": "URB-KGF",
+    "entryId": "REF-LSEEW1",
+    "desc": "Large cooling appliances",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1122,
+    "facId": "URB-KGF",
+    "entryId": "REF-LSEEW2",
+    "desc": "Freezers",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1123,
+    "facId": "URB-KGF",
+    "entryId": "REF-LSEEW3",
+    "desc": "Other large appliances for refrigeration/conservation/storage of food",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1124,
+    "facId": "URB-KGF",
+    "entryId": "REF-LSEEW4",
+    "desc": "Clothes dryers",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1125,
+    "facId": "URB-KGF",
+    "entryId": "REF-LSEEW5",
+    "desc": "Dish Washing Machines",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  },
+  {
+    "id": 1126,
+    "facId": "URB-KGF",
+    "entryId": "REF-LSEEW9",
+    "desc": "Microwaves, Microwave Oven",
+    "groupCode": "LSEEW",
+    "activity": "Refurbishment",
+    "capacityTPA": 10.0,
+    "active": true
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "key": "request_ack",
+    "name": "Request Acknowledgement",
+    "subject": "Your e-waste pickup request {{request_id}} has been received",
+    "body": "Dear {{contact_name}},\n\nThank you for raising an e-waste collection request with Urbeno.\n\nYour request {{request_id}} dated {{request_date}} for {{site_name}} has been received and accepted. Our operations team will attend to it shortly and will confirm the pickup schedule with you.\n\nRequest summary\n  Request ID     : {{request_id}}\n  Site           : {{site_name}}\n  Location       : {{location}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\nYou can track this request at any time from your Urb TecTrack portal.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "request_date", "site_name", "location", "approx_weight", "approx_qty", "contact_name", "client_name"]
+  },
+  {
+    "key": "request_new_admin",
+    "name": "New Request — Ops Alert",
+    "subject": "ACTION: new collection request {{request_id}} from {{client_name}}",
+    "body": "A new e-waste collection request has been raised and is waiting to be acknowledged.\n\n  Request ID     : {{request_id}}\n  Client         : {{client_name}} ({{client_code}})\n  Site           : {{site_name}}\n  Pickup address : {{location}}\n  Raised on      : {{request_date}}\n  Raised by      : {{raised_by}} <{{raised_email}}>\n  Site contact   : {{site_contact}} · {{site_phone}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\n  Client notes   : {{notes}}\n\nOpen the request in Urb TecTrack to acknowledge it, or reply to the client with any change you need. The client is not notified until someone acknowledges, so please action this promptly.\n\n{{portal_url}}\n\nUrb TecTrack automated alert",
+    "variables": ["request_id", "client_name", "client_code", "site_name", "location", "request_date", "raised_by", "raised_email", "site_contact", "site_phone", "approx_weight", "approx_qty", "notes", "portal_url"]
+  },
+  {
+    "key": "cod_delivery",
+    "name": "Certificate of Destruction Delivery",
+    "subject": "Certificate of Destruction {{cert_no}} for request {{request_id}}",
+    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction for your e-waste submission is now available and attached to this email.\n\n  Request ID       : {{request_id}}\n  Invoice          : {{invoice_no}}\n  Certificate No.  : {{cert_no}}\n  Certificate Date : {{cert_date}}\n  Covers           : {{department}}\n  Net weight       : {{net_weight}} kg\n\nWhere a single pickup covers more than one department, you will receive a separate certificate for each — please review them all before closing.\n\nPlease review the attached certificate and acknowledge closure of this request in your Urb TecTrack portal. Once acknowledged, the request lifecycle is complete and the tonnage counts toward your Recycle Heroes milestones.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "invoice_no", "cert_no", "cert_date", "department", "net_weight", "contact_name", "client_name"]
+  },
+  {
+    "key": "payment_reminder",
+    "name": "Payment Reminder",
+    "subject": "Payment reminder — invoice {{invoice_no}} for request {{request_id}}",
+    "body": "Dear {{contact_name}},\n\nThis is a reminder that the following invoice is outstanding.\n\n  Request ID     : {{request_id}}\n  Invoice        : {{invoice_no}} dated {{invoice_date}}\n  Invoice value  : {{invoice_total}}\n  Received       : {{amount_paid}}\n  Outstanding    : {{amount_due}}\n  Payment terms  : {{payment_terms}}\n  Due date       : {{due_date}}\n  {{overdue_line}}\n\nPlease arrange payment at your earliest convenience. If payment has already been made, share the UTR and we will reconcile it against this invoice.\n\nNote that a request cannot be closed in Urb TecTrack until the invoice against it is fully settled.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "invoice_no", "invoice_date", "invoice_total", "amount_paid", "amount_due", "payment_terms", "due_date", "overdue_line", "contact_name", "client_name"]
+  },
+  {
+    "key": "sla_alert",
+    "name": "Recycling SLA Alert",
+    "subject": "SLA alert — {{invoice_no}} is {{sla_state}} ({{days_used}} of {{sla_days}} days)",
+    "body": "Internal SLA alert.\n\n  Request        : {{request_id}}\n  Invoice        : {{invoice_no}}\n  Client         : {{client_name}}\n  Material received : {{received_date}}\n  Target for certificate : {{target_date}}\n  Days elapsed   : {{days_used}} of {{sla_days}}\n  Status         : {{sla_state}}\n\nThe clock runs from receipt of material at the facility to issue of the Certificate of Destruction.\n\nUrb TecTrack automated alert",
+    "variables": ["request_id", "invoice_no", "client_name", "received_date", "target_date", "days_used", "sla_days", "sla_state"]
+  }
+]

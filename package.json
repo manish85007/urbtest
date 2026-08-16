@@ -1,0 +1,23 @@
+{
+  "name": "urb-tectrack",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Urb TecTrack — Urbeno E-Waste Management Platform",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @urb-tectrack/api --filter @urb-tectrack/web dev",
+    "dev:api": "pnpm --filter @urb-tectrack/api dev",
+    "dev:web": "pnpm --filter @urb-tectrack/web dev",
+    "build": "pnpm --filter @urb-tectrack/shared build && pnpm --filter @urb-tectrack/api build && pnpm --filter @urb-tectrack/web build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @urb-tectrack/api db:generate",
+    "db:migrate": "pnpm --filter @urb-tectrack/api db:migrate",
+    "db:migrate:deploy": "pnpm --filter @urb-tectrack/api db:migrate:deploy",
+    "db:seed": "pnpm --filter @urb-tectrack/api db:seed",
+    "db:studio": "pnpm --filter @urb-tectrack/api db:studio"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
