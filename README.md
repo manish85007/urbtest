@@ -91,7 +91,7 @@ pnpm exec playwright install chromium --filter @urb-tectrack/web
 pnpm e2e
 ```
 
-See [docs/E2E-TESTING.md](docs/E2E-TESTING.md) for the full manual UAT walkthrough and automated suite details.
+See [docs/E2E-TESTING.md](docs/E2E-TESTING.md) for Playwright setup, and [docs/uat/README.md](docs/uat/README.md) for the production UAT pack (client, factory, admin scripts and sign-off).
 
 For CI, staging, and production, apply migrations non-interactively:
 

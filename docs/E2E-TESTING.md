@@ -1,6 +1,8 @@
 # End-to-end testing — Urb TecTrack
 
-This guide covers manual UAT and automated Playwright tests for the full 9-stage pickup lifecycle.
+This guide covers **automated Playwright tests** and how to run the app for testers.
+
+**Production UAT and sign-off** (printed scripts for client, factory, and admin) live in [uat/README.md](./uat/README.md). Use that pack for go-live; use this file for `pnpm e2e` and a short smoke walkthrough.
 
 ## Prerequisites
 
@@ -65,7 +67,9 @@ pnpm e2e:ui
 | `e2e/smoke.spec.ts` | Login as admin, client, factory; basic navigation |
 | `e2e/lifecycle.spec.ts` | Full stages 1–9; reject → client edit → resubmit |
 
-## Manual UAT walkthrough
+## Manual smoke (not production sign-off)
+
+For a full UAT with Pass/Fail columns and signatures, use [uat/UAT-CROSS-ROLE-LIFECYCLE.md](./uat/UAT-CROSS-ROLE-LIFECYCLE.md) plus the three role scripts. The steps below are a short developer smoke only.
 
 ### 1. Client — raise request (Stage 1)
 
