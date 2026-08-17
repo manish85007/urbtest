@@ -221,6 +221,7 @@ export function CategoriesTab({ factories, onChanged }: CategoriesTabProps) {
           category={editing}
           onClose={() => setEditing(undefined)}
           onSaved={async (msg) => {
+            setEditing(undefined);
             onChanged(msg);
             await load();
           }}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { dataApi, filesApi, type ClientDetail, type FactorySummary, type LookupRow, type SiteSummary } from '../api';
+import { CompletionDialog } from '../components/CompletionDialog';
 import { FileUpload } from '../components/FileUpload';
 import { Modal } from '../components/Modal';
 import { UserFormModal } from './masters/UserFormModal';
@@ -89,8 +90,8 @@ export function ClientDetailPage() {
           + Add Site
         </button>
       </div>
-      {msg ? <p className="ok-msg">{msg}</p> : null}
       {error ? <p className="error">{error}</p> : null}
+      {msg ? <CompletionDialog message={msg} onClose={() => setMsg('')} /> : null}
 
       <div className="stats" style={{ marginBottom: '1rem' }}>
         <div className="stat">

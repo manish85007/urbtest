@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { dataApi, filesApi, type ClientSummary, type LookupRow } from '../../api';
 import { FileUpload } from '../../components/FileUpload';
 import { Modal } from '../../components/Modal';
@@ -32,12 +32,11 @@ const emptySite = (): SiteDraft => ({
 interface ClientsTabProps {
   clients: ClientSummary[];
   payTerms: LookupRow[];
-  onChanged: (msg: string) => void;
+  onChanged: (msg: string, href?: string) => void;
 }
 
 export function ClientsTab({ clients, payTerms, onChanged }: ClientsTabProps) {
   const [open, setOpen] = useState(false);
-  const nav = useNavigate();
 
   return (
     <>
@@ -119,8 +118,8 @@ export function ClientsTab({ clients, payTerms, onChanged }: ClientsTabProps) {
           payTerms={payTerms}
           onClose={() => setOpen(false)}
           onCreated={(id, message) => {
-            onChanged(message);
-            nav(`/masters/clients/${id}`);
+            setOpen(false);
+            onChanged(message, `/masters/clients/${id}`);
           }}
         />
       ) : null}

@@ -97,7 +97,10 @@ export function FactoriesTab({ factories, users, onChanged }: FactoriesTabProps)
           factory={editing}
           users={users}
           onClose={() => setEditing(undefined)}
-          onSaved={onChanged}
+          onSaved={(msg) => {
+            setEditing(undefined);
+            onChanged(msg);
+          }}
         />
       ) : null}
     </>

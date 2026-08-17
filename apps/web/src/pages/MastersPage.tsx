@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dataApi, emailsApi, type ClientSummary, type FactorySummary, type LookupRow, type UserRow } from '../api';
+import { CompletionDialog } from '../components/CompletionDialog';
 import { CategoriesTab } from './masters/CategoriesTab';
 import { ClientsTab } from './masters/ClientsTab';
 import { EmailTab } from './masters/EmailTab';
@@ -20,6 +21,7 @@ const TABS: Array<[Tab, string]> = [
 ];
 
 export function MastersPage() {
+  const nav = useNavigate();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get('tab') as Tab | null;
   const tab: Tab = TABS.some(([id]) => id === tabParam) ? (tabParam as Tab) : 'clients';
@@ -52,7 +54,7 @@ export function MastersPage() {
       variables?: string[];
     }>
   >([]);
-  const [msg, setMsg] = useState('');
+  const [flash, setFlash] = useState<{ message: string; href?: string } | null>(null);
   const [error, setError] = useState('');
 
   async function reload() {
@@ -79,9 +81,9 @@ export function MastersPage() {
     emailsApi.templates().then(setTemplates).catch(() => undefined);
   }, [tab]);
 
-  async function onChanged(success: string) {
+  async function onChanged(success: string, href?: string) {
     setError('');
-    setMsg(success);
+    setFlash({ message: success, href });
     try {
       await reload();
       if (tab === 'email') {
@@ -91,6 +93,12 @@ export function MastersPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reload failed');
     }
+  }
+
+  function dismissFlash() {
+    const href = flash?.href;
+    setFlash(null);
+    if (href) nav(href);
   }
 
   return (
@@ -103,8 +111,8 @@ export function MastersPage() {
           </div>
         </div>
       </div>
-      {msg ? <p className="ok-msg">{msg}</p> : null}
       {error ? <p className="error">{error}</p> : null}
+      {flash ? <CompletionDialog message={flash.message} onClose={dismissFlash} /> : null}
 
       <div className="card" style={{ padding: '.4rem' }}>
         <div style={{ display: 'flex', gap: '.2rem', flexWrap: 'wrap' }}>

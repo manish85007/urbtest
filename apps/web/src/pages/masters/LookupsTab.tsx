@@ -132,7 +132,10 @@ export function LookupsTab({ lookups, onChanged }: LookupsTabProps) {
           def={editing.def}
           row={editing.row}
           onClose={() => setEditing(null)}
-          onSaved={onChanged}
+          onSaved={(msg) => {
+            setEditing(null);
+            onChanged(msg);
+          }}
         />
       ) : null}
     </>

@@ -6,12 +6,14 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
-  /** Kit openM primary action — Cancel is always shown beside it. */
+  /** Kit openM primary action — Cancel is shown beside it unless `okOnly`. */
   okLabel?: string;
   /** When set, the OK button submits this <form id>. */
   form?: string;
   onOk?: () => void | Promise<unknown>;
   busy?: boolean;
+  /** Hide Cancel — used for post-save confirmation. */
+  okOnly?: boolean;
   /** Render the title as h1 (new-request e2e heading). */
   heading?: boolean;
 }
@@ -27,6 +29,7 @@ export function Modal({
   form,
   onOk,
   busy,
+  okOnly,
   heading,
 }: ModalProps) {
   const TitleTag = heading ? 'h1' : 'div';
@@ -40,9 +43,11 @@ export function Modal({
     footer ??
     (okLabel ? (
       <>
-        <button type="button" className="btn bs" onClick={onClose} disabled={busy}>
-          Cancel
-        </button>
+        {okOnly ? null : (
+          <button type="button" className="btn bs" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+        )}
         <button
           type={form ? 'submit' : 'button'}
           form={form}

@@ -200,10 +200,22 @@ export function EmailTab({ templates, outbox, onChanged }: EmailTabProps) {
         <TemplateEditModal
           template={edit === 'new' ? null : edit}
           onClose={() => setEdit(null)}
-          onSaved={onChanged}
+          onSaved={(msg) => {
+            setEdit(null);
+            onChanged(msg);
+          }}
         />
       ) : null}
-      {send ? <SendModal template={send} onClose={() => setSend(null)} onSaved={onChanged} /> : null}
+      {send ? (
+        <SendModal
+          template={send}
+          onClose={() => setSend(null)}
+          onSaved={(msg) => {
+            setSend(null);
+            onChanged(msg);
+          }}
+        />
+      ) : null}
       {view ? (
         <Modal title={view.subject} onClose={() => setView(null)} wide>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '.4rem', marginBottom: '.7rem' }}>
