@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { STAGES, getFY, listFiscalYears } from '@urb-tectrack/shared';
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
 import { StageBadge } from '../components/StageProgress';
@@ -11,12 +11,13 @@ interface RequestsListPageProps {
 
 export function RequestsListPage({ user }: RequestsListPageProps) {
   const nav = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [rows, setRows] = useState<SubmissionSummary[]>([]);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
-  const [stage, setStage] = useState('');
+  const stage = params.get('stage') ?? '';
   const [clientId, setClientId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [fy, setFy] = useState('');
@@ -88,7 +89,15 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
           </div>
           <div className="fg">
             <label>Stage</label>
-            <select value={stage} onChange={(e) => setStage(e.target.value)}>
+            <select
+              value={stage}
+              onChange={(e) => {
+                const next = new URLSearchParams(params);
+                if (e.target.value) next.set('stage', e.target.value);
+                else next.delete('stage');
+                setParams(next, { replace: true });
+              }}
+            >
               <option value="">All stages</option>
               {STAGES.map((s) => (
                 <option key={s.n} value={String(s.n)}>

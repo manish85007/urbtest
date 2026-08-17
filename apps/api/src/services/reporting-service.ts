@@ -80,16 +80,55 @@ function factoryCanSee(actor: SessionUser, inv: InvoiceRow): boolean {
   return factoryInScope(actor, inv.mrn.factoryId);
 }
 
+async function staffCapacitySummary(actor: SessionUser) {
+  const factories = await prisma.factorySite.findMany({
+    where: { active: true },
+    select: { id: true },
+  });
+  const period = parseReportPeriod({ period: 'fy' });
+  let authorized = 0;
+  let processed = 0;
+  for (const fac of factories.filter((f) => factoryInScope(actor, f.id))) {
+    const row = await getCapacityReport(actor, fac.id, period);
+    authorized += row.stats.authorized;
+    processed += row.stats.processed;
+  }
+  return {
+    pct: authorized > 0 ? (processed / authorized) * 100 : 0,
+    capTpa: authorized / 1000,
+  };
+}
+
+function mapActiveRequest(s: SubmissionFull) {
+  return {
+    id: s.id,
+    clientName: s.client.name,
+    siteName: s.site.name,
+    requestDate: s.requestDate.toISOString().slice(0, 10),
+    stage: deriveSubmissionStage(s),
+    invoices: s.invoices.map((inv) => ({
+      invoiceNo: inv.invoiceNo,
+      stage: invoiceStage(inv),
+    })),
+    netKg: submissionNetKg(s),
+    approxWeight: Number(s.approxWeight),
+    ref: s.ref,
+  };
+}
+
 export async function getStaffDashboard(actor: SessionUser) {
-  const [submissions, openInvoices, reminderLogs] = await Promise.all([
+  const scope = clientScopeFilter(actor);
+  const [allSubs, openInvoices, reminderLogs, capacity] = await Promise.all([
     prisma.submission.findMany({
-      where: { ...clientScopeFilter(actor), closedAt: null },
+      where: scope,
       include: submissionInclude,
       orderBy: { createdAt: 'desc' },
     }),
     loadInvoiceRows(actor),
     prisma.reminderLog.findMany({ where: { key: { startsWith: 'pay:' } } }),
+    staffCapacitySummary(actor),
   ]);
+  const submissions = allSubs.filter((s) => deriveSubmissionStage(s) < 9);
 
   const reminderByKey = new Map(reminderLogs.map((r) => [r.key, r.count]));
 
@@ -198,7 +237,7 @@ export async function getStaffDashboard(actor: SessionUser) {
 
   const fy = currentFY();
   const fyLabel = fy?.label ?? '';
-  const fyNetKg = submissions
+  const fyNetKg = allSubs
     .filter((s) => fyLabel && inFiscalYear(s.requestDate, fyLabel))
     .reduce((sum, s) => sum + submissionNetKg(s), 0);
 
@@ -206,12 +245,15 @@ export async function getStaffDashboard(actor: SessionUser) {
     stats: {
       newRequests: newRequests.length,
       openRequests: submissions.length,
+      totalRequests: allSubs.length,
       openInvoices: openInvoices.length,
       pendingPayments,
       fyNetKg,
       fyLabel,
+      capacity,
     },
     newRequests,
+    activeRequests: submissions.map(mapActiveRequest),
     overdue,
     slaAtRisk,
     queues,
@@ -251,7 +293,7 @@ export async function getImpactReport(actor: SessionUser, siteId?: string, perio
   const pendingClose = await prisma.invoice.findMany({
     where: {
       closedAt: null,
-      submission: scope,
+      submission: siteId ? { ...scope, siteId } : scope,
       certificates: { some: {} },
     },
     include: {
@@ -271,11 +313,71 @@ export async function getImpactReport(actor: SessionUser, siteId?: string, perio
       issuedAt: inv.certificates[0]?.uploadedAt.toISOString().slice(0, 10) ?? null,
     }));
 
+  const clientId = actor.clientId;
+  const [client, allSubs, lifeImp, planted] = await Promise.all([
+    clientId
+      ? prisma.client.findUnique({
+          where: { id: clientId },
+          include: { sites: { where: { active: true }, orderBy: { name: 'asc' } } },
+        })
+      : Promise.resolve(null),
+    prisma.submission.findMany({
+      where: scope,
+      include: submissionInclude,
+      orderBy: { createdAt: 'desc' },
+    }),
+    clientId ? impactForClient(clientId, null) : Promise.resolve(computeImpact(0, 0, 0)),
+    clientId
+      ? prisma.treePlanting.aggregate({ where: { clientId }, _sum: { trees: true } })
+      : Promise.resolve({ _sum: { trees: 0 } }),
+  ]);
+
+  const visible = siteId ? allSubs.filter((s) => s.siteId === siteId) : allSubs;
+  const requests = visible.map((s) => ({
+    id: s.id,
+    siteId: s.siteId,
+    siteName: s.site.name,
+    stage: deriveSubmissionStage(s),
+    netKg: submissionNetKg(s),
+    approxWeight: Number(s.approxWeight),
+    requestDate: s.requestDate.toISOString().slice(0, 10),
+    ref: s.ref,
+  }));
+  const open = requests.filter((r) => r.stage < 9).length;
+
+  const now = new Date();
+  const sites = (client?.sites ?? []).map((st) => {
+    const ss = allSubs.filter((s) => s.siteId === st.id);
+    const next = ss
+      .flatMap((s) => s.vehicles.map((v) => v.expectedAt).filter((d): d is Date => !!d))
+      .filter((d) => d > now)
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    return {
+      id: st.id,
+      name: st.name,
+      city: st.city,
+      gstin: st.gstin,
+      open: ss.filter((s) => deriveSubmissionStage(s) < 9).length,
+      fyKg: ss
+        .filter((s) => fyLabel && inFiscalYear(s.requestDate, fyLabel))
+        .reduce((sum, s) => sum + submissionNetKg(s), 0),
+      total: ss.length,
+      nextPickup: next ? next.toISOString().slice(0, 10) : null,
+    };
+  });
+
   return {
     period: { fy: fyLabel, kind: resolved.kind, label: periodLabel(resolved) },
     impact,
     treesEarned: treesEarned(impact.tonnes),
+    treesPlanted: planted._sum.trees ?? 0,
+    treesEarnedAll: treesEarned(lifeImp.tonnes),
+    lifetimeTonnes: lifeImp.tonnes,
     pendingClose: pending,
+    clientName: client?.name ?? '',
+    counts: { open, closed: requests.length - open, total: requests.length },
+    sites,
+    requests,
   };
 }
 

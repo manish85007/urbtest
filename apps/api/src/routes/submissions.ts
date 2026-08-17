@@ -15,7 +15,7 @@ export async function submissionRoutes(app: FastifyInstance) {
       where: scope,
       orderBy: { createdAt: 'desc' },
       include: submissionInclude,
-      take: 100,
+      take: 2000,
     });
 
     return rows.map((sub) => {

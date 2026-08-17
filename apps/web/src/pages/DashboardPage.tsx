@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatINR } from '@urb-tectrack/shared';
 import {
   dataApi,
   type ClientDashboardReport,
   type SessionUser,
   type StaffDashboardReport,
-  type SubmissionSummary,
 } from '../api';
 import { StageBadge } from '../components/StageProgress';
+import { fmtDate, num } from '../lib/format';
 
 interface DashboardPageProps {
   user: SessionUser;
@@ -17,14 +17,15 @@ interface DashboardPageProps {
 function StaffDashboard({
   user,
   report,
-  subs,
 }: {
   user: SessionUser;
   report: StaffDashboardReport;
-  subs: SubmissionSummary[];
 }) {
+  const nav = useNavigate();
   const overdueTotal = report.overdue.reduce((s, r) => s + BigInt(r.outstandingPaise), 0n);
   const fy = report.stats.fyLabel || 'FY';
+  const cap = report.stats.capacity;
+  const open = report.activeRequests;
 
   return (
     <>
@@ -40,31 +41,36 @@ function StaffDashboard({
         </div>
       </div>
 
-      <div className="stats">
-        <div className="stat">
+      <div className="stats" style={{ marginBottom: '1rem' }}>
+        <Link to="/requests?stage=1" className="stat">
           <div className="stat-l">New Requests</div>
           <div className="stat-v" style={{ color: report.stats.newRequests ? 'var(--am)' : 'var(--g2)' }}>
             {report.stats.newRequests}
           </div>
           <div className="stat-t">awaiting acknowledgement</div>
-        </div>
-        <div className="stat">
+        </Link>
+        <Link to="/requests" className="stat">
           <div className="stat-l">Open Requests</div>
           <div className="stat-v">{report.stats.openRequests}</div>
-          <div className="stat-t">in progress</div>
-        </div>
-        <div className="stat">
+          <div className="stat-t">of {report.stats.totalRequests} total</div>
+        </Link>
+        <Link to="/reports?type=summary" className="stat">
           <div className="stat-l">Net Weight {fy}</div>
-          <div className="stat-v">{report.stats.fyNetKg.toLocaleString()}</div>
+          <div className="stat-v">{num(report.stats.fyNetKg)}</div>
           <div className="stat-t">kg weighed</div>
-        </div>
-        <div className="stat">
+        </Link>
+        <Link to="/capacity" className="stat">
+          <div className="stat-l">Capacity Used</div>
+          <div className="stat-v">{cap.pct.toFixed(2)}%</div>
+          <div className="stat-t">of {num(cap.capTpa)} TPA</div>
+        </Link>
+        <Link to="/reports?type=invoices" className="stat">
           <div className="stat-l">Payments Pending</div>
           <div className="stat-v" style={{ color: report.stats.pendingPayments ? 'var(--am)' : 'var(--g2)' }}>
             {report.stats.pendingPayments}
           </div>
           <div className="stat-t">invoices</div>
-        </div>
+        </Link>
       </div>
 
       <div className="detail-grid">
@@ -109,7 +115,7 @@ function StaffDashboard({
                             {r.approxQty} units
                           </div>
                         </td>
-                        <td className="dim">{r.requestDate.slice(0, 10)}</td>
+                        <td className="dim">{fmtDate(r.requestDate)}</td>
                         <td>
                           <Link to={`/requests/${r.id}`} className="btn bp bsm">
                             {user.role === 'admin' ? 'Acknowledge' : 'Open'}
@@ -131,7 +137,7 @@ function StaffDashboard({
                 View all →
               </Link>
             </div>
-            {subs.length === 0 ? (
+            {open.length === 0 ? (
               <div className="empty">
                 <div className="empty-t">All caught up</div>
                 <div style={{ fontSize: '.85rem' }}>No open requests</div>
@@ -149,14 +155,14 @@ function StaffDashboard({
                     </tr>
                   </thead>
                   <tbody>
-                    {subs.slice(0, 12).map((s) => (
-                      <tr key={s.id} className="click">
+                    {open.slice(0, 12).map((s) => (
+                      <tr key={s.id} className="click" onClick={() => nav(`/requests/${s.id}`)}>
                         <td>
-                          <Link to={`/requests/${s.id}`}>
+                          <Link to={`/requests/${s.id}`} onClick={(e) => e.stopPropagation()}>
                             <b>{s.id}</b>
                           </Link>
                           <div className="dim" style={{ fontSize: '.72rem' }}>
-                            {s.requestDate.slice(0, 10)}
+                            {fmtDate(s.requestDate)}
                           </div>
                         </td>
                         <td>
@@ -169,13 +175,21 @@ function StaffDashboard({
                           <StageBadge stage={s.stage} />
                         </td>
                         <td>
-                          {s.invoiceCount ? (
-                            <span className="badge bg-bl">{s.invoiceCount}</span>
+                          {s.invoices.length ? (
+                            s.invoices.map((inv) => (
+                              <span
+                                key={inv.invoiceNo}
+                                className={`badge ${inv.stage >= 9 ? 'bg-g' : 'bg-bl'}`}
+                                style={{ margin: 1 }}
+                              >
+                                {inv.invoiceNo}
+                              </span>
+                            ))
                           ) : (
                             <span className="dim">—</span>
                           )}
                         </td>
-                        <td className="mono">{s.approxWeight}</td>
+                        <td className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -206,28 +220,46 @@ function StaffDashboard({
                       <th>Client</th>
                       <th>Outstanding</th>
                       <th>Overdue</th>
+                      <th>Reminders</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.overdue.slice(0, 6).map((r) => (
-                      <tr key={r.invoiceNo} className="click">
+                      <tr key={r.invoiceNo} className="click" onClick={() => nav(`/requests/${r.submissionId}`)}>
                         <td>
-                          <Link to={`/requests/${r.submissionId}`}>
+                          <Link to={`/requests/${r.submissionId}`} onClick={(e) => e.stopPropagation()}>
                             <b className="mono">{r.invoiceNo}</b>
                           </Link>
                           <div className="dim" style={{ fontSize: '.7rem' }}>
                             {r.submissionId}
                           </div>
                         </td>
-                        <td className="dim">{r.clientName}</td>
+                        <td className="dim">
+                          {r.clientName}
+                          {r.paymentTerms ? (
+                            <div className="dim" style={{ fontSize: '.7rem' }}>
+                              {r.paymentTerms}
+                            </div>
+                          ) : null}
+                        </td>
                         <td className="mono">{formatINR(Number(r.outstandingPaise))}</td>
                         <td>
                           <span className="badge bg-rd">{r.overdueDays}d</span>
                         </td>
+                        <td className="mono dim">{r.reminders}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+              {report.overdue.length > 6 ? (
+                <div className="dim" style={{ fontSize: '.72rem', marginTop: '.3rem' }}>
+                  +{report.overdue.length - 6} more
+                </div>
+              ) : null}
+              <div className="dim" style={{ fontSize: '.73rem', marginTop: '.35rem' }}>
+                Reminders go out daily until the invoice is settled. A request cannot be closed while payment is
+                outstanding.
               </div>
             </div>
           ) : null}
@@ -239,6 +271,10 @@ function StaffDashboard({
                   ⏱️ Recycling SLA at Risk
                 </div>
                 <span className="badge bg-am">{report.slaAtRisk.length}</span>
+                <div className="spacer" />
+                <span className="dim" style={{ fontSize: '.75rem' }}>
+                  {report.slaAtRisk[0]?.slaDays ?? 30}-day target
+                </span>
               </div>
               <div className="tw">
                 <table>
@@ -246,19 +282,24 @@ function StaffDashboard({
                     <tr>
                       <th>Invoice</th>
                       <th>Client</th>
+                      <th>Received</th>
                       <th>Elapsed</th>
                       <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.slaAtRisk.slice(0, 6).map((r) => (
-                      <tr key={r.invoiceNo}>
+                      <tr key={r.invoiceNo} className="click" onClick={() => nav(`/requests/${r.submissionId}`)}>
                         <td>
-                          <Link to={`/requests/${r.submissionId}`}>
+                          <Link to={`/requests/${r.submissionId}`} onClick={(e) => e.stopPropagation()}>
                             <b className="mono">{r.invoiceNo}</b>
                           </Link>
+                          <div className="dim" style={{ fontSize: '.7rem' }}>
+                            {r.submissionId}
+                          </div>
                         </td>
                         <td className="dim">{r.clientName}</td>
+                        <td className="dim">{fmtDate(r.receivedDate)}</td>
                         <td className="mono">
                           {r.daysUsed} / {r.slaDays}
                         </td>
@@ -269,6 +310,9 @@ function StaffDashboard({
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="dim" style={{ fontSize: '.73rem', marginTop: '.35rem' }}>
+                Measured from receipt of material at the facility to issue of the Certificate of Destruction.
               </div>
             </div>
           ) : null}
@@ -298,6 +342,7 @@ function WorkQueue({
   act: string;
   cls: string;
 }) {
+  const nav = useNavigate();
   return (
     <div className="card" style={{ marginBottom: '.6rem' }}>
       <div className="card-hd">
@@ -309,27 +354,38 @@ function WorkQueue({
           Nothing pending
         </div>
       ) : (
-        <div className="tw">
-          <table>
-            <tbody>
-              {items.slice(0, 6).map((item) => (
-                <tr key={item.invoiceId} className="click">
-                  <td>
-                    <Link to={`/requests/${item.submissionId}`}>
-                      <b>{item.invoiceNo}</b>
-                    </Link>
-                    <div className="dim" style={{ fontSize: '.72rem' }}>
-                      {item.submissionId} · {item.clientName}
-                    </div>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span className="badge bg-gy">{act}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="tw">
+            <table>
+              <tbody>
+                {items.slice(0, 6).map((item) => (
+                  <tr
+                    key={item.invoiceId}
+                    className="click"
+                    onClick={() => nav(`/requests/${item.submissionId}`)}
+                  >
+                    <td>
+                      <Link to={`/requests/${item.submissionId}`} onClick={(e) => e.stopPropagation()}>
+                        <b>{item.invoiceNo}</b>
+                      </Link>
+                      <div className="dim" style={{ fontSize: '.72rem' }}>
+                        {item.submissionId} · {item.clientName}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <span className="badge bg-gy">{act}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {items.length > 6 ? (
+            <div className="dim" style={{ fontSize: '.72rem', marginTop: '.3rem' }}>
+              +{items.length - 6} more
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -338,14 +394,19 @@ function WorkQueue({
 function ClientDashboard({
   user,
   report,
-  subs,
+  siteId,
+  onSite,
 }: {
   user: SessionUser;
   report: ClientDashboardReport;
-  subs: SubmissionSummary[];
+  siteId: string;
+  onSite: (id: string) => void;
 }) {
+  const nav = useNavigate();
   const first = user.name.split(' ')[0];
   const { impact } = report;
+  const siteName = report.sites.find((s) => s.id === siteId)?.name;
+  const requests = report.requests;
 
   return (
     <>
@@ -353,10 +414,16 @@ function ClientDashboard({
         <div>
           <div className="h1">Welcome, {first}</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            {report.period.fy} · all sites
+            {report.clientName || user.name} · {report.period.fy}
+            {siteName ? ` · ${siteName}` : ' · all sites'}
           </div>
         </div>
         <div className="spacer" />
+        {siteId ? (
+          <button type="button" className="btn bs" onClick={() => onSite('')}>
+            Clear site filter
+          </button>
+        ) : null}
         <Link to="/requests/new" className="btn bp">
           + New Request
         </Link>
@@ -375,6 +442,7 @@ function ClientDashboard({
                   <th>Request</th>
                   <th>Invoice</th>
                   <th>Certificate(s)</th>
+                  <th>Issued</th>
                   <th></th>
                 </tr>
               </thead>
@@ -382,10 +450,13 @@ function ClientDashboard({
                 {report.pendingClose.map((p) => (
                   <tr key={p.invoiceNo}>
                     <td>
-                      <b>{p.submissionId}</b>
+                      <Link to={`/requests/${p.submissionId}`}>
+                        <b>{p.submissionId}</b>
+                      </Link>
                     </td>
                     <td className="mono">{p.invoiceNo}</td>
                     <td className="mono">{p.certificates.join(', ')}</td>
+                    <td className="dim">{p.issuedAt ? fmtDate(p.issuedAt) : '—'}</td>
                     <td>
                       <Link to={`/requests/${p.submissionId}`} className="btn bp bsm">
                         Review &amp; Close
@@ -399,44 +470,56 @@ function ClientDashboard({
         </div>
       ) : null}
 
-      <div className="stats">
-        <div className="stat">
+      <div className="stats" style={{ marginBottom: '1rem' }}>
+        <Link to="/requests" className="stat">
           <div className="stat-l">Open Requests</div>
-          <div className="stat-v">{subs.filter((s) => s.stage < 9).length}</div>
+          <div className="stat-v">{report.counts.open}</div>
           <div className="stat-t">in progress</div>
-        </div>
-        <div className="stat">
+        </Link>
+        <Link to="/requests?stage=9" className="stat">
           <div className="stat-l">Completed</div>
-          <div className="stat-v">{subs.filter((s) => s.stage >= 9).length}</div>
+          <div className="stat-v">{report.counts.closed}</div>
           <div className="stat-t">lifecycle closed</div>
-        </div>
-        <div className="stat" style={{ background: 'linear-gradient(135deg,#dcfce7,#f0fdf4)', borderColor: '#86efac' }}>
+        </Link>
+        <Link
+          to="/impact"
+          className="stat"
+          style={{ background: 'linear-gradient(135deg,#dcfce7,#f0fdf4)', borderColor: '#86efac' }}
+        >
           <div className="stat-l" style={{ color: '#166534' }}>
             Recycled {report.period.fy}
           </div>
           <div className="stat-v" style={{ color: '#14532d' }}>
-            {impact.kg.toLocaleString()}
+            {num(impact.kg)}
           </div>
           <div className="stat-t">kg</div>
-        </div>
-        <div className="stat" style={{ background: 'linear-gradient(135deg,#dbeafe,#eff6ff)', borderColor: '#93c5fd' }}>
+        </Link>
+        <Link
+          to="/impact"
+          className="stat"
+          style={{ background: 'linear-gradient(135deg,#dbeafe,#eff6ff)', borderColor: '#93c5fd' }}
+        >
           <div className="stat-l" style={{ color: '#1e40af' }}>
             CO₂ Avoided
           </div>
           <div className="stat-v" style={{ color: '#1e3a8a' }}>
-            {impact.co2.toFixed(0)}
+            {num(impact.co2, 0)}
           </div>
           <div className="stat-t">kg CO₂e</div>
-        </div>
-        <div className="stat" style={{ background: 'linear-gradient(135deg,#fef9c3,#fefce8)', borderColor: '#fde047' }}>
+        </Link>
+        <Link
+          to="/heroes"
+          className="stat"
+          style={{ background: 'linear-gradient(135deg,#fef9c3,#fefce8)', borderColor: '#fde047' }}
+        >
           <div className="stat-l" style={{ color: '#854d0e' }}>
             Trees Planted
           </div>
           <div className="stat-v" style={{ color: '#713f12' }}>
-            {report.treesEarned}
+            {report.treesPlanted}
           </div>
           <div className="stat-t">lifetime</div>
-        </div>
+        </Link>
       </div>
 
       <div className="detail-grid">
@@ -449,7 +532,7 @@ function ClientDashboard({
                 View all →
               </Link>
             </div>
-            {subs.length === 0 ? (
+            {requests.length === 0 ? (
               <div className="empty">
                 <div className="empty-t">No requests yet</div>
                 <div style={{ fontSize: '.85rem', marginBottom: '.7rem' }}>
@@ -472,19 +555,22 @@ function ClientDashboard({
                     </tr>
                   </thead>
                   <tbody>
-                    {subs.slice(0, 12).map((s) => (
-                      <tr key={s.id} className="click">
+                    {requests.slice(0, 12).map((s) => (
+                      <tr key={s.id} className="click" onClick={() => nav(`/requests/${s.id}`)}>
                         <td>
-                          <Link to={`/requests/${s.id}`}>
+                          <Link to={`/requests/${s.id}`} onClick={(e) => e.stopPropagation()}>
                             <b>{s.id}</b>
                           </Link>
+                          <div className="dim" style={{ fontSize: '.72rem' }}>
+                            {s.ref || 'no PO'}
+                          </div>
                         </td>
                         <td className="dim">{s.siteName}</td>
                         <td>
                           <StageBadge stage={s.stage} />
                         </td>
-                        <td className="mono">{s.approxWeight} kg</td>
-                        <td className="dim">{s.requestDate.slice(0, 10)}</td>
+                        <td className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)} kg</td>
+                        <td className="dim">{fmtDate(s.requestDate)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -494,15 +580,70 @@ function ClientDashboard({
           </div>
         </div>
         <div>
+          {report.sites.length ? (
+            <>
+              {report.sites.length > 1 ? (
+                <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--g2)', marginBottom: '.45rem' }}>
+                  Your Sites
+                </div>
+              ) : null}
+              {report.sites.map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  className="card"
+                  style={{
+                    marginBottom: '.5rem',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    font: 'inherit',
+                    color: 'inherit',
+                    borderColor: siteId === st.id ? 'var(--g)' : undefined,
+                    background: siteId === st.id ? 'var(--g3)' : undefined,
+                  }}
+                  onClick={() => onSite(siteId === st.id ? '' : st.id)}
+                >
+                  <div className="card-hd">
+                    <div className="card-ttl">{st.name}</div>
+                    {siteId === st.id ? <span className="badge bg-g">Filtered</span> : null}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: '.4rem' }}>
+                    <div className="tile">
+                      <div className="tile-l">Open</div>
+                      <div className="tile-v">{st.open}</div>
+                    </div>
+                    <div className="tile">
+                      <div className="tile-l">{report.period.fy} kg</div>
+                      <div className="tile-v">{num(st.fyKg)}</div>
+                    </div>
+                    <div className="tile">
+                      <div className="tile-l">Total</div>
+                      <div className="tile-v">{st.total}</div>
+                    </div>
+                    <div className="tile">
+                      <div className="tile-l">Next Pickup</div>
+                      <div className="tile-v" style={{ fontSize: '.78rem' }}>
+                        {st.nextPickup ? fmtDate(st.nextPickup) : '—'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="dim" style={{ fontSize: '.72rem', marginTop: '.35rem' }}>
+                    {st.city || ''} · GST {st.gstin || '—'}
+                  </div>
+                </button>
+              ))}
+            </>
+          ) : null}
           <div className="card" style={{ background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', borderColor: '#86efac' }}>
             <div className="card-ttl" style={{ color: '#166534', marginBottom: '.5rem' }}>
               🌳 Recycle Heroes
             </div>
             <div style={{ textAlign: 'center', padding: '.4rem 0' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#14532d' }}>{report.treesEarned}</div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#14532d' }}>{report.treesPlanted}</div>
               <div style={{ fontSize: '.78rem', color: '#166534', fontWeight: 600 }}>trees planted on your behalf</div>
               <div className="dim" style={{ fontSize: '.72rem', marginTop: '.3rem' }}>
-                {impact.tonnes.toFixed(2)} tonnes recycled
+                {report.treesEarnedAll} earned · {num(report.lifetimeTonnes)} tonnes recycled
               </div>
             </div>
             <Link to="/heroes" className="btn bs bsm" style={{ width: '100%', justifyContent: 'center' }}>
@@ -517,17 +658,15 @@ function ClientDashboard({
 
 export function DashboardPage({ user }: DashboardPageProps) {
   const [report, setReport] = useState<StaffDashboardReport | ClientDashboardReport | null>(null);
-  const [subs, setSubs] = useState<SubmissionSummary[]>([]);
   const [error, setError] = useState('');
+  const [siteId, setSiteId] = useState('');
 
   useEffect(() => {
-    Promise.all([dataApi.reportsDashboard(), dataApi.submissions()])
-      .then(([dash, list]) => {
-        setReport(dash);
-        setSubs(list);
-      })
+    dataApi
+      .reportsDashboard(siteId || undefined)
+      .then(setReport)
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load dashboard'));
-  }, []);
+  }, [siteId]);
 
   return (
     <div>
@@ -535,9 +674,9 @@ export function DashboardPage({ user }: DashboardPageProps) {
       {!report ? (
         <p className="muted">Loading reports…</p>
       ) : report.kind === 'staff' ? (
-        <StaffDashboard user={user} report={report} subs={subs.filter((s) => s.stage < 9)} />
+        <StaffDashboard user={user} report={report} />
       ) : (
-        <ClientDashboard user={user} report={report} subs={subs} />
+        <ClientDashboard user={user} report={report} siteId={siteId} onSite={setSiteId} />
       )}
     </div>
   );

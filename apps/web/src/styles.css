@@ -78,6 +78,8 @@ body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sa
 /* STATS */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.6rem}
 .stat{background:var(--cd);border:1px solid var(--bd);border-radius:10px;padding:.7rem .8rem}
+a.stat{text-decoration:none;color:inherit;display:block}
+a.stat:hover{border-color:var(--g)}
 .stat-l{font-size:.7rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
 .stat-v{font-size:1.5rem;font-weight:800;color:var(--g2);line-height:1.15;margin-top:.15rem}
 .stat-t{font-size:.68rem;color:var(--mu);margin-top:.1rem}

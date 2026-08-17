@@ -12,6 +12,7 @@ export function navItems(role: SessionUser['role']): NavItem[] {
       { to: '/', label: 'Dashboard', match: (p) => p === '/' },
       { to: '/requests', label: 'Requests', match: (p) => p.startsWith('/requests') },
       { to: '/heroes', label: 'Recycle Heroes' },
+      { to: '/capacity', label: 'Capacity' },
       { to: '/masters', label: 'Masters' },
       { to: '/reports', label: 'Reports' },
       { to: '/audit', label: 'Audit' },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   dataApi,
   filesApi,
@@ -33,7 +33,11 @@ interface ReportsPageProps {
 export function ReportsPage({ user }: ReportsPageProps) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const available = KINDS.filter((k) => !k.staffOnly || isStaff);
-  const [type, setType] = useState<RegisterType>(available[0]?.id ?? 'summary');
+  const [params, setParams] = useSearchParams();
+  const typeParam = params.get('type') as RegisterType | null;
+  const type: RegisterType = available.some((k) => k.id === typeParam)
+    ? (typeParam as RegisterType)
+    : (available[0]?.id ?? 'summary');
   const [clientId, setClientId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -126,7 +130,11 @@ export function ReportsPage({ user }: ReportsPageProps) {
             <select
               id="report-kind"
               value={type}
-              onChange={(e) => setType(e.target.value as RegisterType)}
+              onChange={(e) => {
+                const next = new URLSearchParams(params);
+                next.set('type', e.target.value);
+                setParams(next, { replace: true });
+              }}
             >
               {available.map((k) => (
                 <option key={k.id} value={k.id}>

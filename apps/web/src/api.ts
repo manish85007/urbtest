@@ -492,10 +492,12 @@ export interface StaffDashboardReport {
   stats: {
     newRequests: number;
     openRequests: number;
+    totalRequests: number;
     openInvoices: number;
     pendingPayments: number;
     fyNetKg: number;
     fyLabel: string;
+    capacity: { pct: number; capTpa: number };
   };
   newRequests: Array<{
     id: string;
@@ -506,10 +508,23 @@ export interface StaffDashboardReport {
     requestDate: string;
     ref: string | null;
   }>;
+  activeRequests: Array<{
+    id: string;
+    clientName: string;
+    siteName: string;
+    requestDate: string;
+    stage: number;
+    invoices: Array<{ invoiceNo: string; stage: number }>;
+    netKg: number;
+    approxWeight: number;
+    ref: string | null;
+  }>;
   overdue: Array<{
     submissionId: string;
+    invoiceId?: string;
     invoiceNo: string;
     clientName: string;
+    paymentTerms?: string;
     outstandingPaise: string;
     overdueDays: number;
     reminders: number;
@@ -546,6 +561,31 @@ export interface ClientDashboardReport {
     submissions: number;
   };
   treesEarned: number;
+  treesPlanted: number;
+  treesEarnedAll: number;
+  lifetimeTonnes: number;
+  clientName: string;
+  counts: { open: number; closed: number; total: number };
+  sites: Array<{
+    id: string;
+    name: string;
+    city: string | null;
+    gstin: string | null;
+    open: number;
+    fyKg: number;
+    total: number;
+    nextPickup: string | null;
+  }>;
+  requests: Array<{
+    id: string;
+    siteId: string;
+    siteName: string;
+    stage: number;
+    netKg: number;
+    approxWeight: number;
+    requestDate: string;
+    ref: string | null;
+  }>;
   pendingClose: Array<{
     submissionId: string;
     invoiceNo: string;
