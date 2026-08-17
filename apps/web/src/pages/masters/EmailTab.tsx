@@ -21,7 +21,7 @@ const SAMPLE_VARS: Record<string, string> = {
   code: '482913',
   expiry_minutes: '15',
   support_email: 'hello@urbeno.in',
-  temp_password: 'urb492013',
+  temp_password: 'demo',
   admin_name: 'Urbeno Admin',
   portal_url: 'https://tectrack.urbeno.in',
 };

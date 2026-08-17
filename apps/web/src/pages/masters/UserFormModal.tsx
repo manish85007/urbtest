@@ -82,7 +82,7 @@ export function UserFormModal({
         });
         onSaved(
           created.tempPassword
-            ? `User created — temporary password ${created.tempPassword}`
+            ? `User created — password ${created.tempPassword}`
             : 'User created.',
         );
       }
@@ -182,7 +182,7 @@ export function UserFormModal({
         </label>
       ) : (
         <div className="note-box" style={{ background: 'var(--bl2)', color: 'var(--bl)' }}>
-          A welcome email with a temporary password will be sent automatically.
+          A welcome email is sent automatically. The sign-in password is <b className="mono">demo</b>.
         </div>
       )}
     </Modal>

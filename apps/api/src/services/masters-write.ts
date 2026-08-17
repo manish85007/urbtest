@@ -138,8 +138,9 @@ export async function createSite(actor: SessionUser, clientId: string, input: Si
   return site;
 }
 
+/** Same password as seeded demo accounts — used so testers can sign in immediately. */
 function tempPassword() {
-  return `urb${Math.floor(100000 + Math.random() * 900000)}`;
+  return 'demo';
 }
 
 export async function createUser(
