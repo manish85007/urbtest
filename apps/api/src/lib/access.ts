@@ -4,17 +4,33 @@ import { AppError } from './errors.js';
 import { prisma } from './prisma.js';
 import { submissionInclude, type SubmissionFull } from './db-helpers.js';
 import { deriveSubmissionStage } from './stage-mapper.js';
+import { denyAccess } from '../services/security-log.js';
 
 export async function loadSubmissionForActor(
   id: string,
   actor: SessionUser,
 ): Promise<SubmissionFull> {
-  const sub = await prisma.submission.findFirst({
+  const found = await prisma.submission.findUnique({
+    where: { id },
+    include: submissionInclude,
+  });
+  if (!found) throw new AppError('Request not found', 404);
+
+  const scoped = await prisma.submission.findFirst({
     where: { id, ...clientScopeFilter(actor) },
     include: submissionInclude,
   });
-  if (!sub) throw new AppError('Request not found', 404);
-  return sub;
+  if (!scoped) {
+    await denyAccess(
+      actor.email,
+      actor.role,
+      'request',
+      id,
+      "outside the signed-in user's client or site scope",
+    );
+    throw new AppError("You don't have access to this request", 403);
+  }
+  return scoped;
 }
 
 export async function loadInvoiceForActor(invoiceId: string, actor: SessionUser) {

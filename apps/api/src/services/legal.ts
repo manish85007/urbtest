@@ -92,6 +92,26 @@ export async function acceptLegalDocuments(
     details: { keys: unique, versions: docs.map((d) => ({ key: d.key, version: d.version })) },
   });
 
+  const privacy = docs.find((d) => d.key === 'privacy');
+  if (privacy) {
+    await prisma.consentRecord.create({
+      data: {
+        userId,
+        email: userEmail,
+        version: privacy.version,
+        ip: ipAddress ?? 'recorded server-side',
+      },
+    });
+    await auditLog({
+      actorEmail: userEmail,
+      actorId: userId,
+      action: 'consent.record',
+      entity: 'user',
+      entityId: userEmail,
+      details: { version: privacy.version },
+    });
+  }
+
   return getLegalStatus(userId);
 }
 

@@ -1,49 +1,169 @@
 import bcrypt from 'bcryptjs';
+import {
+  PW_POLICY,
+  mfaRequired,
+  pwCheck,
+  pwExpired,
+  pwNeedsMessage,
+  pwReusedMessage,
+} from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
+import { AppError } from '../lib/errors.js';
+import { newTotpSecret, totpCode, totpUri, verifyTotp } from '../lib/totp.js';
 import { auditLog } from './audit.js';
+import { recordSecurityEvent } from './security-log.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { toSessionUser } from '../lib/auth-context.js';
 
-const LOCK_ATTEMPTS = 5;
-const LOCK_WINDOW_MS = 15 * 60 * 1000;
+const LOCK_ATTEMPTS = PW_POLICY.lockAfter;
+const LOCK_WINDOW_MS = PW_POLICY.lockWindowMins * 60 * 1000;
 const SESSION_HOURS = 8;
 
-const locks = new Map<string, { count: number; until: number }>();
+export class AuthError extends Error {
+  mfaRequired = false;
+  constructor(message: string, opts?: { mfaRequired?: boolean }) {
+    super(message);
+    this.name = 'AuthError';
+    this.mfaRequired = !!opts?.mfaRequired;
+  }
+}
 
-export async function signIn(email: string, password: string): Promise<{ user: SessionUser; token: string }> {
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
+}
+
+export async function assertPasswordPolicy(email: string, password: string, userId?: string) {
+  const fails = pwCheck(password, email);
+  if (fails.length) throw new AppError(pwNeedsMessage(fails));
+  if (userId) {
+    const hist = await prisma.passwordHistory.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: PW_POLICY.historyDepth,
+    });
+    for (const h of hist) {
+      if (await bcrypt.compare(password, h.passwordHash)) {
+        throw new AppError(pwReusedMessage());
+      }
+    }
+  }
+}
+
+export async function rememberPassword(userId: string, passwordHash: string) {
+  await prisma.passwordHistory.create({ data: { userId, passwordHash } });
+  const extra = await prisma.passwordHistory.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    skip: PW_POLICY.historyDepth,
+    select: { id: true },
+  });
+  if (extra.length) {
+    await prisma.passwordHistory.deleteMany({ where: { id: { in: extra.map((e) => e.id) } } });
+  }
+}
+
+export async function applyPassword(userId: string, email: string, password: string) {
+  await assertPasswordPolicy(email, password, userId);
+  const passwordHash = await hashPassword(password);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, passwordSetAt: new Date(), mustReset: false },
+  });
+  await rememberPassword(userId, passwordHash);
+  return passwordHash;
+}
+
+export async function signIn(
+  email: string,
+  password: string,
+  mfaCode?: string,
+  userAgent?: string,
+): Promise<{ user: SessionUser; token: string; passwordExpired: boolean }> {
   const normalized = email.trim().toLowerCase();
-  const lock = locks.get(normalized);
-  if (lock && lock.until > Date.now()) {
-    const mins = Math.ceil((lock.until - Date.now()) / 60000);
-    throw new Error(
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
+
+  if (user?.lockedUntil && user.lockedUntil > new Date()) {
+    const mins = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+    await recordSecurityEvent(
+      'auth.locked.attempt',
+      normalized,
+      { minutesRemaining: mins },
+      'high',
+      userAgent,
+    );
+    throw new AuthError(
       `Account locked after ${LOCK_ATTEMPTS} failed attempts. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`,
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { email: normalized } });
-  const valid = user?.active && user.passwordHash
-    ? await bcrypt.compare(password, user.passwordHash)
-    : false;
+  const valid = user?.active && user.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
 
   if (!valid || !user) {
-    const current = locks.get(normalized) ?? { count: 0, until: 0 };
-    current.count += 1;
-    if (current.count >= LOCK_ATTEMPTS) {
-      current.until = Date.now() + LOCK_WINDOW_MS;
-      current.count = 0;
+    let attempts = 0;
+    let locked = false;
+    if (user) {
+      attempts = user.failedLoginCount + 1;
+      locked = attempts >= LOCK_ATTEMPTS;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: locked
+          ? {
+              failedLoginCount: 0,
+              lockedUntil: new Date(Date.now() + LOCK_WINDOW_MS),
+            }
+          : { failedLoginCount: attempts },
+      });
     }
-    locks.set(normalized, current);
-    await auditLog({ actorEmail: normalized, action: 'auth.fail', entity: 'user', entityId: normalized });
-    throw new Error('Incorrect email or password.');
+    await auditLog({
+      actorEmail: normalized,
+      action: 'auth.fail',
+      entity: 'user',
+      entityId: normalized,
+      details: { attempts },
+    });
+    await recordSecurityEvent(
+      'auth.failed',
+      normalized,
+      { attempts, known: !!user },
+      locked ? 'high' : 'warn',
+      userAgent,
+    );
+    if (locked) {
+      await recordSecurityEvent(
+        'auth.lockout',
+        normalized,
+        { minutes: PW_POLICY.lockWindowMins },
+        'high',
+        userAgent,
+      );
+    }
+    throw new AuthError('Incorrect email or password.');
   }
 
-  locks.delete(normalized);
+  if (user.mfaSecret) {
+    if (!mfaCode?.trim()) {
+      throw new AuthError('Enter the six-digit code from your authenticator.', { mfaRequired: true });
+    }
+    if (!verifyTotp(user.mfaSecret, mfaCode)) {
+      await recordSecurityEvent('mfa.failed', user.email, {}, 'warn', userAgent);
+      throw new AuthError('That code is not right. It changes every 30 seconds — try the current one.', {
+        mfaRequired: true,
+      });
+    }
+    await recordSecurityEvent('mfa.verified', user.email, {}, 'info', userAgent);
+  }
+
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
+  const expired = pwExpired(user.passwordSetAt);
 
-  await prisma.session.create({
-    data: { userId: user.id, token, expiresAt },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+    }),
+    prisma.session.create({ data: { userId: user.id, token, expiresAt } }),
+  ]);
 
   await auditLog({
     actorEmail: user.email,
@@ -52,8 +172,12 @@ export async function signIn(email: string, password: string): Promise<{ user: S
     entity: 'user',
     entityId: user.email,
   });
+  await recordSecurityEvent('auth.success', user.email, {}, 'info', userAgent);
+  if (expired) {
+    await recordSecurityEvent('auth.password.expired', user.email, {}, 'warn', userAgent);
+  }
 
-  return { user: toSessionUser(user), token };
+  return { user: toSessionUser(user), token, passwordExpired: expired };
 }
 
 export async function signOut(token: string, actor?: SessionUser) {
@@ -66,6 +190,7 @@ export async function signOut(token: string, actor?: SessionUser) {
       entity: 'user',
       entityId: actor.email,
     });
+    await recordSecurityEvent('auth.logout', actor.email, {});
   }
 }
 
@@ -79,24 +204,17 @@ export async function getSessionUser(token: string | undefined): Promise<Session
   return toSessionUser(session.user);
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
-}
-
 export async function changePassword(actor: SessionUser, current: string, next: string) {
-  if (next.length < 4) throw new Error('New password must be at least 4 characters.');
-
   const user = await prisma.user.findUnique({ where: { id: actor.id } });
-  if (!user) throw new Error('User not found.');
+  if (!user) throw new AppError('User not found');
 
   const valid = await bcrypt.compare(current, user.passwordHash);
-  if (!valid) throw new Error('Current password is incorrect.');
+  if (!valid) {
+    await recordSecurityEvent('auth.pwchange.failed', actor.email, {}, 'warn');
+    throw new AppError('Current password is not correct.');
+  }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashPassword(next) },
-  });
-
+  await applyPassword(user.id, user.email, next);
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
@@ -104,6 +222,75 @@ export async function changePassword(actor: SessionUser, current: string, next: 
     entity: 'user',
     entityId: actor.email,
   });
-
+  await recordSecurityEvent('auth.password.changed', actor.email, {});
   return { ok: true };
+}
+
+export async function startMfaEnrol(actor: SessionUser) {
+  const secret = newTotpSecret();
+  return {
+    secret,
+    uri: totpUri(actor.email, secret),
+    required: mfaRequired(actor.role),
+  };
+}
+
+export async function confirmMfaEnrol(actor: SessionUser, secret: string, code: string) {
+  const user = await prisma.user.findUnique({ where: { id: actor.id } });
+  if (!user) throw new AppError('User not found');
+  if (!verifyTotp(secret, code)) {
+    throw new AppError('That code is not right. It changes every 30 seconds — try the current one.');
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { mfaSecret: secret, mfaAt: new Date() },
+  });
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'mfa.enrol',
+    entity: 'user',
+    entityId: actor.email,
+  });
+  await recordSecurityEvent('mfa.enrolled', actor.email, {});
+  return { ok: true, enrolled: true };
+}
+
+export async function disableMfa(actor: SessionUser, reason: string) {
+  if (!reason?.trim()) throw new AppError('Record why the second factor is being removed.');
+  const user = await prisma.user.findUnique({ where: { id: actor.id } });
+  if (!user) throw new AppError('User not found');
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { mfaSecret: null, mfaAt: null },
+  });
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'mfa.disable',
+    entity: 'user',
+    entityId: actor.email,
+    details: { reason },
+  });
+  await recordSecurityEvent('mfa.disabled', actor.email, { reason }, 'high');
+  return { ok: true, enrolled: false };
+}
+
+export async function mfaStatus(actor: SessionUser) {
+  const user = await prisma.user.findUnique({ where: { id: actor.id } });
+  return {
+    required: mfaRequired(actor.role),
+    enrolled: !!user?.mfaSecret,
+    enrolledAt: user?.mfaAt?.toISOString() ?? null,
+    passwordAgeDays: user?.passwordSetAt
+      ? Math.floor((Date.now() - user.passwordSetAt.getTime()) / 86400000)
+      : null,
+    passwordExpired: pwExpired(user?.passwordSetAt ?? null),
+    policyText: (await import('@urb-tectrack/shared')).pwPolicyText(),
+  };
+}
+
+/** Test helper — current TOTP for a stored secret. */
+export function currentMfaCode(secret: string): string {
+  return totpCode(secret);
 }

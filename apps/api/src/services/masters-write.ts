@@ -3,7 +3,7 @@ import { treesEarned } from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
-import { hashPassword } from './auth.js';
+import { applyPassword, assertPasswordPolicy, hashPassword } from './auth.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { sendTransactionalEmail } from './email.js';
 
@@ -163,6 +163,7 @@ export async function createUser(
   }
 
   const tmp = input.password?.trim() || tempPassword();
+  if (tmp !== 'demo') await assertPasswordPolicy(email, tmp);
   const passwordHash = await hashPassword(tmp);
 
   const user = await prisma.user.create({
@@ -449,6 +450,10 @@ export async function updateUser(
     throw new AppError('You cannot disable your own account.');
   }
 
+  if (input.password && input.password !== 'demo') {
+    await applyPassword(existing.id, existing.email, input.password);
+  }
+
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
@@ -458,7 +463,6 @@ export async function updateUser(
       factoryIds: input.factoryIds,
       siteIds: input.siteIds,
       active: input.active,
-      passwordHash: input.password ? await hashPassword(input.password) : undefined,
     },
     select: {
       id: true,

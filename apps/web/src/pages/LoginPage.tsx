@@ -18,16 +18,20 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [newPw, setNewPw] = useState('');
   const [newPw2, setNewPw2] = useState('');
   const [info, setInfo] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [needMfa, setNeedMfa] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const { user } = await authApi.login(email, password);
+      const { user } = await authApi.login(email, password, needMfa ? mfaCode : undefined);
       onLogin(user);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed');
+      const e = err as Error & { mfaRequired?: boolean };
+      setError(e.message || 'Sign in failed');
+      if (e.mfaRequired || /six-digit|authenticator/i.test(e.message)) setNeedMfa(true);
     } finally {
       setBusy(false);
     }
@@ -139,7 +143,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </div>
               <div className="fg">
                 <label>New password</label>
-                <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} required minLength={6} />
+                <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} required minLength={10} />
               </div>
               <div className="fg">
                 <label>Confirm new password</label>
@@ -185,6 +189,20 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 autoComplete="current-password"
               />
             </div>
+            {needMfa ? (
+              <div className="fg">
+                <label htmlFor="li-mfa">Authenticator code</label>
+                <input
+                  id="li-mfa"
+                  className="mono"
+                  maxLength={6}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  placeholder="000000"
+                  style={{ fontSize: '1.1rem', letterSpacing: '.2em', textAlign: 'center' }}
+                />
+              </div>
+            ) : null}
             {info ? <div style={{ color: 'var(--g2)', fontSize: '.8rem', marginBottom: '.5rem' }}>{info}</div> : null}
             {error ? (
               <div style={{ color: 'var(--rd)', fontSize: '.8rem', marginBottom: '.5rem' }}>{error}</div>
@@ -202,6 +220,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <b>Demo logins</b> (password: <span className="mono">demo</span>)
           <br />
           admin@urbeno.in — Urbeno admin
+          <br />
+          ops@urbeno.in — Urbeno admin
           <br />
           kgf@urbeno.in — Factory manager (KGF)
           <br />

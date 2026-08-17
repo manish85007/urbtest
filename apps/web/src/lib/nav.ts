@@ -16,6 +16,7 @@ export function navItems(role: SessionUser['role']): NavItem[] {
       { to: '/masters', label: 'Masters' },
       { to: '/reports', label: 'Reports' },
       { to: '/audit', label: 'Audit' },
+      { to: '/compliance', label: 'Compliance' },
     ];
   }
   if (role === 'factory') {

@@ -1,5 +1,11 @@
+import { randomBytes } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { auditHashPayload } from '../lib/audit-hash.js';
+
+function newAuditId() {
+  return 'c' + randomBytes(16).toString('hex').slice(0, 24);
+}
 
 export interface AuditEntry {
   actorEmail: string;
@@ -22,17 +28,128 @@ export interface AuditListFilters {
   limit?: number;
 }
 
+export type ChainResult =
+  | { ok: true; count: number; note: string; head?: undefined; from?: undefined; to?: undefined }
+  | { ok: true; count: number; head: string; from: string; to: string; note?: undefined }
+  | { ok: false; seq: number; reason: string };
+
+function iso(d: Date): string {
+  return d.toISOString();
+}
+
 export async function auditLog(entry: AuditEntry) {
-  return prisma.auditLog.create({
-    data: {
-      actorEmail: entry.actorEmail,
-      actorId: entry.actorId,
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(87231001)`;
+    const prev = await tx.auditLog.findFirst({ orderBy: { seq: 'desc' } });
+    const id = newAuditId();
+    const ts = new Date();
+    const seq = (prev?.seq ?? 0) + 1;
+    const details = (entry.details ?? {}) as Record<string, unknown>;
+    const prevHash = prev?.hash || 'GENESIS';
+    const hash = auditHashPayload({
+      seq,
+      id,
+      ts: iso(ts),
+      actor: entry.actorEmail,
       action: entry.action,
       entity: entry.entity,
-      entityId: entry.entityId,
-      details: (entry.details ?? {}) as Prisma.InputJsonValue,
-    },
+      entityId: entry.entityId ?? null,
+      details,
+      prevHash,
+    });
+    return tx.auditLog.create({
+      data: {
+        id,
+        seq,
+        ts,
+        actorEmail: entry.actorEmail,
+        actorId: entry.actorId,
+        action: entry.action,
+        entity: entry.entity,
+        entityId: entry.entityId,
+        details: details as Prisma.InputJsonValue,
+        prevHash,
+        hash,
+      },
+    });
   });
+}
+
+export async function verifyChain(): Promise<ChainResult> {
+  const rows = await prisma.auditLog.findMany({ orderBy: { seq: 'asc' } });
+  if (!rows.length) return { ok: true, count: 0, note: 'No entries yet' };
+  let prevHash: string | null = null;
+  for (let i = 0; i < rows.length; i++) {
+    const e = rows[i];
+    if (!e.hash) return { ok: false, seq: e.seq ?? i, reason: 'entry carries no hash' };
+    const computed = auditHashPayload({
+      seq: e.seq,
+      id: e.id,
+      ts: iso(e.ts),
+      actor: e.actorEmail,
+      action: e.action,
+      entity: e.entity,
+      entityId: e.entityId,
+      details: e.details,
+      prevHash: e.prevHash,
+    });
+    if (computed !== e.hash) {
+      return {
+        ok: false,
+        seq: e.seq ?? i,
+        reason: 'contents do not match the recorded hash — the entry was altered',
+      };
+    }
+    if (prevHash !== null && e.prevHash !== prevHash && e.prevHash !== 'ARCHIVED') {
+      return {
+        ok: false,
+        seq: e.seq ?? i,
+        reason: 'does not follow the previous entry — an entry was removed or reordered',
+      };
+    }
+    prevHash = e.hash;
+  }
+  const last = rows[rows.length - 1];
+  return {
+    ok: true,
+    count: rows.length,
+    head: last.hash.slice(0, 16),
+    from: iso(rows[0].ts),
+    to: iso(last.ts),
+  };
+}
+
+/** Recompute the entire chain from stored rows (used after schema backfill). */
+export async function rebuildAuditChain() {
+  const all = await prisma.auditLog.findMany({ orderBy: [{ seq: 'asc' }, { ts: 'asc' }, { id: 'asc' }] });
+  let prevHash = 'GENESIS';
+  let seq = 0;
+  for (const row of all) {
+    seq += 1;
+    const hash = auditHashPayload({
+      seq,
+      id: row.id,
+      ts: iso(row.ts),
+      actor: row.actorEmail,
+      action: row.action,
+      entity: row.entity,
+      entityId: row.entityId,
+      details: row.details,
+      prevHash,
+    });
+    if (row.seq !== seq || row.prevHash !== prevHash || row.hash !== hash) {
+      await prisma.auditLog.update({
+        where: { id: row.id },
+        data: { seq, prevHash, hash },
+      });
+    }
+    prevHash = hash;
+  }
+}
+
+/** Fill seq/hash on rows created before the chain existed. */
+export async function backfillAuditHashes() {
+  await rebuildAuditChain();
 }
 
 export async function listAudit(filters: AuditListFilters) {
@@ -119,6 +236,7 @@ export async function listAudit(filters: AuditListFilters) {
     limit,
     rows: rows.map((r) => ({
       id: r.id,
+      seq: r.seq,
       ts: r.ts.toISOString(),
       actorEmail: r.actorEmail,
       actorName: r.actor?.name ?? nameByEmail.get(r.actorEmail) ?? null,
@@ -126,6 +244,8 @@ export async function listAudit(filters: AuditListFilters) {
       entity: r.entity,
       entityId: r.entityId,
       details: r.details,
+      prevHash: r.prevHash,
+      hash: r.hash,
     })),
     actors: actorRows.map((a) => ({
       email: a.actorEmail,

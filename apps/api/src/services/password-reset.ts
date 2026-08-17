@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
-import { hashPassword } from './auth.js';
+import { applyPassword } from './auth.js';
+import { recordSecurityEvent } from './security-log.js';
 import { processEmailQueue, sendTransactionalEmail } from './email.js';
 
 const RESET_MINS = Number(process.env.RESET_CODE_MINS ?? 15);
@@ -40,6 +41,7 @@ export async function requestPasswordReset(emailRaw: string): Promise<{ sent: tr
     });
     await processEmailQueue(5).catch(() => undefined);
     await auditLog({ actorEmail: email, action: 'auth.reset.request', entity: 'user', entityId: email });
+    await recordSecurityEvent('auth.reset.requested', email, {});
     return { sent: true, ...(allowDemoCode() ? { demoCode: code } : {}) };
   }
 
@@ -55,9 +57,6 @@ export async function requestPasswordReset(emailRaw: string): Promise<{ sent: tr
 
 export async function confirmPasswordReset(emailRaw: string, code: string, newPassword: string) {
   const email = emailRaw.trim().toLowerCase();
-  if (!newPassword || newPassword.length < 6) {
-    throw new Error('Choose a password of at least 6 characters.');
-  }
 
   const row = await prisma.passwordReset.findFirst({
     where: { email, usedAt: null },
@@ -77,11 +76,8 @@ export async function confirmPasswordReset(emailRaw: string, code: string, newPa
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user?.active) throw new Error('No active reset request for this email. Request a new code.');
 
+  await applyPassword(user.id, user.email, newPassword);
   await prisma.$transaction([
-    prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword) },
-    }),
     prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
     prisma.session.deleteMany({ where: { userId: user.id } }),
   ]);
@@ -93,6 +89,7 @@ export async function confirmPasswordReset(emailRaw: string, code: string, newPa
     entity: 'user',
     entityId: email,
   });
+  await recordSecurityEvent('auth.password.reset', email, {});
 
   return { ok: true };
 }

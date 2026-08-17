@@ -26,6 +26,7 @@ import {
 } from '../lib/access.js';
 import { deriveInvoiceStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
+import { logSoD, sodCheck } from './compliance.js';
 import { assertFilesExist } from './file-service.js';
 import { assertCategoryCapacityOrOverride } from './category-capacity.js';
 import { sendTransactionalEmail } from './email.js';
@@ -586,6 +587,8 @@ export async function closeInvoice(
     if (daysSinceCert < 60) {
       throw new AppError('Admin force-close is only permitted 60 days after the first certificate.');
     }
+    const conflicts = sodCheck('force-close', { invCreatedBy: invoice.createdBy }, actor.email);
+    await logSoD(actor, 'force-close', conflicts, invoice.invoiceNo);
   } else if (actor.role === 'client') {
     if (actor.clientId !== invoice.submission.clientId) {
       throw new AppError('You do not have permission to close this invoice.', 403);

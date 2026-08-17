@@ -201,3 +201,73 @@ not
 > "Validation failed."
 
 Review these during UAT. They are how the system teaches its own rules.
+
+
+---
+
+## Compliance controls (v6.4)
+
+Added following the review against SOC 2 and ISO/IEC 27001. Each names the
+function that enforces it and the test that proves it. Standard references are
+given so an auditor can trace the feature to the criterion it serves.
+
+**X1 · The audit log is tamper-evident.**
+Every entry carries a hash of its own contents and of the entry before it.
+Altering, removing or reordering anything breaks the chain, and verification
+names the entry and the reason. Never let a stored flag replace this.
+`audit.log`, `audit.verifyChain` · A.8.15 / CC7.1 · `compliance_test.js`
+
+**X2 · Security events are logged apart from business activity.**
+Sign-ins, failures, lockouts, refused access, second-factor activity. High
+severity alerts administrators rather than sitting unread.
+`secLog.record`, `denyAccess` · A.8.15 / CC7.2 · `compliance_test.js`
+
+**X3 · Privileged roles require a second factor.**
+Admin and factory manager. Removing one requires a reason and logs high.
+`mfa`, `CFG.mfaRoles` · A.5.17 / CC6.1 · `compliance_test.js`
+
+**X4 · Password rules are enforced wherever a password is set.**
+Ten characters, mixed case, a digit, not the user's own name, not one of the
+last five, expiring after 180 days. One checker, used by every path.
+`pwCheck`, `pwReused`, `pwExpired` · A.5.17 / CC6.1 · `compliance_test.js`
+
+**X5 · Access is recertified every 90 days.**
+A review cannot complete while any account is undecided. Withdrawal requires a
+written reason and deactivates the account immediately.
+`compliance.startReview`, `.decideReview`, `.closeReview` · A.5.18 / CC6.2
+
+**X6 · An incident cannot be closed without a root cause and a corrective action.**
+The ISO 9001 discipline applied to security. Stops the register becoming a list
+of things that merely stopped happening.
+`compliance.updateIncident` · A.5.24–A.5.28 · `compliance_test.js`
+
+**X7 · Consent is versioned and recorded.**
+Publishing a new notice version re-prompts everyone automatically.
+`compliance.needsConsent`, `.recordConsent`, `consentGate` · DPDPA / A.5.34
+
+**X8 · A data-principal request has a 30-day deadline and cannot be closed
+without recording what was done.**
+`compliance.raiseDSR`, `.closeDSR`, `.subjectData` · DPDPA · `compliance_test.js`
+
+**X9 · Retention is tracked per record and disposal is recorded.**
+Nothing is deleted automatically — disposal is a decision, and the record of it
+is itself evidence.
+`compliance.retentionRegister`, `.recordDisposal` · A.5.33 / Rule 12(4)
+
+**X10 · Every document type carries a classification.**
+Public, internal, confidential or restricted. Device serial records are the only
+category rated restricted.
+`FILE_CLASS`, `DATA_CLASSES` · A.5.12 · `compliance_test.js`
+
+**X11 · Compliance is administrator-only.**
+The registers hold personal data and security records. Client and factory users
+are refused even if they navigate directly.
+`renderCompliance` · CC6.3 · `compliance_test.js`
+
+### In production
+
+These are application controls. The hosted build must add: server-side hashing
+with bcrypt or argon2, a real TOTP library verified server-side, audit and
+security logs written to storage the application cannot subsequently edit,
+encryption at rest and in transit, and automated backup with a tested restore.
+See `PRODUCTION-NOTES.md` and the Compliance Review document.

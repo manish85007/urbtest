@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { signIn, signOut, changePassword } from '../services/auth.js';
+import { signIn, signOut, changePassword, AuthError, startMfaEnrol, confirmMfaEnrol, disableMfa, mfaStatus } from '../services/auth.js';
 import { confirmPasswordReset, requestPasswordReset } from '../services/password-reset.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  mfaCode: z.string().optional(),
 });
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -36,7 +37,7 @@ export async function authRoutes(app: FastifyInstance) {
     checkLoginRateLimit(request.ip);
     const body = loginSchema.parse(request.body);
     try {
-      const { user, token } = await signIn(body.email, body.password);
+      const { user, token } = await signIn(body.email, body.password, body.mfaCode, request.headers['user-agent']);
       reply.setCookie(SESSION_COOKIE, token, {
         httpOnly: true,
         sameSite: 'lax',
@@ -46,7 +47,9 @@ export async function authRoutes(app: FastifyInstance) {
       });
       return { user };
     } catch (err) {
-      return reply.badRequest(err instanceof Error ? err.message : 'Login failed');
+      const message = err instanceof Error ? err.message : 'Login failed';
+      const mfaRequired = err instanceof AuthError && err.mfaRequired;
+      return reply.status(400).send({ message, error: 'Bad Request', statusCode: 400, mfaRequired });
     }
   });
 
@@ -65,7 +68,7 @@ export async function authRoutes(app: FastifyInstance) {
     const body = z
       .object({
         currentPassword: z.string().min(1),
-        newPassword: z.string().min(4),
+        newPassword: z.string().min(1),
       })
       .parse(request.body);
     try {
@@ -89,13 +92,35 @@ export async function authRoutes(app: FastifyInstance) {
       .object({
         email: z.string().email(),
         code: z.string().min(4),
-        newPassword: z.string().min(6),
+        newPassword: z.string().min(1),
       })
       .parse(request.body);
     try {
       return await confirmPasswordReset(body.email, body.code, body.newPassword);
     } catch (err) {
       return reply.badRequest(err instanceof Error ? err.message : 'Reset failed');
+    }
+  });
+
+  app.get('/auth/mfa', { preHandler: requireAuth }, async (request) => mfaStatus(request.user!));
+
+  app.post('/auth/mfa/start', { preHandler: requireAuth }, async (request) => startMfaEnrol(request.user!));
+
+  app.post('/auth/mfa/confirm', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z.object({ secret: z.string().min(8), code: z.string().min(6) }).parse(request.body);
+    try {
+      return await confirmMfaEnrol(request.user!, body.secret, body.code);
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Enrolment failed');
+    }
+  });
+
+  app.post('/auth/mfa/disable', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z.object({ reason: z.string() }).parse(request.body);
+    try {
+      return await disableMfa(request.user!, body.reason);
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Could not remove second factor');
     }
   });
 }

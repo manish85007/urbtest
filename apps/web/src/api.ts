@@ -12,7 +12,10 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message ?? 'Request failed');
+    const error = new Error(err.message ?? 'Request failed') as Error & { mfaRequired?: boolean; statusCode?: number };
+    error.mfaRequired = !!err.mfaRequired;
+    error.statusCode = err.statusCode ?? res.status;
+    throw error;
   }
   return res.json() as Promise<T>;
 }
@@ -597,10 +600,10 @@ export interface ClientDashboardReport {
 export type DashboardReport = StaffDashboardReport | ClientDashboardReport;
 
 export const authApi = {
-  login: (email: string, password: string) =>
+  login: (email: string, password: string, mfaCode?: string) =>
     api<{ user: SessionUser }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, mfaCode }),
     }),
   logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => api<{ user: SessionUser }>('/auth/me'),
@@ -628,6 +631,26 @@ export const authApi = {
     api<{ ok: boolean }>('/auth/reset', {
       method: 'POST',
       body: JSON.stringify({ email, code, newPassword }),
+    }),
+  mfaStatus: () =>
+    api<{
+      required: boolean;
+      enrolled: boolean;
+      enrolledAt: string | null;
+      passwordAgeDays: number | null;
+      passwordExpired: boolean;
+      policyText: string;
+    }>('/auth/mfa'),
+  mfaStart: () => api<{ secret: string; uri: string; required: boolean }>('/auth/mfa/start', { method: 'POST' }),
+  mfaConfirm: (secret: string, code: string) =>
+    api<{ ok: boolean; enrolled: boolean }>('/auth/mfa/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ secret, code }),
+    }),
+  mfaDisable: (reason: string) =>
+    api<{ ok: boolean; enrolled: boolean }>('/auth/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     }),
 };
 
@@ -1212,3 +1235,120 @@ export const lifecycleApi = {
       body: JSON.stringify(body),
     }),
 };
+
+export type ControlRow = {
+  ref: string;
+  nm: string;
+  state: 'ok' | 'warn' | 'fail';
+  detail: string;
+  act: string | null;
+};
+
+export const complianceApi = {
+  controls: () => api<{ controls: ControlRow[]; stats: Record<string, unknown> }>('/compliance/controls'),
+  security: (q = '') =>
+    api<{
+      rows: Array<{ id: string; ts: string; kind: string; email: string; severity: string; detail: unknown }>;
+      kinds: string[];
+    }>(`/compliance/security${q}`),
+  reviews: () =>
+    api<{
+      open: {
+        id: string;
+        ref: string;
+        startedAt: string;
+        lines: Array<{
+          email: string;
+          name: string;
+          role: string;
+          lastLoginAt: string | null;
+          decision: string | null;
+          note: string;
+        }>;
+      } | null;
+      reviews: Array<{
+        id: string;
+        ref: string;
+        status: string;
+        startedAt: string;
+        closedAt: string | null;
+        lines: Array<{ decision: string | null }>;
+      }>;
+    }>('/compliance/reviews'),
+  startReview: () => api<{ id: string; ref: string }>('/compliance/reviews', { method: 'POST' }),
+  decideReview: (id: string, email: string, decision: 'keep' | 'revoke', note?: string) =>
+    api<unknown>(`/compliance/reviews/${id}/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ email, decision, note }),
+    }),
+  closeReview: (id: string) =>
+    api<unknown>(`/compliance/reviews/${id}/close`, { method: 'POST' }),
+  incidents: () =>
+    api<{
+      incidents: Array<{
+        id: string;
+        ref: string;
+        title: string;
+        severity: string;
+        detectedAt: string;
+        status: string;
+        reportable: boolean;
+        rootCause: string;
+        action: string;
+        description: string;
+      }>;
+    }>('/compliance/incidents'),
+  raiseIncident: (body: Record<string, unknown>) =>
+    api<unknown>('/compliance/incidents', { method: 'POST', body: JSON.stringify(body) }),
+  updateIncident: (id: string, body: Record<string, unknown>) =>
+    api<unknown>(`/compliance/incidents/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  privacy: () =>
+    api<{
+      version: string;
+      accepted: number;
+      notAccepted: number;
+      openRequests: number;
+      dsrs: Array<{
+        id: string;
+        ref: string;
+        kind: string;
+        subject: string;
+        due: string;
+        status: string;
+        raisedAt: string;
+      }>;
+      retentionYears: Record<string, number>;
+    }>('/compliance/privacy'),
+  raiseDsr: (body: { kind: string; subject: string; note?: string; cid?: string }) =>
+    api<unknown>('/compliance/dsr', { method: 'POST', body: JSON.stringify(body) }),
+  closeDsr: (id: string, outcome: string) =>
+    api<unknown>(`/compliance/dsr/${id}/close`, { method: 'POST', body: JSON.stringify({ outcome }) }),
+  subject: (email: string) =>
+    api<{ found: boolean; summary: Record<string, string | number>; email: string }>(
+      `/compliance/subject?email=${encodeURIComponent(email)}`,
+    ),
+  retention: () =>
+    api<{
+      register: Array<{
+        cls: string;
+        kind: string;
+        ref: string;
+        held: string | null;
+        keep: number;
+        years: number;
+        dueFrom: string | null;
+        due: boolean;
+        ctx: string;
+      }>;
+      disposals: Array<{ id: string; ref: string; kind: string; describes: string; method: string; at: string; by: string }>;
+      years: Record<string, number>;
+    }>('/compliance/retention'),
+  dispose: (body: { kind: string; describes: string; method: string; approvedBy?: string; note?: string }) =>
+    api<unknown>('/compliance/disposals', { method: 'POST', body: JSON.stringify(body) }),
+  evidence: () => api<Record<string, unknown>>('/compliance/evidence'),
+  auditChain: () =>
+    api<{ ok: boolean; count?: number; head?: string; reason?: string; seq?: number; note?: string }>(
+      '/compliance/audit-chain',
+    ),
+};
+

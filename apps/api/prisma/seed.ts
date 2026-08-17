@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { seedLookups } from '../src/services/lookups.js';
+import { backfillAuditHashes } from '../src/services/audit.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 for (const envPath of [resolve(here, '../.env'), resolve(here, '../../../.env')]) {
@@ -78,8 +79,60 @@ async function main() {
     },
   });
 
+  const infosoft = await prisma.client.upsert({
+    where: { id: 'INFR' },
+    update: {},
+    create: {
+      id: 'INFR',
+      name: 'Infosoft Solutions',
+      city: 'Bengaluru',
+      contact: 'Meera Iyer',
+      phone: '+91 98450 20002',
+      email: 'meera@infosoft.in',
+      payTermsDays: 30,
+    },
+  });
+  const infrSite = await prisma.site.upsert({
+    where: { clientId_code: { clientId: infosoft.id, code: 'BLR' } },
+    update: {},
+    create: {
+      clientId: infosoft.id,
+      code: 'BLR',
+      name: 'Infosoft Koramangala',
+      address: 'Koramangala, Bengaluru',
+      contactName: 'Meera Iyer',
+      contactPhone: '+91 98450 20002',
+    },
+  });
+  const bharat = await prisma.client.upsert({
+    where: { id: 'BHRT' },
+    update: {},
+    create: {
+      id: 'BHRT',
+      name: 'Bharat Retail',
+      city: 'Bengaluru',
+      contact: 'Anand Desai',
+      phone: '+91 98450 30003',
+      email: 'anand@bharatretail.in',
+      payTermsDays: 45,
+    },
+  });
+  const bhrtSite = await prisma.site.upsert({
+    where: { clientId_code: { clientId: bharat.id, code: 'BLR' } },
+    update: {},
+    create: {
+      clientId: bharat.id,
+      code: 'BLR',
+      name: 'Bharat Retail HQ',
+      address: 'Whitefield, Bengaluru',
+      contactName: 'Anand Desai',
+      contactPhone: '+91 98450 30003',
+    },
+  });
+
   const users = [
-    { email: 'admin@urbeno.in', name: 'Urbeno Admin', role: UserRole.admin },
+    { email: 'admin@urbeno.in', name: 'Manish Jain', role: UserRole.admin },
+    { email: 'ops@urbeno.in', name: 'Deepa Rao', role: UserRole.admin },
     { email: 'blr@urbeno.in', name: 'Suresh Babu', role: UserRole.factory, factoryIds: ['URB-BLR'] },
     { email: 'kgf@urbeno.in', name: 'Ravi Shankar', role: UserRole.factory, factoryIds: ['URB-KGF'] },
     {
@@ -88,6 +141,27 @@ async function main() {
       role: UserRole.client,
       clientId: 'TCPL',
       siteIds: [site.id],
+    },
+    {
+      email: 'priya@techcorp.in',
+      name: 'Priya Sharma',
+      role: UserRole.client,
+      clientId: 'TCPL',
+      siteIds: [site.id],
+    },
+    {
+      email: 'meera@infosoft.in',
+      name: 'Meera Iyer',
+      role: UserRole.client,
+      clientId: 'INFR',
+      siteIds: [infrSite.id],
+    },
+    {
+      email: 'anand@bharatretail.in',
+      name: 'Anand Desai',
+      role: UserRole.client,
+      clientId: 'BHRT',
+      siteIds: [bhrtSite.id],
     },
   ];
 
@@ -442,8 +516,78 @@ async function main() {
     },
   });
 
+  await prisma.submission.upsert({
+    where: { id: 'REQ-00043' },
+    update: {},
+    create: {
+      id: 'REQ-00043',
+      clientId: infosoft.id,
+      siteId: infrSite.id,
+      ref: 'PO-INFR-001',
+      requestDate: new Date('2026-08-08'),
+      location: 'Infosoft Koramangala',
+      approxQty: 20,
+      approxWeight: 40,
+      notes: 'Infosoft demo request — used for tenancy tests',
+      createdBy: 'meera@infosoft.in',
+    },
+  });
+
+  for (const em of ['ramesh@techcorp.in', 'meera@infosoft.in'] as const) {
+    const u = await prisma.user.findUnique({ where: { email: em } });
+    const existingConsent = await prisma.consentRecord.findFirst({ where: { email: em } });
+    if (u && !existingConsent) {
+      await prisma.consentRecord.create({
+        data: { userId: u.id, email: u.email, version: '1.0', ip: 'seed' },
+      });
+    }
+  }
+
+  const existingDsr = await prisma.dsrRequest.findUnique({ where: { ref: 'DSR-0001' } });
+  if (!existingDsr) {
+    await prisma.dsrRequest.create({
+      data: {
+        ref: 'DSR-0001',
+        kind: 'access',
+        subject: 'priya@techcorp.in',
+        clientId: 'TCPL',
+        raisedBy: 'admin@urbeno.in',
+        due: new Date('2026-08-20'),
+        note: 'Seeded access request',
+        status: 'closed',
+        closedAt: new Date('2026-08-12'),
+        closedBy: 'admin@urbeno.in',
+        outcome: 'Subject-access pack emailed to the requestor.',
+      },
+    });
+  }
+
+  const existingInc = await prisma.incident.findUnique({ where: { ref: 'INC-0001' } });
+  if (!existingInc) {
+    await prisma.incident.create({
+      data: {
+        ref: 'INC-0001',
+        title: 'Failed sign-in burst on a client account',
+        severity: 'medium',
+        category: 'access',
+        detectedAt: new Date('2026-08-10'),
+        raisedBy: 'admin@urbeno.in',
+        description: 'Five failed attempts against meera@infosoft.in within the lock window.',
+        summary: 'Five failed attempts against meera@infosoft.in within the lock window.',
+        status: 'closed',
+        closedAt: new Date('2026-08-11'),
+        closedBy: 'admin@urbeno.in',
+        rootCause: 'User mistyped a newly rotated password.',
+        action: 'Account unlocked after identity check; password reset issued.',
+        reportable: false,
+      },
+    });
+  }
+
+  await backfillAuditHashes();
+
   console.log(
-    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, 3 demo requests, lookups`,
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, demo requests, lookups, v6.4 compliance registers`,
   );
 }
 

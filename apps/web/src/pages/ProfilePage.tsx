@@ -114,6 +114,11 @@ export function ProfilePage({ user }: ProfilePageProps) {
           </div>
 
           <div className="card">
+            <div className="card-ttl">Two-factor authentication</div>
+            <MfaCard />
+          </div>
+
+          <div className="card">
             <div className="card-ttl">Change password</div>
             <form className="sub-form" onSubmit={changePassword} style={{ marginTop: '.6rem', paddingTop: 0, border: 'none' }}>
               <div className="fg">
@@ -123,13 +128,17 @@ export function ProfilePage({ user }: ProfilePageProps) {
               <div className="fr2">
                 <div className="fg">
                   <label>New password</label>
-                  <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={4} />
+                  <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={10} />
                 </div>
                 <div className="fg">
                   <label>Confirm new password</label>
-                  <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={4} />
+                  <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={10} />
                 </div>
               </div>
+              <p className="dim" style={{ fontSize: '.78rem' }}>
+                10 characters or more, an upper-case letter, a lower-case letter, a digit. It cannot repeat your last 5
+                passwords.
+              </p>
               {msg ? <p className="ok-msg">{msg}</p> : null}
               {error ? <p className="error">{error}</p> : null}
               <button type="submit" className="btn bp">
@@ -197,6 +206,103 @@ export function ProfilePage({ user }: ProfilePageProps) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MfaCard() {
+  const [status, setStatus] = useState<Awaited<ReturnType<typeof authApi.mfaStatus>> | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [reason, setReason] = useState('');
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+
+  async function load() {
+    setStatus(await authApi.mfaStatus());
+  }
+  useEffect(() => {
+    load().catch(() => undefined);
+  }, []);
+
+  return (
+    <div style={{ marginTop: '.5rem' }}>
+      {status?.required ? <span className="badge bg-am">Required for your role</span> : null}
+      <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0' }}>
+        {status?.enrolled
+          ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}.`
+          : 'Not enrolled. Administrators and factory managers should set this up.'}
+      </p>
+      {status?.passwordExpired ? (
+        <p className="error">Your password is past the rotation period.</p>
+      ) : status?.passwordAgeDays != null ? (
+        <p className="dim">Password age: {status.passwordAgeDays} days.</p>
+      ) : null}
+      {secret ? (
+        <div>
+          <p className="dim">Add this secret to your authenticator app, then enter the current code.</p>
+          <div className="mono" style={{ fontWeight: 700, margin: '.4rem 0' }}>
+            {secret}
+          </div>
+          <input
+            className="mono"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="000000"
+          />
+          <button
+            type="button"
+            className="btn bp bsm"
+            onClick={() =>
+              authApi
+                .mfaConfirm(secret, code)
+                .then(() => {
+                  setSecret(null);
+                  setMsg('✓ Two-factor enabled');
+                  return load();
+                })
+                .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
+            }
+          >
+            Confirm
+          </button>
+        </div>
+      ) : status?.enrolled ? (
+        <div>
+          <input placeholder="Reason for removal" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <button
+            type="button"
+            className="btn bs bsm"
+            onClick={() =>
+              authApi
+                .mfaDisable(reason)
+                .then(() => {
+                  setMsg('Second factor removed');
+                  return load();
+                })
+                .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
+            }
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="btn bp bsm"
+          onClick={() =>
+            authApi
+              .mfaStart()
+              .then((r) => setSecret(r.secret))
+              .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
+          }
+        >
+          Set up two-factor
+        </button>
+      )}
+      {msg ? <p className="ok-msg">{msg}</p> : null}
+      {error ? <p className="error">{error}</p> : null}
     </div>
   );
 }

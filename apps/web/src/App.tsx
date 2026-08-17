@@ -16,6 +16,7 @@ import { CapacityPage } from './pages/CapacityPage';
 import { MastersPage } from './pages/MastersPage';
 import { ClientDetailPage } from './pages/ClientDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { CompliancePage } from './pages/CompliancePage';
 import { Shell } from './components/Shell';
 import { LegalConsentGate } from './components/LegalConsentGate';
 
@@ -128,6 +129,14 @@ export function App() {
           element={
             <AdminOnly user={user}>
               <AuditPage />
+            </AdminOnly>
+          }
+        />
+        <Route
+          path="/compliance"
+          element={
+            <AdminOnly user={user}>
+              <CompliancePage />
             </AdminOnly>
           }
         />

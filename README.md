@@ -68,6 +68,7 @@ Phases **1–9** of the production build plan are implemented in this branch:
 - ✅ Email queue + scheduled payment/SLA reminders
 - ✅ Reporting dashboard + sustainability metrics
 - ✅ DPDPA legal consent, audit log, security headers
+- ✅ v6.4 compliance controls: hash-chained audit, security log, MFA, password policy, access review, incidents, DSR, retention
 
 ## Critical rule from the build plan
 

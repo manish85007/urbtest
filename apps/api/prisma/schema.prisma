@@ -101,6 +101,13 @@ model User {
   factoryIds   String[] @default([]) @map("factory_ids")
   siteIds      String[] @default([]) @map("site_ids")
   passwordHash String   @map("password_hash")
+  passwordSetAt DateTime? @map("password_set_at")
+  mustReset    Boolean  @default(false) @map("must_reset")
+  mfaSecret    String?  @map("mfa_secret")
+  mfaAt        DateTime? @map("mfa_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+  failedLoginCount Int  @default(0) @map("failed_login_count")
+  lockedUntil  DateTime? @map("locked_until")
   active       Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -109,8 +116,23 @@ model User {
   notifications Notification[]
   auditLogs    AuditLog[] @relation("AuditActor")
   legalAcceptances LegalAcceptance[]
+  passwordHistory PasswordHistory[]
+  consents     ConsentRecord[]
+  reviewLines  AccessReviewLine[]
 
   @@map("users")
+}
+
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("password_history")
 }
 
 model Session {
@@ -425,6 +447,7 @@ model StoredFile {
 
 model AuditLog {
   id         String   @id @default(cuid())
+  seq        Int      @unique
   ts         DateTime @default(now())
   actorEmail String   @map("actor_email")
   actorId    String?  @map("actor_id")
@@ -432,12 +455,140 @@ model AuditLog {
   entity     String
   entityId   String?  @map("entity_id")
   details    Json     @default("{}")
+  prevHash   String   @map("prev_hash")
+  hash       String
 
   actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
 
   @@index([ts])
   @@index([entity, entityId])
   @@map("audit_log")
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  ts        DateTime @default(now())
+  kind      String
+  email     String
+  severity  String
+  detail    Json     @default("{}")
+  userAgent String?  @map("user_agent")
+
+  @@index([ts])
+  @@index([kind])
+  @@index([severity])
+  @@map("security_events")
+}
+
+model ConsentRecord {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  email     String
+  version   String
+  at        DateTime @default(now())
+  ip        String?
+  withdrawn Boolean  @default(false)
+  reason    String?
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, at])
+  @@map("consent_records")
+}
+
+model DsrRequest {
+  id        String    @id @default(cuid())
+  ref       String    @unique
+  kind      String
+  subject   String
+  clientId  String?   @map("client_id") @db.VarChar(4)
+  raisedAt  DateTime  @default(now()) @map("raised_at")
+  raisedBy  String?   @map("raised_by")
+  due       DateTime  @db.Date
+  note      String    @default("")
+  status    String    @default("open")
+  closedAt  DateTime? @map("closed_at")
+  closedBy  String?   @map("closed_by")
+  outcome   String    @default("")
+
+  @@index([status, due])
+  @@map("dsr_requests")
+}
+
+model Incident {
+  id          String    @id @default(cuid())
+  ref         String    @unique
+  title       String
+  severity    String
+  category    String?
+  detectedAt  DateTime  @map("detected_at") @db.Date
+  raisedBy    String?   @map("raised_by")
+  raisedAt    DateTime  @default(now()) @map("raised_at")
+  description String    @default("")
+  summary     String    @default("")
+  affected    String    @default("")
+  status      String    @default("open")
+  containedAt DateTime? @map("contained_at")
+  closedAt    DateTime? @map("closed_at")
+  closedBy    String?   @map("closed_by")
+  rootCause   String    @default("") @map("root_cause")
+  action      String    @default("")
+  reportable  Boolean   @default(false)
+  reportedAt  DateTime? @map("reported_at")
+
+  @@index([status])
+  @@map("incidents")
+}
+
+model AccessReview {
+  id        String    @id @default(cuid())
+  ref       String    @unique
+  startedAt DateTime  @default(now()) @map("started_at")
+  startedBy String    @map("started_by")
+  status    String    @default("open")
+  closedAt  DateTime? @map("closed_at")
+  closedBy  String?   @map("closed_by")
+  lines     AccessReviewLine[]
+
+  @@index([status])
+  @@map("access_reviews")
+}
+
+model AccessReviewLine {
+  id          String    @id @default(cuid())
+  reviewId    String    @map("review_id")
+  userId      String?   @map("user_id")
+  email       String
+  name        String
+  role        String
+  clientId    String?   @map("client_id")
+  siteIds     String[]  @default([]) @map("site_ids")
+  factoryIds  String[]  @default([]) @map("factory_ids")
+  lastLoginAt DateTime? @map("last_login_at")
+  decision    String?
+  note        String    @default("")
+  decidedAt   DateTime? @map("decided_at")
+  decidedBy   String?   @map("decided_by")
+
+  review      AccessReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([reviewId, email])
+  @@map("access_review_lines")
+}
+
+model DisposalRecord {
+  id          String   @id @default(cuid())
+  ref         String   @unique
+  kind        String
+  describes   String
+  method      String
+  at          DateTime @default(now())
+  by          String
+  approvedBy  String   @default("") @map("approved_by")
+  note        String   @default("")
+
+  @@map("disposal_records")
 }
 
 model Notification {

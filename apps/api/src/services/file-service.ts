@@ -5,6 +5,8 @@ import { isMimeAllowed, maxBytesForKind, maxMbForKind } from '../lib/file-limits
 import { prisma } from '../lib/prisma.js';
 import { getStorage } from '../lib/storage.js';
 import { auditLog } from './audit.js';
+import { recordSecurityEvent } from './security-log.js';
+import { FILE_CLASS } from '@urb-tectrack/shared';
 
 export interface UploadInput {
   filename: string;
@@ -75,6 +77,9 @@ export async function readFileBlob(actor: SessionUser, fileId: string) {
   if (!file) throw new AppError('File not found.', 404);
 
   const blob = await getStorage().read(file.storageKey);
+  if (FILE_CLASS[file.kind] === 'restricted') {
+    await recordSecurityEvent('access.restricted', actor.email, { ref: file.name, cls: 'restricted' });
+  }
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
