@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getPayStatus, formatINR, rupeesToPaise } from '@urb-tectrack/shared';
-import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetail } from '../api';
+import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetail, type VehicleDetail } from '../api';
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
@@ -16,7 +16,7 @@ import { fmtDate, fmtTS, num } from '../lib/format';
 type StepModal =
   | { kind: 'ack' }
   | { kind: 'reject' }
-  | { kind: 'vehicle' }
+  | { kind: 'vehicle'; vehicleId?: string }
   | { kind: 'weigh'; vehicleId: string }
   | { kind: 'invoice' }
   | { kind: 'edit' };
@@ -90,6 +90,10 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const allWeighed = sub.vehicles.length > 0 && sub.vehicles.every((v) => v.weighment);
   const weighTarget =
     step?.kind === 'weigh' ? sub.vehicles.find((v) => v.id === step.vehicleId) : unweighed[0];
+  const vehicleTarget =
+    step?.kind === 'vehicle' && step.vehicleId
+      ? sub.vehicles.find((v) => v.id === step.vehicleId)
+      : undefined;
   const showResubmit = user.role === 'client' && stage === 1 && !!sub.rejectNote;
 
   return (
@@ -186,6 +190,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             user={user}
             netKg={netKg}
             onAddVehicle={() => setStep({ kind: 'vehicle' })}
+            onEditVehicle={(vehicleId) => setStep({ kind: 'vehicle', vehicleId })}
             onWeighVehicle={(vehicleId) => setStep({ kind: 'weigh', vehicleId })}
           />
 
@@ -223,6 +228,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 <InvoiceLifecyclePanel
                   invoice={activeInv}
                   vehicles={sub.vehicles}
+                  lineItems={sub.items ?? []}
                   payTermsDays={sub.client.payTermsDays ?? 30}
                   user={user}
                   disabled={busy}
@@ -322,17 +328,26 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
 
       {step?.kind === 'vehicle' ? (
         <Modal
-          title={`Assign Vehicle — ${sub.id}`}
+          title={
+            vehicleTarget
+              ? `Edit Vehicle — ${vehicleTarget.registration}`
+              : `Assign Vehicle — ${sub.id}`
+          }
           onClose={() => setStep(null)}
-          okLabel="Assign vehicle"
+          okLabel={vehicleTarget ? 'Save Vehicle' : 'Assign vehicle'}
           form="assign-vehicle-form"
           busy={busy}
           wide
         >
           <AssignVehicleForm
             formId="assign-vehicle-form"
+            vehicle={vehicleTarget}
             disabled={busy}
-            onAssign={(body) => act(() => lifecycleApi.addVehicle(sub.id, body), 'Vehicle assigned.')}
+            onAssign={(body) =>
+              vehicleTarget
+                ? act(() => lifecycleApi.updateVehicle(vehicleTarget.id, body), 'Vehicle updated.')
+                : act(() => lifecycleApi.addVehicle(sub.id, body), 'Vehicle assigned.')
+            }
           />
         </Modal>
       ) : null}
@@ -546,12 +561,14 @@ function VehicleCard({
   user,
   netKg,
   onAddVehicle,
+  onEditVehicle,
   onWeighVehicle,
 }: {
   sub: SubmissionDetail;
   user: SessionUser;
   netKg: number;
   onAddVehicle: () => void;
+  onEditVehicle: (vehicleId: string) => void;
   onWeighVehicle: (vehicleId: string) => void;
 }) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
@@ -564,6 +581,7 @@ function VehicleCard({
   if (!sub.vehicles.length && stage < 3) return null;
 
   const canAdd = isStaff && stage >= 3 && stage <= 5;
+  const canEditVehicle = isStaff && !sub.closedAt;
 
   return (
     <div className="card" id="assign-vehicle">
@@ -598,6 +616,11 @@ function VehicleCard({
                   </span>
                 ) : null}
                 <div className="spacer" />
+                {canEditVehicle ? (
+                  <button type="button" className="btn bs bsm" onClick={() => onEditVehicle(v.id)}>
+                    Edit vehicle
+                  </button>
+                ) : null}
                 {isAdmin && !w && stage >= 4 && stage <= 5 ? (
                   <button type="button" className="btn bp bsm" onClick={() => onWeighVehicle(v.id)}>
                     Record Weighment
@@ -676,6 +699,21 @@ function VehicleCard({
                     ))}
                   </div>
                 </>
+              ) : null}
+              {v.changeRemark ? (
+                <div
+                  style={{
+                    background: 'var(--am2)',
+                    border: '1px solid #fcd34d',
+                    borderRadius: 8,
+                    padding: '.4rem .65rem',
+                    fontSize: '.78rem',
+                    color: 'var(--g2)',
+                    marginBottom: '.4rem',
+                  }}
+                >
+                  <b style={{ color: 'var(--am)' }}>Vehicle change:</b> {v.changeRemark}
+                </div>
               ) : null}
               {w?.manual && w.reason ? (
                 <div
@@ -1209,9 +1247,11 @@ function AssignVehicleForm({
   disabled,
   onAssign,
   formId,
+  vehicle,
 }: {
   disabled: boolean;
   formId?: string;
+  vehicle?: VehicleDetail;
   onAssign: (body: {
     registration: string;
     vehicleType: string;
@@ -1219,19 +1259,28 @@ function AssignVehicleForm({
     driverPhone: string;
     logisticsPartner?: string;
     expectedAt?: string;
+    changeRemark?: string;
     team: Array<{ name: string; role: string; phone: string }>;
   }) => void;
 }) {
   const vehicleTypes = useLookups('vehicleType');
   const logistics = useLookups('logistics');
   const teamRoles = useLookups('teamRole');
-  const [registration, setRegistration] = useState('');
-  const [vehicleType, setVehicleType] = useState('VT2');
-  const [driverName, setDriverName] = useState('');
-  const [driverPhone, setDriverPhone] = useState('');
-  const [partner, setPartner] = useState('');
-  const [expectedAt, setExpectedAt] = useState(localDateTimeValue);
-  const [team, setTeam] = useState<Array<{ name: string; role: string; phone: string }>>([]);
+  const [registration, setRegistration] = useState(vehicle?.registration ?? '');
+  const [vehicleType, setVehicleType] = useState(vehicle?.vehicleType ?? 'VT2');
+  const [driverName, setDriverName] = useState(vehicle?.driverName ?? '');
+  const [driverPhone, setDriverPhone] = useState(vehicle?.driverPhone ?? '');
+  const [partner, setPartner] = useState(vehicle?.logisticsPartner ?? '');
+  const [expectedAt, setExpectedAt] = useState(
+    vehicle?.expectedAt ? localDateTimeValue(new Date(vehicle.expectedAt)) : localDateTimeValue(),
+  );
+  const [remark, setRemark] = useState(vehicle?.changeRemark ?? '');
+  const [team, setTeam] = useState<Array<{ name: string; role: string; phone: string }>>(() => {
+    if (!vehicle?.team?.length) return [];
+    return vehicle.team.filter(
+      (t, i) => !(i === 0 && t.name === vehicle.driverName),
+    );
+  });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -1260,6 +1309,16 @@ function AssignVehicleForm({
           setError('Every team member needs a name, role and 10-digit phone.');
           return;
         }
+        const identityChanged =
+          !!vehicle &&
+          (registration.trim().toUpperCase() !== vehicle.registration.toUpperCase() ||
+            vehicleType !== vehicle.vehicleType);
+        if (identityChanged && !remark.trim()) {
+          setError(
+            'Record a remark when changing the vehicle number or type (for example a breakdown or replacement).',
+          );
+          return;
+        }
         onAssign({
           registration,
           vehicleType,
@@ -1267,6 +1326,7 @@ function AssignVehicleForm({
           driverPhone,
           logisticsPartner: partner || undefined,
           expectedAt: expectedAt || undefined,
+          changeRemark: remark.trim() || undefined,
           team: [
             { name: driverName, role: teamRoles[0]?.id ?? 'TR1', phone: driverPhone },
             ...extra,
@@ -1274,9 +1334,11 @@ function AssignVehicleForm({
         });
       }}
     >
-      <h3>Assign vehicle</h3>
+      <h3>{vehicle ? 'Edit vehicle' : 'Assign vehicle'}</h3>
       <p className="dim" style={{ fontSize: '.82rem', margin: '-.3rem 0 .7rem' }}>
-        Assign as many vehicles as this pickup needs. Each vehicle carries its own team and weighment.
+        {vehicle
+          ? 'Update registration or type if the vehicle broke down or was replaced. A remark is required for those changes.'
+          : 'Assign as many vehicles as this pickup needs. Each vehicle carries its own team and weighment.'}
       </p>
       <div className="fr2">
         <div className="fg">
@@ -1326,6 +1388,18 @@ function AssignVehicleForm({
         </div>
         <PhoneField label="Driver phone" value={driverPhone} onChange={setDriverPhone} required />
       </div>
+      {vehicle ? (
+        <div className="fg">
+          <label htmlFor="vh-remark">Change remark</label>
+          <textarea
+            id="vh-remark"
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            rows={2}
+            placeholder="Required if registration or vehicle type changes — e.g. breakdown at site, replacement vehicle KA-…"
+          />
+        </div>
+      ) : null}
       <div className="section-hd" style={{ marginTop: '.2rem' }}>
         Pickup team <span className="hint">every extra person on this vehicle, with phone</span>
       </div>
@@ -1382,7 +1456,7 @@ function AssignVehicleForm({
       {error ? <p className="error">{error}</p> : null}
       {formId ? null : (
         <button type="submit" className="btn primary" disabled={disabled} style={{ marginTop: '.6rem' }}>
-          Assign vehicle
+          {vehicle ? 'Save Vehicle' : 'Assign vehicle'}
         </button>
       )}
     </form>

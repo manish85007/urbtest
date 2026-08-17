@@ -3,19 +3,36 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { canSeeMrn, isStaff } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { loadInvoiceForActor } from '../lib/access.js';
-import { buildTextPdf } from '../lib/simple-pdf.js';
+import { buildTextPdf, type PdfLetterhead } from '../lib/simple-pdf.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
 import { getImpactReport, getRegisterReport, type RegisterType } from './reporting-service.js';
+import { getCompanyProfile } from './settings.js';
+import { readStoredFileSilent } from './file-service.js';
 
-const CO = {
-  name: process.env.URBENO_NAME ?? 'Urbeno Private Limited',
-  brand: 'Urb TecTrack',
-  gst: process.env.URBENO_GST ?? '29AABCU1234R1ZX',
-  cpcb: process.env.URBENO_CPCB ?? 'CPCB/EPR/2022/KA/00817',
-  kspcb: process.env.URBENO_KSPCB ?? 'KSPCB/HWM/AUTH/2024-27/1142',
-  r2: process.env.URBENO_R2 ?? 'R2V3-2024-IN-0341',
-};
+async function letterheadFromProfile(): Promise<{ co: Awaited<ReturnType<typeof getCompanyProfile>>; letterhead: PdfLetterhead }> {
+  const co = await getCompanyProfile();
+  const letterhead: PdfLetterhead = {
+    name: co.name,
+    brand: co.brand,
+    address: co.address,
+    gst: co.gst,
+    cin: co.cin,
+    phone: co.phone,
+    email: co.email,
+    cpcb: co.cpcb,
+    kspcb: co.kspcb,
+  };
+  if (co.logoFileId) {
+    const stored = await readStoredFileSilent(co.logoFileId);
+    if (stored && /jpeg|jpg/i.test(stored.file.mimeType)) {
+      letterhead.logoJpeg = stored.buffer;
+    } else if (stored && stored.buffer[0] === 0xff && stored.buffer[1] === 0xd8) {
+      letterhead.logoJpeg = stored.buffer;
+    }
+  }
+  return { co, letterhead };
+}
 
 function fmt(d: Date | null | undefined): string {
   return d ? d.toISOString().slice(0, 10) : '—';
@@ -34,6 +51,10 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
   const factory = await prisma.factorySite.findUnique({ where: { id: mrn.factoryId } });
   const sub = invoice.submission;
   const vehs = sub.vehicles.filter((v) => invoice.vehicleIds.includes(v.id) || !invoice.vehicleIds.length);
+  const { co, letterhead } = await letterheadFromProfile();
+  const mats = Array.isArray(mrn.materials)
+    ? (mrn.materials as Array<{ n?: string; q?: number; w?: number }>)
+    : [];
 
   const buffer = buildTextPdf(
     'MATERIAL RECEIPT NOTE',
@@ -62,6 +83,22 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
         },
       },
       {
+        heading: 'MATERIALS RECEIVED',
+        table: {
+          headers: ['Description', 'Qty', 'Weight kg'],
+          rows: mats.length
+            ? mats.map((m) => [String(m.n || '—'), String(m.q ?? 0), num(m.w)])
+            : [['—', '—', '—']],
+        },
+      },
+      {
+        heading: 'GATE SIGNATURES',
+        pairs: [
+          ['Driver', mrn.driverSign || '—', 'Factory Manager', mrn.managerSign || '—'],
+          ['Security Officer', mrn.securitySign || '—', '', ''],
+        ],
+      },
+      {
         heading: 'NOTES',
         lines: [
           mrn.note || 'No remarks.',
@@ -70,7 +107,8 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
         ],
       },
     ],
-    `${mrn.mrnNo} · ${CO.name} · ${factory?.kspcbConsent || CO.kspcb}`,
+    `${mrn.mrnNo} · ${co.name} · ${factory?.kspcbConsent || co.kspcb}`,
+    letterhead,
   );
 
   await auditLog({
@@ -98,6 +136,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const pl = Number(recy.recoveryPl);
   const pcb = Number(recy.recoveryPcb);
   const sum = fe + nfe + pl + pcb;
+  const { co, letterhead } = await letterheadFromProfile();
 
   const buffer = buildTextPdf(
     'FORM 6 — MANIFEST FOR E-WASTE',
@@ -109,6 +148,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ['Manifest Number', recy.form6No, 'Processing Date', fmt(recy.processedAt)],
           ['Request ID', sub.id, 'Invoice Number', invoice.invoiceNo],
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'MRN Reference', invoice.mrn?.mrnNo || '—'],
+          ['Devices destroyed', String(recy.devicesDestroyed ?? 0), '', ''],
         ],
       },
       {
@@ -121,9 +161,10 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
       {
         heading: 'RECEIVER — AUTHORIZED RECYCLER',
         pairs: [
-          ['Facility', factory?.name || CO.name, 'Facility Code', recy.factoryId],
-          ['CPCB / EPR', factory?.cpcbEpr || CO.cpcb, 'KSPCB Consent', factory?.kspcbConsent || CO.kspcb],
-          ['GST', factory?.gstin || CO.gst, 'R2v3', CO.r2],
+          ['Facility', factory?.name || co.name, 'Facility Code', recy.factoryId],
+          ['CPCB / EPR', factory?.cpcbEpr || co.cpcb, 'KSPCB Consent', factory?.kspcbConsent || co.kspcb],
+          ['GST', factory?.gstin || co.gst, 'CIN', co.cin || '—'],
+          ['Phone', co.phone, 'R2v3', co.r2],
         ],
       },
       {
@@ -151,7 +192,8 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
         lines: [`Serial records on file: ${recy.serials.length}`],
       },
     ],
-    `Form 6 ${recy.form6No} · Invoice ${invoice.invoiceNo} · ${CO.name}`,
+    `Form 6 ${recy.form6No} · Invoice ${invoice.invoiceNo} · ${co.name}`,
+    letterhead,
   );
 
   await auditLog({
@@ -182,6 +224,7 @@ export async function impactPdf(
     actor.role === 'client'
       ? (await prisma.client.findUnique({ where: { id: actor.clientId ?? '' } }))?.name ?? 'Client'
       : 'Urbeno portfolio';
+  const co = await getCompanyProfile();
 
   const buffer = buildTextPdf(
     'SUSTAINABILITY IMPACT CERTIFICATE',
@@ -208,7 +251,7 @@ export async function impactPdf(
         ],
       },
     ],
-    `${CO.name} · ${CO.brand} · generated by Urb TecTrack`,
+    `${co.name} · ${co.brand} · generated by Urb TecTrack`,
   );
 
   await auditLog({
@@ -227,6 +270,7 @@ export async function methodologyPdf(actor?: SessionUser): Promise<{ filename: s
   const fy = getFY(new Date());
   const daily = (S.co2PerTree / 365).toFixed(6);
   const today = new Date().toISOString().slice(0, 10);
+  const co = await getCompanyProfile();
 
   const buffer = buildTextPdf(
     'SUSTAINABILITY METRICS — METHODOLOGY',
@@ -308,12 +352,12 @@ export async function methodologyPdf(actor?: SessionUser): Promise<{ filename: s
         lines: [
           'Every figure decomposes to individual consignments. For any number in any report, the underlying records — weighment slip, MRN, Form 6 manifest, Certificate of Destruction, closure acknowledgement and, for trees, the dated growth photographs — are retained in Urb TecTrack and can be produced on request. Compliance records are held for a minimum of five years and certificates for ten, in line with Rule 12(4) of the E-Waste (Management) Rules, 2022.',
           'Where an assurance provider wishes to sample, we recommend selecting consignments at random from the Certificate Log report for the period and tracing each back through the portal. Every document referenced is downloadable.',
-          `Prepared by — ${CO.name} · ${CO.cpcb}`,
+          `Prepared by — ${co.name} · ${co.cpcb}`,
           `Version / Date — v1 · ${today}`,
         ],
       },
     ],
-    `Sustainability methodology v1 · ${CO.name} · applies to all impact figures in Urb TecTrack`,
+    `Sustainability methodology v1 · ${co.name} · applies to all impact figures in Urb TecTrack`,
   );
 
   if (actor) {
@@ -337,6 +381,7 @@ export async function registerPdf(
 ): Promise<{ filename: string; buffer: Buffer }> {
   const report = await getRegisterReport(actor, type, period, filters);
   if (!report.rows.length) throw new AppError('Nothing to export for this period.');
+  const co = await getCompanyProfile();
 
   const shown = report.rows.slice(0, 80).map((r) => r.map((c) => String(c ?? '')));
   const buffer = buildTextPdf(
@@ -351,7 +396,7 @@ export async function registerPdf(
         ? [{ heading: 'NOTE', lines: [`Showing 80 of ${report.total} rows. Export CSV for the full set.`] }]
         : []),
     ],
-    `${report.title} · ${report.periodLabel} · ${CO.name}`,
+    `${report.title} · ${report.periodLabel} · ${co.name}`,
   );
 
   await auditLog({

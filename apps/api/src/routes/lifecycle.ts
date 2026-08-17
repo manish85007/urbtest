@@ -8,7 +8,7 @@ import {
   rejectSubmission,
   updateSubmission,
 } from '../services/submission-service.js';
-import { addVehicle, recordWeighment } from '../services/vehicle-service.js';
+import { addVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 import {
   addPayment,
   closeInvoice,
@@ -54,6 +54,7 @@ const vehicleSchema = z.object({
   driverName: z.string().min(1),
   driverPhone: z.string().min(1),
   expectedAt: z.string().optional(),
+  changeRemark: z.string().optional(),
   team: z
     .array(
       z.object({
@@ -156,6 +157,16 @@ export async function lifecycleRoutes(app: FastifyInstance) {
     }
   });
 
+  app.patch('/vehicles/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = vehicleSchema.parse(request.body);
+      return await updateVehicle(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
   app.post('/vehicles/:id/weighment', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
@@ -215,6 +226,8 @@ export async function lifecycleRoutes(app: FastifyInstance) {
             .optional(),
           condition: z.string().optional(),
           note: z.string().optional(),
+          gatePhotoIds: z.array(z.string()).optional(),
+          materialPhotoIds: z.array(z.string()).optional(),
         })
         .parse(request.body);
       return await createMrn(request.user!, id, body);
@@ -231,6 +244,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           processedAt: z.string(),
           factoryId: z.string().optional(),
           divertedPct: z.number().optional(),
+          devicesDestroyed: z.number().optional(),
           categories: z
             .array(
               z.object({
@@ -264,7 +278,14 @@ export async function lifecycleRoutes(app: FastifyInstance) {
         ...body,
         categories: body.categories.map((c) => ({
           ...c,
-          groupCode: c.groupCode as 'ITEW',
+          groupCode: c.groupCode as
+            | 'ITEW'
+            | 'CEEW'
+            | 'LSEEW'
+            | 'EETW'
+            | 'TLSEW'
+            | 'MDW'
+            | 'LIW',
         })),
       });
     } catch (err) {

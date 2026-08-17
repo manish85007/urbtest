@@ -200,6 +200,7 @@ model Vehicle {
   driverName   String   @map("driver_name")
   driverPhone  String   @map("driver_phone")
   expectedAt   DateTime? @map("expected_at") @db.Date
+  changeRemark String?  @map("change_remark")
   createdAt    DateTime @default(now()) @map("created_at")
 
   submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -318,6 +319,8 @@ model Mrn {
   materials    Json     @default("[]")
   condition    String   @default("Good")
   note         String?
+  gatePhotoIds     String[] @default([]) @map("gate_photo_ids")
+  materialPhotoIds String[] @default([]) @map("material_photo_ids")
   createdAt    DateTime @default(now()) @map("created_at")
 
   invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -333,6 +336,7 @@ model Recycling {
   processedAt  DateTime @map("processed_at") @db.Date
   factoryId    String   @map("factory_id") @db.VarChar(16)
   divertedPct  Decimal  @default(0) @map("diverted_pct") @db.Decimal(5, 2)
+  devicesDestroyed Int  @default(0) @map("devices_destroyed")
   recoveryFe   Decimal  @default(0) @map("recovery_fe") @db.Decimal(12, 3)
   recoveryNfe  Decimal  @default(0) @map("recovery_nfe") @db.Decimal(12, 3)
   recoveryPl   Decimal  @default(0) @map("recovery_pl") @db.Decimal(12, 3)

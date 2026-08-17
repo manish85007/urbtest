@@ -69,10 +69,15 @@ test.describe('full lifecycle', () => {
     await login(page, 'blr@urbeno.in');
     await page.goto(`/requests/${submissionId}`);
     await page.getByRole('button', { name: 'Create MRN' }).click();
+    await page.getByLabel('Security Officer').fill('Gate Security');
+    const mrnFiles = page.locator('.modal input[type="file"]');
+    await mrnFiles.nth(0).setInputFiles(photo);
+    await mrnFiles.nth(1).setInputFiles(photo);
+    await expect(page.locator('.modal').getByText(/seed|sample|\.jpg/i).first()).toBeVisible({ timeout: 15_000 });
     await page.locator('.modal').getByRole('button', { name: 'Record goods receipt (MRN)' }).click();
     await expect(page.getByText('MRN created.')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Process & Issue Form 6' }).click();
-    await expect(page.locator('#recy-form select').nth(1).locator('option')).not.toHaveCount(0);
+    await expect(page.locator('#recy-form select.rc-c')).not.toHaveValue('', { timeout: 15_000 });
     await page.locator('.modal').getByRole('button', { name: 'Issue Form 6' }).click();
     await expect(page.getByText('Recycling recorded.')).toBeVisible({ timeout: 15_000 });
 

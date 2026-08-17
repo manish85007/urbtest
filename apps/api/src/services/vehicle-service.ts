@@ -23,6 +23,7 @@ export interface AddVehicleInput {
   driverPhone: string;
   expectedAt?: string;
   team: TeamMemberInput[];
+  changeRemark?: string;
 }
 
 export interface WeighmentInput {
@@ -188,6 +189,87 @@ export async function recordWeighment(
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);
   return { weighment, submission: withDerivedStages(refreshed) };
+}
+
+export async function updateVehicle(
+  actor: SessionUser,
+  vehicleId: string,
+  input: AddVehicleInput,
+) {
+  requireStaff(actor);
+
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: vehicleId },
+    include: { submission: true, team: true },
+  });
+  if (!vehicle) throw new AppError('Vehicle not found', 404);
+
+  const sub = await loadSubmissionForActor(vehicle.submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is closed — vehicle details can no longer be changed.');
+  }
+
+  if (!input.team?.length) {
+    throw new AppError('Every vehicle needs at least one team member with name, role and phone.');
+  }
+
+  const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
+  for (const member of input.team) {
+    if (!member.name?.trim() || !member.role?.trim() || !member.phone?.trim()) {
+      throw new AppError('Every team member needs a name, role and phone.');
+    }
+    requireMobile(member.phone, 'Team member phone');
+  }
+
+  const nextReg = input.registration.trim().toUpperCase();
+  const regChanged = nextReg !== vehicle.registration;
+  const typeChanged = input.vehicleType !== vehicle.vehicleType;
+  const remark = input.changeRemark?.trim() || '';
+  if ((regChanged || typeChanged) && !remark) {
+    throw new AppError(
+      'Record a remark when changing the vehicle number or type (for example a breakdown or replacement).',
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicleTeamMember.deleteMany({ where: { vehicleId } });
+    await tx.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        registration: nextReg,
+        vehicleType: input.vehicleType,
+        logisticsPartner: input.logisticsPartner ?? null,
+        driverName: input.driverName.trim(),
+        driverPhone,
+        expectedAt: input.expectedAt ? new Date(input.expectedAt) : null,
+        changeRemark: remark || vehicle.changeRemark,
+        team: {
+          create: input.team.map((m) => ({
+            name: m.name.trim(),
+            role: m.role.trim(),
+            phone: requireMobile(m.phone, 'Team member phone'),
+          })),
+        },
+      },
+    });
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'veh.update',
+    entity: 'vehicle',
+    entityId: vehicleId,
+    details: {
+      submissionId: sub.id,
+      from: { reg: vehicle.registration, type: vehicle.vehicleType },
+      to: { reg: nextReg, type: input.vehicleType },
+      remark: remark || null,
+    },
+  });
+
+  const refreshed = await loadSubmissionForActor(sub.id, actor);
+  return { submission: withDerivedStages(refreshed) };
 }
 
 function requireMobile(raw: string, label: string): string {

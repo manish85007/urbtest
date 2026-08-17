@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   formatINR,
   getPayStatus,
@@ -10,7 +10,6 @@ import {
   type PayStatusKey,
 } from '@urb-tectrack/shared';
 import {
-  dataApi,
   filesApi,
   lifecycleApi,
   type InvoiceDetail,
@@ -20,12 +19,15 @@ import {
 import { FileUpload } from './FileUpload';
 import { FileRow, FileThumb } from './FileThumb';
 import { Modal } from './Modal';
+import { MrnForm } from './MrnForm';
+import { RecyclingForm } from './RecyclingForm';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 
 interface InvoiceLifecyclePanelProps {
   invoice: InvoiceDetail;
   vehicles: VehicleDetail[];
+  lineItems?: Array<{ name: string; qty: number; weightKg: string | number }>;
   payTermsDays: number;
   user: SessionUser;
   disabled: boolean;
@@ -50,6 +52,7 @@ function asPaise(v: string | number | bigint | undefined): bigint {
 export function InvoiceLifecyclePanel({
   invoice,
   vehicles,
+  lineItems = [],
   payTermsDays,
   user,
   disabled,
@@ -457,6 +460,10 @@ export function InvoiceLifecyclePanel({
         >
           <MrnForm
             formId="mrn-form"
+            invoice={invoice}
+            vehicles={vehicles}
+            lineItems={lineItems}
+            userName={user.name}
             disabled={disabled}
             onSubmit={(body) => run(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')}
           />
@@ -476,6 +483,20 @@ export function InvoiceLifecyclePanel({
             formId="recy-form"
             defaultFactoryId={invoice.mrn?.factoryId ?? 'URB-BLR'}
             billingWeight={Number(invoice.billingWeight)}
+            ewayBillNo={invoice.ewayBillNo}
+            seedHints={
+              invoice.mrn?.materials?.length
+                ? invoice.mrn.materials.map((m) => ({
+                    name: m.n ?? '',
+                    qty: m.q ?? 0,
+                    weightKg: m.w ?? 0,
+                  }))
+                : lineItems.map((it) => ({
+                    name: it.name,
+                    qty: it.qty,
+                    weightKg: Number(it.weightKg) || 0,
+                  }))
+            }
             disabled={disabled}
             onSubmit={(body) => run(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')}
           />
@@ -671,6 +692,22 @@ function MrnCard({
               </div>
             </>
           ) : null}
+          {(m.gatePhotoIds?.length || m.materialPhotoIds?.length) ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginTop: '.5rem' }}>
+              <div>
+                <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--g2)', marginBottom: '.2rem' }}>
+                  Vehicle at the gate
+                </div>
+                <FileRow ids={m.gatePhotoIds} kind="image" />
+              </div>
+              <div>
+                <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--g2)', marginBottom: '.2rem' }}>
+                  Material inside the vehicle
+                </div>
+                <FileRow ids={m.materialPhotoIds} kind="image" />
+              </div>
+            </div>
+          ) : null}
           <div className="dim" style={{ fontSize: '.73rem', marginTop: '.35rem' }}>
             Category classification happens at the recycling stage, once material is segregated inside
             the facility.
@@ -754,7 +791,7 @@ function RecyclingCard({
             </div>
             <div className="tile">
               <div className="tile-l">Devices Destroyed</div>
-              <div className="tile-v">{destroyed}</div>
+              <div className="tile-v">{r.devicesDestroyed ?? destroyed}</div>
             </div>
           </div>
           {cats.length ? (
@@ -881,145 +918,6 @@ function RecyclingCard({
         </>
       )}
     </div>
-  );
-}
-
-function MrnForm({
-  formId,
-  disabled,
-  onSubmit,
-}: {
-  formId?: string;
-  disabled: boolean;
-  onSubmit: (body: {
-    factoryId: string;
-    receivedAt: string;
-    driverSign?: string;
-    managerSign?: string;
-    securitySign?: string;
-  }) => void;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [factories, setFactories] = useState<Array<{ id: string; name: string }>>([]);
-  const [factoryId, setFactoryId] = useState('URB-BLR');
-
-  useEffect(() => {
-    dataApi.factories().then(setFactories);
-  }, []);
-
-  return (
-    <form
-      id={formId}
-      className="sub-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit({ factoryId, receivedAt: today, driverSign: 'Driver', managerSign: 'Manager', securitySign: 'Security' });
-      }}
-    >
-      <h3>Create MRN</h3>
-      <label>
-        Factory
-        <select value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-          {factories.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {formId ? null : (
-        <button type="submit" className="btn primary" disabled={disabled}>
-          Record goods receipt (MRN)
-        </button>
-      )}
-    </form>
-  );
-}
-
-function RecyclingForm({
-  formId,
-  defaultFactoryId,
-  billingWeight,
-  disabled,
-  onSubmit,
-}: {
-  formId?: string;
-  defaultFactoryId: string;
-  billingWeight: number;
-  disabled: boolean;
-  onSubmit: (body: {
-    processedAt: string;
-    factoryId?: string;
-    categories: Array<{ entryId: string; groupCode: string; weightKg: number; overrideReason?: string }>;
-  }) => void;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [factoryId, setFactoryId] = useState(defaultFactoryId);
-  const [categories, setCategories] = useState<Array<{ entryId: string; description: string; groupCode: string }>>([]);
-  const [entryId, setEntryId] = useState('');
-  const [overrideReason, setOverrideReason] = useState('');
-
-  useEffect(() => {
-    if (!factoryId) return;
-    dataApi.categories(factoryId).then((cats) => {
-      setCategories(cats);
-      if (cats[0]) setEntryId(cats[0].entryId);
-    });
-  }, [factoryId]);
-
-  const selected = categories.find((c) => c.entryId === entryId);
-
-  return (
-    <form
-      id={formId}
-      className="sub-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!selected) return;
-        onSubmit({
-          processedAt: today,
-          factoryId,
-          categories: [{
-            entryId: selected.entryId,
-            groupCode: selected.groupCode,
-            weightKg: billingWeight,
-            ...(overrideReason.trim() ? { overrideReason: overrideReason.trim() } : {}),
-          }],
-        });
-      }}
-    >
-      <h3>Record recycling</h3>
-      <label>
-        Factory
-        <select value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-          <option value="URB-BLR">Urbeno Bengaluru Facility</option>
-          <option value="URB-KGF">Urbeno KGF Integrated Facility</option>
-        </select>
-      </label>
-      <label>
-        Category ({billingWeight} kg total)
-        <select value={entryId} onChange={(e) => setEntryId(e.target.value)} required>
-          {categories.slice(0, 50).map((c) => (
-            <option key={c.entryId} value={c.entryId}>
-              {c.entryId} — {c.description.slice(0, 60)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Capacity override reason
-        <input
-          value={overrideReason}
-          onChange={(e) => setOverrideReason(e.target.value)}
-          placeholder="Required only if category TPA would be exceeded"
-        />
-      </label>
-      {formId ? null : (
-        <button type="submit" className="btn primary" disabled={disabled || !selected}>
-          Issue Form 6
-        </button>
-      )}
-    </form>
   );
 }
 

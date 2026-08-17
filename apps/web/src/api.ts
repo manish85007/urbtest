@@ -222,6 +222,21 @@ export interface FactorySummary {
   city?: string | null;
 }
 
+export interface CompanyProfile {
+  name: string;
+  brand: string;
+  address: string;
+  gst: string;
+  cin: string;
+  phone: string;
+  email: string;
+  wa: string;
+  cpcb: string;
+  kspcb: string;
+  r2: string;
+  logoFileId: string | null;
+}
+
 export interface LookupRow {
   id: string;
   category: string;
@@ -325,6 +340,7 @@ export interface VehicleDetail {
   driverName: string;
   driverPhone: string;
   expectedAt?: string | null;
+  changeRemark?: string | null;
   team: Array<{ name: string; role: string; phone: string }>;
   weighment: {
     netKg: string;
@@ -374,12 +390,15 @@ export interface InvoiceDetail {
     securitySign?: string | null;
     condition?: string | null;
     materials?: Array<{ n?: string; q?: number; w?: number }>;
+    gatePhotoIds?: string[];
+    materialPhotoIds?: string[];
     factory?: { id: string; name: string };
   } | null;
   recycling: {
     form6No: string;
     processedAt?: string;
     factoryId?: string;
+    devicesDestroyed?: number;
     factory?: { id: string; name: string };
     recoveryFe?: string;
     recoveryNfe?: string;
@@ -676,6 +695,9 @@ export const dataApi = {
   markAllNotificationsRead: () =>
     api<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
   users: () => api<UserRow[]>('/users'),
+  company: () => api<CompanyProfile>('/settings/company'),
+  saveCompany: (body: Partial<CompanyProfile>) =>
+    api<CompanyProfile>('/settings/company', { method: 'PUT', body: JSON.stringify(body) }),
   createClient: (body: {
     id: string;
     name: string;
@@ -992,11 +1014,30 @@ export const lifecycleApi = {
       driverPhone: string;
       logisticsPartner?: string;
       expectedAt?: string;
+      changeRemark?: string;
       team: Array<{ name: string; role: string; phone: string }>;
     },
   ) =>
     api<{ submission: SubmissionDetail }>(`/submissions/${submissionId}/vehicles`, {
       method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateVehicle: (
+    vehicleId: string,
+    body: {
+      registration: string;
+      vehicleType: string;
+      driverName: string;
+      driverPhone: string;
+      logisticsPartner?: string;
+      expectedAt?: string;
+      changeRemark?: string;
+      team: Array<{ name: string; role: string; phone: string }>;
+    },
+  ) =>
+    api<{ submission: SubmissionDetail }>(`/vehicles/${vehicleId}`, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     }),
 
@@ -1055,7 +1096,11 @@ export const lifecycleApi = {
       driverSign?: string;
       managerSign?: string;
       securitySign?: string;
+      materials?: Array<{ name: string; qty: number; weight: number }>;
+      condition?: string;
       note?: string;
+      gatePhotoIds?: string[];
+      materialPhotoIds?: string[];
     },
   ) =>
     api<{ mrnNo: string }>(`/invoices/${invoiceId}/mrn`, {
@@ -1068,7 +1113,19 @@ export const lifecycleApi = {
     body: {
       processedAt: string;
       factoryId?: string;
-      categories: Array<{ entryId: string; groupCode: string; weightKg: number; overrideReason?: string }>;
+      devicesDestroyed?: number;
+      categories: Array<{
+        entryId: string;
+        groupCode: string;
+        weightKg: number;
+        recoveryFe?: number;
+        recoveryNfe?: number;
+        recoveryPl?: number;
+        recoveryPcb?: number;
+        overrideReason?: string;
+      }>;
+      photoIds?: string[];
+      reportIds?: string[];
     },
   ) =>
     api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {

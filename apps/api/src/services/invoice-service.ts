@@ -83,6 +83,8 @@ export interface MrnInput {
   materials?: Array<{ name: string; qty: number; weight: number }>;
   condition?: string;
   note?: string;
+  gatePhotoIds?: string[];
+  materialPhotoIds?: string[];
 }
 
 export interface RecyclingCategoryInput {
@@ -100,6 +102,7 @@ export interface RecyclingInput {
   processedAt: string;
   factoryId?: string;
   divertedPct?: number;
+  devicesDestroyed?: number;
   categories: RecyclingCategoryInput[];
   photoIds?: string[];
   reportIds?: string[];
@@ -235,6 +238,47 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   const factory = await prisma.factorySite.findUnique({ where: { id: input.factoryId } });
   if (!factory) throw new AppError('Select a factory site.');
 
+  const materials = (input.materials ?? [])
+    .map((m) => ({
+      n: String(m.name ?? '').trim(),
+      q: Number(m.qty) || 0,
+      w: Number(m.weight) || 0,
+    }))
+    .filter((m) => m.n);
+  if (!materials.length) {
+    throw new AppError('Record at least one material line counted at the gate.');
+  }
+
+  const driverSign = input.driverSign?.trim() || '';
+  const managerSign = input.managerSign?.trim() || '';
+  const securitySign = input.securitySign?.trim() || '';
+  if (!driverSign || !managerSign || !securitySign) {
+    throw new AppError('All three signatures are required on the gate document (driver, factory manager, security).');
+  }
+
+  const gatePhotoIds = [...new Set(input.gatePhotoIds ?? [])];
+  const materialPhotoIds = [...new Set(input.materialPhotoIds ?? [])];
+  if (!gatePhotoIds.length) {
+    throw new AppError('Upload at least one photograph of the vehicle at the gate.');
+  }
+  if (!materialPhotoIds.length) {
+    throw new AppError('Upload at least one photograph of the material inside the vehicle.');
+  }
+  await assertFilesExist(gatePhotoIds, ['pickPhoto']);
+  await assertFilesExist(materialPhotoIds, ['processing', 'pickPhoto']);
+
+  const invoiceVehs = invoice.submission.vehicles.filter(
+    (v) => !invoice.vehicleIds.length || invoice.vehicleIds.includes(v.id),
+  );
+  if (!invoiceVehs.length) {
+    throw new AppError('This invoice has no vehicles to receive.');
+  }
+  if (invoiceVehs.some((v) => !v.weighment)) {
+    throw new AppError(
+      'Every vehicle on this invoice must have a recorded weighment before the MRN can be raised.',
+    );
+  }
+
   const receivedAt = new Date(input.receivedAt);
 
   const mrn = await prisma.$transaction(async (tx) => {
@@ -247,16 +291,14 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
         factoryId: input.factoryId,
         receivedAt,
         receivedBy: actor.email,
-        driverSign: input.driverSign ?? null,
-        managerSign: input.managerSign ?? null,
-        securitySign: input.securitySign ?? null,
-        materials: (input.materials ?? []).map((m) => ({
-          n: m.name,
-          q: m.qty,
-          w: m.weight,
-        })),
-        condition: input.condition || 'Good',
-        note: input.note ?? null,
+        driverSign,
+        managerSign,
+        securitySign,
+        materials,
+        condition: input.condition?.trim() || 'Good',
+        note: input.note?.trim() || null,
+        gatePhotoIds,
+        materialPhotoIds,
       },
     });
   });
@@ -373,6 +415,10 @@ export async function createRecycling(
     totalPcb += mat.pcb;
   }
 
+  if (input.photoIds?.length) await assertFilesExist(input.photoIds, ['processing']);
+  if (input.reportIds?.length) await assertFilesExist(input.reportIds, ['report']);
+  if (input.serialFileId) await assertFilesExist([input.serialFileId], ['serials']);
+
   const form6No = await nextSequence('f6');
 
   const recycling = await prisma.recycling.create({
@@ -382,6 +428,7 @@ export async function createRecycling(
       processedAt: new Date(input.processedAt),
       factoryId,
       divertedPct: input.divertedPct ?? 0,
+      devicesDestroyed: Math.max(0, Math.floor(Number(input.devicesDestroyed) || 0)),
       recoveryFe: roundKg(totalFe),
       recoveryNfe: roundKg(totalNfe),
       recoveryPl: roundKg(totalPl),

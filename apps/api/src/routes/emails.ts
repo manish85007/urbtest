@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
-import { attachSession, requireAdmin } from '../middleware/session.js';
+import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
 import { listEmailOutbox } from '../services/email.js';
 import {
   createEmailTemplate,
@@ -8,7 +8,7 @@ import {
   sendCampaign,
   updateEmailTemplate,
 } from '../services/masters-write.js';
-import { getSmtpSettings, saveSmtpSettings, sendTestEmail, smtpPublicView } from '../services/settings.js';
+import { getCompanyProfile, getSmtpSettings, saveCompanyProfile, saveSmtpSettings, sendTestEmail, smtpPublicView } from '../services/settings.js';
 import { isAppError } from '../lib/errors.js';
 
 function handleErr(err: unknown, reply: { badRequest: (m: string) => unknown; status: (n: number) => { send: (b: unknown) => unknown } }) {
@@ -98,6 +98,32 @@ export async function emailsRoutes(app: FastifyInstance) {
       const body = z.object({ to: z.string().email() }).parse(request.body);
       await sendTestEmail(body.to);
       return { ok: true };
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.get('/settings/company', { preHandler: requireAuth }, async () => getCompanyProfile());
+
+  app.put('/settings/company', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const body = z
+        .object({
+          name: z.string().optional(),
+          brand: z.string().optional(),
+          address: z.string().optional(),
+          gst: z.string().optional(),
+          cin: z.string().optional(),
+          phone: z.string().optional(),
+          email: z.string().optional(),
+          wa: z.string().optional(),
+          cpcb: z.string().optional(),
+          kspcb: z.string().optional(),
+          r2: z.string().optional(),
+          logoFileId: z.string().nullable().optional(),
+        })
+        .parse(request.body);
+      return await saveCompanyProfile(body, request.user!.email);
     } catch (err) {
       return handleErr(err, reply);
     }

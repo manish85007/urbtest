@@ -102,6 +102,17 @@ export async function assertFilesExist(fileIds: string[], kinds?: FileKind[]) {
   }
 }
 
+export async function readStoredFileSilent(fileId: string) {
+  const file = await prisma.storedFile.findUnique({ where: { id: fileId } });
+  if (!file) return null;
+  try {
+    const blob = await getStorage().read(file.storageKey);
+    return { file, buffer: blob.buffer };
+  } catch {
+    return null;
+  }
+}
+
 function sanitizeFilename(name: string) {
   return name.replace(/[^\w.\-()+ ]/g, '_').slice(0, 180);
 }

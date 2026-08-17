@@ -7,7 +7,7 @@ import { toSessionUser } from '../lib/auth-context.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
 import { submissionInclude } from '../lib/db-helpers.js';
 import { createSubmission, acknowledgeSubmission } from '../services/submission-service.js';
-import { addVehicle, recordWeighment } from '../services/vehicle-service.js';
+import { addVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 import {
   addPayment,
   closeInvoice,
@@ -87,6 +87,34 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     });
     vehicleId = vehicle.id;
 
+    await expect(
+      updateVehicle(admin, vehicleId, {
+        registration: 'KA-INT-BROKE',
+        vehicleType: 'VT3',
+        driverName: 'Test Driver',
+        driverPhone: '+91 99000 00000',
+        team: [{ name: 'Test Driver', role: 'TR1', phone: '+91 99000 00000' }],
+      }),
+    ).rejects.toThrow(/remark/i);
+
+    await updateVehicle(admin, vehicleId, {
+      registration: 'KA-INT-BROKE',
+      vehicleType: 'VT3',
+      driverName: 'Test Driver',
+      driverPhone: '+91 99000 00000',
+      team: [{ name: 'Test Driver', role: 'TR1', phone: '+91 99000 00000' }],
+      changeRemark: 'Breakdown at client gate — replacement vehicle assigned.',
+    });
+
+    await updateVehicle(admin, vehicleId, {
+      registration: 'KA-INT-2026',
+      vehicleType: 'VT2',
+      driverName: 'Test Driver',
+      driverPhone: '+91 99000 00000',
+      team: [{ name: 'Test Driver', role: 'TR1', phone: '+91 99000 00000' }],
+      changeRemark: 'Original vehicle restored after the test swap.',
+    });
+
     const slip = await seedFile('weighPhoto', admin.email);
     const pick = await seedFile('pickPhoto', admin.email);
 
@@ -111,17 +139,24 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     invoiceId = invoiced.invoices[0].id;
     expect(invoiced.invoices[0].derivedStage).toBe(5);
 
+    const gate = await seedFile('pickPhoto', factory.email);
+    const inside = await seedFile('processing', factory.email);
+
     await createMrn(factory, invoiceId, {
       factoryId: 'URB-BLR',
       receivedAt: '2026-08-16',
       driverSign: 'Driver',
       managerSign: 'Manager',
       securitySign: 'Security',
+      materials: [{ name: 'Mixed e-waste', qty: 10, weight: 50 }],
+      gatePhotoIds: [gate.id],
+      materialPhotoIds: [inside.id],
     });
 
     await createRecycling(factory, invoiceId, {
       processedAt: '2026-08-16',
       factoryId: 'URB-BLR',
+      devicesDestroyed: 10,
       categories: [{ entryId: 'REC-ITEW2', groupCode: 'ITEW', weightKg: 50 }],
     });
 
