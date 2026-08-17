@@ -52,13 +52,15 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
   const sub = invoice.submission;
   const vehs = sub.vehicles.filter((v) => invoice.vehicleIds.includes(v.id) || !invoice.vehicleIds.length);
   const { co, letterhead } = await letterheadFromProfile();
+  letterhead.docNo = mrn.mrnNo;
+  letterhead.docDate = new Date().toISOString().slice(0, 10);
   const mats = Array.isArray(mrn.materials)
     ? (mrn.materials as Array<{ n?: string; q?: number; w?: number }>)
     : [];
 
   const buffer = buildTextPdf(
     'MATERIAL RECEIPT NOTE',
-    `${mrn.mrnNo} · ${factory?.name ?? mrn.factoryId}`,
+    `Receiving facility: ${factory?.name ?? mrn.factoryId}`,
     [
       {
         heading: 'REFERENCE',
@@ -137,10 +139,12 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const pcb = Number(recy.recoveryPcb);
   const sum = fe + nfe + pl + pcb;
   const { co, letterhead } = await letterheadFromProfile();
+  letterhead.docNo = recy.form6No;
+  letterhead.docDate = new Date().toISOString().slice(0, 10);
 
   const buffer = buildTextPdf(
     'FORM 6 — MANIFEST FOR E-WASTE',
-    `${recy.form6No} · E-Waste (Management) Rules, 2022 · Rule 12`,
+    'E-Waste (Management) Rules, 2022 · Rule 12 · one manifest per invoice',
     [
       {
         heading: 'CONSIGNMENT',
@@ -148,7 +152,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ['Manifest Number', recy.form6No, 'Processing Date', fmt(recy.processedAt)],
           ['Request ID', sub.id, 'Invoice Number', invoice.invoiceNo],
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'MRN Reference', invoice.mrn?.mrnNo || '—'],
-          ['Devices destroyed', String(recy.devicesDestroyed ?? 0), '', ''],
+          ['Devices destroyed', String(recy.devicesDestroyed ?? 0), 'Serial records', String(recy.serials.length)],
         ],
       },
       {
@@ -173,6 +177,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           headers: ['Entry', 'Group', 'Weight (kg)'],
           rows: cats.map((c) => [c.entryId, c.groupCode, num(c.weightKg.toString())]),
           total: ['TOTAL', '', num(cats.reduce((a, c) => a + Number(c.weightKg), 0))],
+          aligns: ['l', 'l', 'r'],
         },
       },
       {
@@ -185,14 +190,17 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
             ['Plastics', num(pl), sum ? `${((pl / sum) * 100).toFixed(1)}%` : '—'],
             ['Printed circuit boards', num(pcb), sum ? `${((pcb / sum) * 100).toFixed(1)}%` : '—'],
           ],
+          aligns: ['l', 'r', 'r'],
         },
       },
       {
-        heading: 'SERIALS',
-        lines: [`Serial records on file: ${recy.serials.length}`],
+        heading: 'NOTES',
+        lines: [
+          'This manifest is issued under Rule 12 of the E-Waste (Management) Rules, 2022. Original to be retained for a minimum of five years.',
+        ],
       },
     ],
-    `Form 6 ${recy.form6No} · Invoice ${invoice.invoiceNo} · ${co.name}`,
+    `Form 6 manifest ${recy.form6No} · Invoice ${invoice.invoiceNo} · ${co.name}`,
     letterhead,
   );
 
