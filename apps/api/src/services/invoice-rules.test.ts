@@ -19,12 +19,14 @@ describe('invoice payment rules', () => {
   });
 });
 
-describe('billing weight deviation message', () => {
-  it('matches prototype format', () => {
-    const billWt = 110;
-    const vehNet = 100;
-    const dev = billWt - vehNet;
-    const msg = `Billing weight (${billWt} kg) does not match the weighed vehicle net (${vehNet} kg). Record the reason for the excess of ${Math.abs(dev)} kg in the deviation note.`;
-    expect(msg).toContain('deviation note');
+describe('billing weight overall match', () => {
+  it('rejects over-billing against remaining weighment', () => {
+    const totalNet = 100;
+    const alreadyBilled = 40;
+    const remaining = totalNet - alreadyBilled;
+    const billWt = 70;
+    expect(billWt).toBeGreaterThan(remaining);
+    const msg = `Billing weight (${billWt} kg) exceeds the remaining weighment (${remaining} kg). Total vehicle weighment is ${totalNet} kg and ${alreadyBilled} kg is already billed. The sum of all invoice billing weights must equal the total weighment.`;
+    expect(msg).toContain('remaining weighment');
   });
 });

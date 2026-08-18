@@ -4,7 +4,7 @@ import { AppError } from '../lib/errors.js';
 import { roundKg, toKg } from '../lib/decimal.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude } from '../lib/db-helpers.js';
-import { loadSubmissionForActor, requireStaff } from '../lib/access.js';
+import { loadSubmissionForActor, requireAdmin, requireStaff } from '../lib/access.js';
 import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
@@ -70,6 +70,7 @@ export async function addVehicle(
   }
 
   const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
+  const registration = requireRegistration(input.registration);
 
   const extraTeam = (input.team ?? []).filter((m) => m.name?.trim() && m.phone?.trim());
   for (const member of extraTeam) {
@@ -82,7 +83,7 @@ export async function addVehicle(
   const vehicle = await prisma.vehicle.create({
     data: {
       submissionId,
-      registration: input.registration.trim().toUpperCase(),
+      registration,
       vehicleType: input.vehicleType,
       logisticsPartner: input.logisticsPartner ?? null,
       driverName: input.driverName.trim(),
@@ -117,7 +118,7 @@ export async function addVehicle(
     expected_date: input.expectedAt
       ? new Date(input.expectedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
       : '(TBD)',
-    registration: vehicle.registration,
+    registration,
     driver_name: input.driverName.trim(),
     driver_phone: input.driverPhone,
     contact_name: refreshed.createdBy,
@@ -146,7 +147,7 @@ export async function recordWeighment(
   let data;
   if (input.manual) {
     const net = toKg(input.net);
-    if (!(net > 0)) throw new AppError('Enter the weight recorded manually.');
+    if (!(net > 0)) throw new AppError('Net weight cannot be zero or negative. Enter a positive recorded weight.');
     if (!input.reason?.trim()) {
       throw new AppError(
         'Record why the weighbridge was not used — this is what makes the manual figure auditable.',
@@ -188,14 +189,17 @@ export async function recordWeighment(
     await assertFilesExist(input.pickupPhotoIds, ['pickPhoto']);
     const gross = toKg(input.gross);
     const tare = toKg(input.tare);
-    if (!(gross > tare)) throw new AppError('Gross weight must be greater than tare weight.');
+    const net = roundKg(gross - tare);
+    if (!(net > 0)) {
+      throw new AppError('Net weight cannot be zero or negative. Check gross and tare, then try again.');
+    }
     if (!input.slipNumber?.trim()) throw new AppError('Weighment slip number is required.');
 
     data = {
       manual: false,
       grossKg: roundKg(gross),
       tareKg: roundKg(tare),
-      netKg: roundKg(gross - tare),
+      netKg: net,
       slipNumber: input.slipNumber.trim(),
       method: null,
       reason: null,
@@ -255,8 +259,9 @@ export async function updateVehicle(
     requireMobile(member.phone, 'Team member phone');
   }
 
-  const nextReg = input.registration.trim().toUpperCase();
-  const regChanged = nextReg !== vehicle.registration;
+  const nextReg = requireRegistration(input.registration);
+  const prevReg = requireRegistration(vehicle.registration);
+  const regChanged = nextReg !== prevReg;
   const typeChanged = input.vehicleType !== vehicle.vehicleType;
   const remark = input.changeRemark?.trim() || '';
   if ((regChanged || typeChanged) && !remark) {
@@ -304,6 +309,46 @@ export async function updateVehicle(
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);
   return { submission: withDerivedStages(refreshed) };
+}
+
+export async function deleteVehicle(actor: SessionUser, vehicleId: string) {
+  requireAdmin(actor);
+
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: vehicleId },
+    include: { submission: { include: { invoices: true } }, weighment: true, team: true },
+  });
+  if (!vehicle) throw new AppError('Vehicle not found', 404);
+
+  const sub = await loadSubmissionForActor(vehicle.submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is closed — vehicles can no longer be removed.');
+  }
+  const billed = sub.invoices.some((inv) => inv.vehicleIds.includes(vehicleId));
+  if (billed) {
+    throw new AppError('This vehicle is on an invoice and cannot be deleted.');
+  }
+
+  await prisma.vehicle.delete({ where: { id: vehicleId } });
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'veh.delete',
+    entity: 'vehicle',
+    entityId: vehicleId,
+    details: { submissionId: sub.id, registration: vehicle.registration },
+  });
+
+  const refreshed = await loadSubmissionForActor(sub.id, actor);
+  return { submission: withDerivedStages(refreshed) };
+}
+
+function requireRegistration(raw: string): string {
+  const next = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (!next) {
+    throw new AppError('Vehicle registration can only contain letters and numbers — no spaces or special characters.');
+  }
+  return next;
 }
 
 function requireMobile(raw: string, label: string): string {

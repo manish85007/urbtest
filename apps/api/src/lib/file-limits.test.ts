@@ -14,4 +14,10 @@ describe('file-limits', () => {
     expect(isMimeAllowed('certificate', 'image/jpeg')).toBe(false);
     expect(isMimeAllowed('certificate', 'application/pdf')).toBe(true);
   });
+
+  it('accepts pickup photos with empty mime when the extension is known', () => {
+    expect(isMimeAllowed('pickPhoto', '', 'gate.jpg')).toBe(true);
+    expect(isMimeAllowed('pickPhoto', 'application/octet-stream', 'site.HEIC')).toBe(true);
+    expect(isMimeAllowed('pickPhoto', 'image/jpg', 'phone.jpg')).toBe(true);
+  });
 });

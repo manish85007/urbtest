@@ -376,6 +376,8 @@ export interface InvoiceDetail {
   ewayBillDate?: string;
   invoiceFileId?: string | null;
   ewayFileId?: string | null;
+  invoiceFileIds?: string[];
+  ewayFileIds?: string[];
   vehicleIds?: string[];
   derivedStage: number;
   closedAt: string | null;
@@ -451,6 +453,7 @@ export interface SubmissionDetail {
   approxWeight: string;
   notes: string | null;
   bomFileId?: string | null;
+  bomFileIds?: string[];
   rejectNote?: string | null;
   rejectAt?: string | null;
   createdBy: string;
@@ -1003,9 +1006,9 @@ export const emailsApi = {
 export const filesApi = {
   upload: async (file: File, kind: string) => {
     const form = new FormData();
-    form.append('file', file);
     form.append('kind', kind);
-    const res = await fetch(`${base}/files`, {
+    form.append('file', file);
+    const res = await fetch(`${base}/files?kind=${encodeURIComponent(kind)}`, {
       method: 'POST',
       credentials: 'include',
       body: form,
@@ -1037,6 +1040,7 @@ export const lifecycleApi = {
     notes?: string;
     ref?: string;
     bomFileId?: string;
+    bomFileIds?: string[];
     items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
   }) => api<SubmissionDetail>('/submissions', { method: 'POST', body: JSON.stringify(body) }),
 
@@ -1058,6 +1062,7 @@ export const lifecycleApi = {
       notes?: string;
       ref?: string;
       bomFileId?: string | null;
+      bomFileIds?: string[];
       items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
       siteId?: string;
       requestDate?: string;
@@ -1104,6 +1109,9 @@ export const lifecycleApi = {
       body: JSON.stringify(body),
     }),
 
+  deleteVehicle: (vehicleId: string) =>
+    api<{ submission: SubmissionDetail }>(`/vehicles/${vehicleId}`, { method: 'DELETE' }),
+
   weigh: (
     vehicleId: string,
     body: {
@@ -1132,18 +1140,47 @@ export const lifecycleApi = {
       ewayBillNo: string;
       ewayBillDate: string;
       vehicleIds?: string[];
-      billingWeight?: number;
+      billingWeight: number;
       deviationNote?: string;
-      taxRatePct?: number;
+      taxRatePct: number;
       billingMode?: string;
       invoiceFileId?: string;
       ewayFileId?: string;
+      invoiceFileIds?: string[];
+      ewayFileIds?: string[];
     },
   ) =>
     api<SubmissionDetail>(`/submissions/${submissionId}/invoices`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  updateInvoice: (
+    invoiceId: string,
+    body: {
+      invoiceNo: string;
+      invoiceDate: string;
+      taxableAmount: number;
+      ewayBillNo: string;
+      ewayBillDate: string;
+      vehicleIds?: string[];
+      billingWeight: number;
+      deviationNote?: string;
+      taxRatePct: number;
+      billingMode?: string;
+      invoiceFileId?: string;
+      ewayFileId?: string;
+      invoiceFileIds?: string[];
+      ewayFileIds?: string[];
+    },
+  ) =>
+    api<{ submission: SubmissionDetail }>(`/invoices/${invoiceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteInvoice: (invoiceId: string) =>
+    api<{ submission: SubmissionDetail }>(`/invoices/${invoiceId}`, { method: 'DELETE' }),
 
   addPayment: (invoiceId: string, body: { utr: string; amount: number; paidAt: string; mode: string }) =>
     api<unknown>(`/invoices/${invoiceId}/payments`, {

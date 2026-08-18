@@ -37,9 +37,11 @@ test.describe('full lifecycle', () => {
 
     // Stage 3 — assign vehicle
     await page.getByRole('button', { name: 'Assign Vehicle' }).click();
-    await page.getByLabel('Registration').fill(`KA-E2E-${uniq}`);
+    await page.getByLabel('Registration').fill(`KAE2E${uniq}`);
     await page.getByLabel('Driver name').fill('E2E Driver');
     await page.getByLabel('Driver phone').fill('9900112233');
+    await page.locator('#vh-exp-ok').click();
+    await expect(page.getByText(/Confirmed pickup:/)).toBeVisible();
     await page.locator('.modal').getByRole('button', { name: 'Assign vehicle' }).click();
     await expect(page.getByText('Vehicle assigned.')).toBeVisible({ timeout: 10_000 });
 
@@ -58,8 +60,13 @@ test.describe('full lifecycle', () => {
     // Stage 5 — raise invoice
     await page.getByRole('button', { name: 'Raise Invoice' }).click();
     await page.getByLabel('Invoice no.').fill(`INV-E2E-${uniq}`);
+    await page.getByLabel('Invoice date').fill('2026-08-16');
     await page.getByLabel('Taxable amount (₹)').fill('8500');
+    await expect(page.locator('#iv-tax option[value="TX18"]')).toHaveCount(1, { timeout: 10_000 });
+    await page.getByLabel('Tax rate').selectOption('TX18');
     await page.getByLabel('E-way bill no.').fill(`EWB-E2E-${uniq}`);
+    await page.getByLabel('E-way bill date').fill('2026-08-16');
+    await page.getByLabel('Billing weight (kg)').fill('75');
     await page.locator('.modal').getByRole('button', { name: 'Create invoice' }).click();
     await expect(page.getByText('Invoice created.')).toBeVisible({ timeout: 10_000 });
 

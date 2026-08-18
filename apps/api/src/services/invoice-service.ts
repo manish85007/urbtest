@@ -73,8 +73,8 @@ export interface CreateInvoiceInput {
   invoiceNo: string;
   invoiceDate: string;
   taxableAmount: number;
-  taxRatePct?: number;
-  billingWeight?: number;
+  taxRatePct: number;
+  billingWeight: number;
   deviationNote?: string;
   billingMode?: string;
   ewayBillNo: string;
@@ -82,6 +82,8 @@ export interface CreateInvoiceInput {
   vehicleIds?: string[];
   invoiceFileId?: string;
   ewayFileId?: string;
+  invoiceFileIds?: string[];
+  ewayFileIds?: string[];
 }
 
 export interface PaymentInput {
@@ -142,6 +144,79 @@ export interface CloseInvoiceInput {
   forced?: boolean;
 }
 
+function todayYmd(timeZone = 'Asia/Kolkata') {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function assertNotFutureDate(raw: string, label: string) {
+  const ymd = String(raw || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+    throw new AppError(`${label} is required.`);
+  }
+  if (ymd > todayYmd()) {
+    throw new AppError(`${label} cannot be a future date.`);
+  }
+}
+
+function attachmentIds(ids?: string[], single?: string) {
+  return [...new Set([...(ids ?? []), ...(single ? [single] : [])].map((id) => id.trim()).filter(Boolean))];
+}
+
+function totalWeighmentKg(vehicles: Array<{ weighment?: { netKg?: unknown } | null }>) {
+  return roundKg(vehicles.reduce((sum, v) => sum + toKg(v.weighment?.netKg), 0));
+}
+
+function billedWeightKg(
+  invoices: Array<{ id: string; billingWeight?: unknown }>,
+  excludeId?: string,
+) {
+  return roundKg(
+    invoices
+      .filter((inv) => inv.id !== excludeId)
+      .reduce((sum, inv) => sum + toKg(inv.billingWeight), 0),
+  );
+}
+
+function assertOverallBillingWeight(billWt: number, totalNet: number, alreadyBilled: number) {
+  if (!(billWt > 0)) {
+    throw new AppError('Billing weight is required.');
+  }
+  if (totalNet <= 0) {
+    throw new AppError('Record weighment on all vehicles before raising an invoice.');
+  }
+  const remaining = roundKg(totalNet - alreadyBilled);
+  if (roundKg(billWt - remaining) > 0.001) {
+    throw new AppError(
+      `Billing weight (${billWt} kg) exceeds the remaining weighment (${remaining} kg). Total vehicle weighment is ${totalNet} kg and ${alreadyBilled} kg is already billed. The sum of all invoice billing weights must equal the total weighment.`,
+    );
+  }
+}
+
+function assertInvoiceMutable(invoice: {
+  closedAt: Date | null;
+  mrn: unknown;
+  recycling: unknown;
+  certificates: unknown[];
+}) {
+  if (invoice.closedAt) {
+    throw new AppError('This invoice is closed and can no longer be changed.');
+  }
+  if (invoice.mrn) {
+    throw new AppError('Goods have been received against this invoice — it can no longer be edited or deleted.');
+  }
+  if (invoice.recycling) {
+    throw new AppError('This invoice has recycling records and can no longer be edited or deleted.');
+  }
+  if (invoice.certificates.length) {
+    throw new AppError('A certificate has been uploaded for this invoice — it can no longer be edited or deleted.');
+  }
+}
+
 export async function createInvoice(
   actor: SessionUser,
   submissionId: string,
@@ -155,24 +230,26 @@ export async function createInvoice(
     throw new AppError(`Invoice ${input.invoiceNo.trim()} already exists on this request.`);
   }
 
+  assertNotFutureDate(input.invoiceDate, 'Invoice date');
+  assertNotFutureDate(input.ewayBillDate, 'E-way bill date');
+
+  const invoiceFileIds = attachmentIds(input.invoiceFileIds, input.invoiceFileId);
+  const ewayFileIds = attachmentIds(input.ewayFileIds, input.ewayFileId);
+  await assertFilesExist(invoiceFileIds, ['invoice']);
+  await assertFilesExist(ewayFileIds, ['eway']);
+
   const vehicleIds = input.vehicleIds ?? [];
-  const vehNet = sub.vehicles
-    .filter((v) => vehicleIds.includes(v.id))
-    .reduce((sum, v) => sum + toKg(v.weighment?.netKg), 0);
+  const totalNet = totalWeighmentKg(sub.vehicles);
+  const alreadyBilled = billedWeightKg(sub.invoices);
+  const billWt = roundKg(toKg(input.billingWeight));
+  assertOverallBillingWeight(billWt, totalNet, alreadyBilled);
+  const billedAfter = roundKg(alreadyBilled + billWt);
+  const remainingAfter = roundKg(totalNet - billedAfter);
 
-  const billWt =
-    input.billingWeight !== undefined && input.billingWeight !== null
-      ? toKg(input.billingWeight)
-      : roundKg(vehNet);
-
-  const dev = vehNet ? round2(billWt - vehNet) : 0;
-  if (vehNet && Math.abs(dev) >= 0.01 && !String(input.deviationNote || '').trim()) {
-    throw new AppError(
-      `Billing weight (${billWt} kg) does not match the weighed vehicle net (${vehNet} kg). Record the reason for the ${dev > 0 ? 'excess' : 'shortfall'} of ${Math.abs(dev)} kg in the deviation note.`,
-    );
+  const taxRatePct = input.taxRatePct;
+  if (taxRatePct === undefined || taxRatePct === null || Number.isNaN(Number(taxRatePct))) {
+    throw new AppError('Select a tax rate.');
   }
-
-  const taxRatePct = input.taxRatePct ?? 18;
   const taxablePaise = BigInt(rupeesToPaise(input.taxableAmount));
   const taxPaise = BigInt(deriveTax(Number(taxablePaise), taxRatePct));
   const totalPaise = BigInt(deriveTotal(Number(taxablePaise), taxRatePct));
@@ -187,14 +264,16 @@ export async function createInvoice(
       taxPaise,
       totalPaise,
       billingWeight: billWt,
-      vehicleNetKg: vehNet || null,
-      deviationKg: dev,
+      vehicleNetKg: totalNet || null,
+      deviationKg: remainingAfter,
       deviationNote: String(input.deviationNote || '').trim() || null,
       billingMode: input.billingMode || 'urbeno',
       ewayBillNo: input.ewayBillNo.trim(),
       ewayBillDate: new Date(input.ewayBillDate),
-      invoiceFileId: input.invoiceFileId ?? null,
-      ewayFileId: input.ewayFileId ?? null,
+      invoiceFileId: invoiceFileIds[0] ?? null,
+      ewayFileId: ewayFileIds[0] ?? null,
+      invoiceFileIds,
+      ewayFileIds,
       vehicleIds,
       createdBy: actor.email,
     },
@@ -218,6 +297,98 @@ export async function createInvoice(
 
   const refreshed = await loadSubmissionForActor(submissionId, actor);
   return withDerivedStages(refreshed);
+}
+
+export async function updateInvoice(actor: SessionUser, invoiceId: string, input: CreateInvoiceInput) {
+  requireStaff(actor);
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertInvoiceMutable(invoice);
+  const sub = await loadSubmissionForActor(invoice.submissionId, actor);
+
+  const nextNo = input.invoiceNo.trim();
+  const duplicate = sub.invoices.some((i) => i.id !== invoiceId && i.invoiceNo === nextNo);
+  if (duplicate) {
+    throw new AppError(`Invoice ${nextNo} already exists on this request.`);
+  }
+
+  assertNotFutureDate(input.invoiceDate, 'Invoice date');
+  assertNotFutureDate(input.ewayBillDate, 'E-way bill date');
+
+  const invoiceFileIds = attachmentIds(input.invoiceFileIds, input.invoiceFileId);
+  const ewayFileIds = attachmentIds(input.ewayFileIds, input.ewayFileId);
+  await assertFilesExist(invoiceFileIds, ['invoice']);
+  await assertFilesExist(ewayFileIds, ['eway']);
+
+  const vehicleIds = input.vehicleIds ?? [];
+  const totalNet = totalWeighmentKg(sub.vehicles);
+  const alreadyBilled = billedWeightKg(sub.invoices, invoiceId);
+  const billWt = roundKg(toKg(input.billingWeight));
+  assertOverallBillingWeight(billWt, totalNet, alreadyBilled);
+  const remainingAfter = roundKg(totalNet - alreadyBilled - billWt);
+
+  const taxRatePct = input.taxRatePct;
+  if (taxRatePct === undefined || taxRatePct === null || Number.isNaN(Number(taxRatePct))) {
+    throw new AppError('Select a tax rate.');
+  }
+  const taxablePaise = BigInt(rupeesToPaise(input.taxableAmount));
+  const taxPaise = BigInt(deriveTax(Number(taxablePaise), taxRatePct));
+  const totalPaise = BigInt(deriveTotal(Number(taxablePaise), taxRatePct));
+
+  await prisma.invoice.update({
+    where: { id: invoiceId },
+    data: {
+      invoiceNo: nextNo,
+      invoiceDate: new Date(input.invoiceDate),
+      taxablePaise,
+      taxRatePct,
+      taxPaise,
+      totalPaise,
+      billingWeight: billWt,
+      vehicleNetKg: totalNet || null,
+      deviationKg: remainingAfter,
+      deviationNote: String(input.deviationNote || '').trim() || null,
+      billingMode: input.billingMode || 'urbeno',
+      ewayBillNo: input.ewayBillNo.trim(),
+      ewayBillDate: new Date(input.ewayBillDate),
+      invoiceFileId: invoiceFileIds[0] ?? null,
+      ewayFileId: ewayFileIds[0] ?? null,
+      invoiceFileIds,
+      ewayFileIds,
+      vehicleIds,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'inv.update',
+    entity: 'invoice',
+    entityId: nextNo,
+    details: { submissionId: sub.id, from: invoice.invoiceNo, to: nextNo },
+  });
+
+  const refreshed = await loadSubmissionForActor(sub.id, actor);
+  return { submission: withDerivedStages(refreshed) };
+}
+
+export async function deleteInvoice(actor: SessionUser, invoiceId: string) {
+  requireStaff(actor);
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertInvoiceMutable(invoice);
+  const sub = await loadSubmissionForActor(invoice.submissionId, actor);
+
+  await prisma.invoice.delete({ where: { id: invoiceId } });
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'inv.delete',
+    entity: 'invoice',
+    entityId: invoice.invoiceNo,
+    details: { submissionId: sub.id, invoiceNo: invoice.invoiceNo },
+  });
+
+  const refreshed = await loadSubmissionForActor(sub.id, actor);
+  return { submission: withDerivedStages(refreshed) };
 }
 
 export async function addPayment(actor: SessionUser, invoiceId: string, input: PaymentInput) {

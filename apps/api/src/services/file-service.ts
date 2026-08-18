@@ -29,7 +29,7 @@ export async function uploadFile(actor: SessionUser, input: UploadInput) {
     );
   }
 
-  if (!isMimeAllowed(input.kind, input.mimeType)) {
+  if (!isMimeAllowed(input.kind, input.mimeType, input.filename)) {
     throw new AppError(`File type ${input.mimeType || 'unknown'} is not allowed for ${input.kind}.`);
   }
 

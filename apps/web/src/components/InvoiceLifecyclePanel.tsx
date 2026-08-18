@@ -32,6 +32,8 @@ interface InvoiceLifecyclePanelProps {
   user: SessionUser;
   disabled: boolean;
   onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
+  onEditInvoice?: () => void;
+  onDeleteInvoice?: () => void;
 }
 
 function payCls(key: PayStatusKey): string {
@@ -57,6 +59,8 @@ export function InvoiceLifecyclePanel({
   user,
   disabled,
   onAction,
+  onEditInvoice,
+  onDeleteInvoice,
 }: InvoiceLifecyclePanelProps) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const isFactory = user.role === 'factory' || user.role === 'admin';
@@ -88,7 +92,6 @@ export function InvoiceLifecyclePanel({
       : vehicles;
   const billingKg = Number(invoice.billingWeight || 0);
   const vehicleNet = Number(invoice.vehicleNetKg ?? 0);
-  const deviation = Number(invoice.deviationKg ?? 0);
   const firstCert = invoice.certificates[0]?.certDate ?? invoice.certificates[0]?.mailedAt;
   const sla =
     invoice.mrn?.receivedAt
@@ -112,6 +115,17 @@ export function InvoiceLifecyclePanel({
         <div className="card-hd">
           <div className="card-ttl">🧾 Invoice {invoice.invoiceNo}</div>
           <span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>
+          <div className="spacer" />
+          {onEditInvoice ? (
+            <button type="button" className="btn bs bsm" disabled={disabled} onClick={onEditInvoice}>
+              Edit
+            </button>
+          ) : null}
+          {onDeleteInvoice ? (
+            <button type="button" className="btn brd bsm" disabled={disabled} onClick={onDeleteInvoice}>
+              Delete
+            </button>
+          ) : null}
         </div>
         <div
           style={{
@@ -145,14 +159,13 @@ export function InvoiceLifecyclePanel({
           <div className="tile">
             <div className="tile-l">Billing Weight</div>
             <div className="tile-v mono">{num(billingKg)} kg</div>
-            {deviation ? (
-              <div style={{ fontSize: '.68rem', color: 'var(--am)' }}>
-                {deviation > 0 ? '+' : ''}
-                {num(deviation)} kg vs weighed
+            {Math.abs(Number(invoice.deviationKg ?? 0)) < 0.001 ? (
+              <div className="dim" style={{ fontSize: '.68rem' }}>
+                remaining weighment billed
               </div>
             ) : (
               <div className="dim" style={{ fontSize: '.68rem' }}>
-                matches weighed net
+                of {num(vehicleNet || billingKg)} kg total weighment
               </div>
             )}
           </div>
@@ -210,8 +223,10 @@ export function InvoiceLifecyclePanel({
               Invoice PDF
             </div>
             <div className="frow">
-              {invoice.invoiceFileId ? (
-                <FileThumb id={invoice.invoiceFileId} kind="doc" name="Invoice" />
+              {(invoice.invoiceFileIds?.length ? invoice.invoiceFileIds : invoice.invoiceFileId ? [invoice.invoiceFileId] : []).length ? (
+                (invoice.invoiceFileIds?.length ? invoice.invoiceFileIds : [invoice.invoiceFileId!]).map((id, i) => (
+                  <FileThumb key={id} id={id} kind="doc" name={i === 0 ? 'Invoice' : `Invoice ${i + 1}`} />
+                ))
               ) : (
                 <span className="dim" style={{ fontSize: '.75rem' }}>
                   not attached
@@ -224,8 +239,10 @@ export function InvoiceLifecyclePanel({
               E-way Bill PDF
             </div>
             <div className="frow">
-              {invoice.ewayFileId ? (
-                <FileThumb id={invoice.ewayFileId} kind="doc" name="E-way" />
+              {(invoice.ewayFileIds?.length ? invoice.ewayFileIds : invoice.ewayFileId ? [invoice.ewayFileId] : []).length ? (
+                (invoice.ewayFileIds?.length ? invoice.ewayFileIds : [invoice.ewayFileId!]).map((id, i) => (
+                  <FileThumb key={id} id={id} kind="doc" name={i === 0 ? 'E-way' : `E-way ${i + 1}`} />
+                ))
               ) : (
                 <span className="dim" style={{ fontSize: '.75rem' }}>
                   not attached

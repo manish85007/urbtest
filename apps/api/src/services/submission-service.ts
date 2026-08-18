@@ -30,8 +30,16 @@ export interface CreateSubmissionInput {
   approxQty?: number;
   approxWeight?: number;
   bomFileId?: string;
+  bomFileIds?: string[];
   notes?: string;
   items?: SubmissionLineInput[];
+}
+
+function bomIdsFrom(input: { bomFileId?: string | null; bomFileIds?: string[] | null }) {
+  const ids = [...(input.bomFileIds ?? []), ...(input.bomFileId ? [input.bomFileId] : [])]
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return [...new Set(ids)];
 }
 
 function namedLines(items?: SubmissionLineInput[]) {
@@ -85,8 +93,11 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
   if (!location || !input.requestDate || !approxQty || !approxWeight) {
     throw new AppError('Site, location, date, approximate quantity and weight are all required.');
   }
-  if (input.bomFileId) await assertFilesExist([input.bomFileId], ['bom']);
-  const lines = linesForCreate(input.items, input.bomFileId, approxQty, approxWeight);
+  if (input.bomFileId || input.bomFileIds?.length) {
+    await assertFilesExist(bomIdsFrom(input), ['bom']);
+  }
+  const bomIds = bomIdsFrom(input);
+  const lines = linesForCreate(input.items, bomIds[0], approxQty, approxWeight);
 
   const id = await nextSequence('sub');
   const sub = await prisma.submission.create({
@@ -99,7 +110,8 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
       location,
       approxQty,
       approxWeight,
-      bomFileId: input.bomFileId ?? null,
+      bomFileId: bomIds[0] ?? null,
+      bomFileIds: bomIds,
       notes: input.notes?.trim() || null,
       createdBy: actor.email,
       items: {
@@ -245,6 +257,7 @@ export interface UpdateSubmissionInput {
   notes?: string;
   ref?: string;
   bomFileId?: string | null;
+  bomFileIds?: string[];
   items?: SubmissionLineInput[];
   siteId?: string;
   requestDate?: string;
@@ -281,7 +294,11 @@ export async function updateSubmission(
     if (!site) throw new AppError('Site not found for this client.');
   }
 
-  if (input.bomFileId) await assertFilesExist([input.bomFileId], ['bom']);
+  if (input.bomFileId || input.bomFileIds) {
+    const bomIds = bomIdsFrom(input);
+    if (bomIds.length) await assertFilesExist(bomIds, ['bom']);
+    input = { ...input, bomFileId: bomIds[0] ?? null, bomFileIds: bomIds };
+  }
   const nextItems = input.items ? namedLines(input.items) : null;
   if (nextItems && !nextItems.length) {
     throw new AppError('Keep at least one line item.');
@@ -296,6 +313,7 @@ export async function updateSubmission(
       notes: input.notes !== undefined ? input.notes.trim() || null : undefined,
       ref: input.ref !== undefined ? input.ref.trim() || null : undefined,
       bomFileId: input.bomFileId !== undefined ? input.bomFileId : undefined,
+      bomFileIds: input.bomFileIds !== undefined ? input.bomFileIds : undefined,
       siteId: input.siteId,
       requestDate: input.requestDate ? new Date(input.requestDate) : undefined,
       rejectNote: actor.role === 'client' ? null : undefined,

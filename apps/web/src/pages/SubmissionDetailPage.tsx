@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPayStatus, formatINR, rupeesToPaise } from '@urb-tectrack/shared';
-import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetail, type VehicleDetail } from '../api';
+import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise } from '@urb-tectrack/shared';
+import {
+  dataApi,
+  filesApi,
+  lifecycleApi,
+  type InvoiceDetail,
+  type SessionUser,
+  type SubmissionDetail,
+  type VehicleDetail,
+} from '../api';
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
@@ -18,8 +26,45 @@ type StepModal =
   | { kind: 'reject' }
   | { kind: 'vehicle'; vehicleId?: string }
   | { kind: 'weigh'; vehicleId: string }
-  | { kind: 'invoice' }
+  | { kind: 'invoice'; invoiceId?: string }
   | { kind: 'edit' };
+
+function bomFilesOf(sub: SubmissionDetail): string[] {
+  if (sub.bomFileIds?.length) return sub.bomFileIds;
+  return sub.bomFileId ? [sub.bomFileId] : [];
+}
+
+function formatPickupConfirm(value: string) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function localToday() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function dateInputValue(value?: string | null) {
+  return value ? value.slice(0, 10) : '';
+}
+
+function invoicePdfIds(inv?: InvoiceDetail | null) {
+  if (!inv) return [];
+  if (inv.invoiceFileIds?.length) return inv.invoiceFileIds;
+  return inv.invoiceFileId ? [inv.invoiceFileId] : [];
+}
+
+function ewayPdfIds(inv?: InvoiceDetail | null) {
+  if (!inv) return [];
+  if (inv.ewayFileIds?.length) return inv.ewayFileIds;
+  return inv.ewayFileId ? [inv.ewayFileId] : [];
+}
+
+function invoiceMutable(inv: InvoiceDetail) {
+  return !inv.closedAt && !inv.mrn && !inv.recycling && !inv.certificates?.length;
+}
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const { id } = useParams<{ id: string }>();
@@ -94,6 +139,10 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
     step?.kind === 'vehicle' && step.vehicleId
       ? sub.vehicles.find((v) => v.id === step.vehicleId)
       : undefined;
+  const invoiceTarget =
+    step?.kind === 'invoice' && step.invoiceId
+      ? sub.invoices.find((i) => i.id === step.invoiceId)
+      : undefined;
   const showResubmit = user.role === 'client' && stage === 1 && !!sub.rejectNote;
 
   return (
@@ -167,8 +216,15 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             user={user}
             busy={busy}
             onEdit={() => setStep({ kind: 'edit' })}
-            onBom={(bomFileId) =>
-              act(() => lifecycleApi.updateSubmission(sub.id, { bomFileId }), 'Bill of materials updated.')
+            onBom={(bomFileIds) =>
+              act(
+                () =>
+                  lifecycleApi.updateSubmission(sub.id, {
+                    bomFileIds,
+                    bomFileId: bomFileIds[0] ?? null,
+                  }),
+                'Bill of materials updated.',
+              )
             }
           />
 
@@ -192,6 +248,16 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             onAddVehicle={() => setStep({ kind: 'vehicle' })}
             onEditVehicle={(vehicleId) => setStep({ kind: 'vehicle', vehicleId })}
             onWeighVehicle={(vehicleId) => setStep({ kind: 'weigh', vehicleId })}
+            onDeleteVehicle={(vehicleId, registration) => {
+              if (
+                !window.confirm(
+                  `Delete vehicle ${registration}? This removes an incorrect assignment and cannot be undone.`,
+                )
+              ) {
+                return;
+              }
+              void act(() => lifecycleApi.deleteVehicle(vehicleId), `Vehicle ${registration} removed.`);
+            }}
           />
 
           {sub.invoices.length > 0 ? (
@@ -233,6 +299,28 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                   user={user}
                   disabled={busy}
                   onAction={act}
+                  onEditInvoice={
+                    isAdmin && invoiceMutable(activeInv)
+                      ? () => setStep({ kind: 'invoice', invoiceId: activeInv.id })
+                      : undefined
+                  }
+                  onDeleteInvoice={
+                    isAdmin && invoiceMutable(activeInv)
+                      ? () => {
+                          if (
+                            !window.confirm(
+                              `Delete invoice ${activeInv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          void act(
+                            () => lifecycleApi.deleteInvoice(activeInv.id),
+                            `Invoice ${activeInv.invoiceNo} removed.`,
+                          );
+                        }
+                      : undefined
+                  }
                 />
               ) : null}
             </div>
@@ -372,9 +460,13 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
 
       {step?.kind === 'invoice' ? (
         <Modal
-          title={`Raise Invoice — ${sub.id}`}
+          title={
+            invoiceTarget
+              ? `Edit Invoice — ${invoiceTarget.invoiceNo}`
+              : `Raise Invoice — ${sub.id}`
+          }
           onClose={() => setStep(null)}
-          okLabel="Create invoice"
+          okLabel={invoiceTarget ? 'Save invoice' : 'Create invoice'}
           form="invoice-form"
           busy={busy}
           wide
@@ -382,8 +474,14 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           <InvoiceForm
             formId="invoice-form"
             vehicles={sub.vehicles}
+            invoices={sub.invoices}
+            invoice={invoiceTarget}
             disabled={busy}
-            onCreate={(body) => act(() => lifecycleApi.createInvoice(sub.id, body), 'Invoice created.')}
+            onSubmit={(body) =>
+              invoiceTarget
+                ? act(() => lifecycleApi.updateInvoice(invoiceTarget.id, body), 'Invoice updated.')
+                : act(() => lifecycleApi.createInvoice(sub.id, body), 'Invoice created.')
+            }
           />
         </Modal>
       ) : null}
@@ -426,13 +524,14 @@ function RequestCard({
   user: SessionUser;
   busy: boolean;
   onEdit: () => void;
-  onBom: (bomFileId: string | null) => void;
+  onBom: (bomFileIds: string[]) => void;
 }) {
   const isClient = user.role === 'client';
   const isAdmin = user.role === 'admin';
   const closed = !!sub.closedAt;
   const canEdit = !closed && (isAdmin || (isClient && sub.derivedStage === 1));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
+  const bomIds = bomFilesOf(sub);
 
   return (
     <div className="card">
@@ -486,39 +585,35 @@ function RequestCard({
       <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--g2)', marginBottom: '.3rem' }}>
         Bill of Materials
       </div>
-      {sub.bomFileId ? (
-        <div className="frow">
-          <a
-            className="btn bs bsm"
-            href={filesApi.url(sub.bomFileId)}
-            target="_blank"
-            rel="noreferrer"
-            style={{ fontWeight: 400 }}
-          >
-            📄 View BoM
-          </a>
-          {canEdit ? (
-            <button type="button" className="btn brd bsm" disabled={busy} onClick={() => onBom(null)}>
-              ×
-            </button>
-          ) : null}
+      {bomIds.length ? (
+        <div className="frow" style={{ flexWrap: 'wrap' }}>
+          {bomIds.map((id) => (
+            <a
+              key={id}
+              className="btn bs bsm"
+              href={filesApi.url(id)}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontWeight: 400 }}
+            >
+              📄 View BoM
+            </a>
+          ))}
         </div>
       ) : (
         <div className="dim" style={{ fontSize: '.8rem', marginBottom: '.4rem' }}>
           No BoM file attached{canEdit ? ' — upload a CSV, Excel or PDF listing line items' : ''}
         </div>
       )}
-      {canEdit && !sub.bomFileId ? (
+      {canEdit ? (
         <FileUpload
           kind="bom"
-          label="Upload BoM"
-          hint="CSV, Excel or PDF listing line items"
+          label={bomIds.length ? 'Add another BoM file' : 'Upload BoM'}
+          hint="CSV, Excel or PDF — multiple files allowed"
           accept=".csv,.xls,.xlsx,application/pdf,text/csv"
           disabled={busy}
-          value={[]}
-          onChange={(ids) => {
-            if (ids[0]) onBom(ids[0]);
-          }}
+          value={bomIds}
+          onChange={onBom}
         />
       ) : null}
       {(sub.items ?? []).length ? (
@@ -575,6 +670,7 @@ function VehicleCard({
   onAddVehicle,
   onEditVehicle,
   onWeighVehicle,
+  onDeleteVehicle,
 }: {
   sub: SubmissionDetail;
   user: SessionUser;
@@ -582,6 +678,7 @@ function VehicleCard({
   onAddVehicle: () => void;
   onEditVehicle: (vehicleId: string) => void;
   onWeighVehicle: (vehicleId: string) => void;
+  onDeleteVehicle: (vehicleId: string, registration: string) => void;
 }) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const isAdmin = user.role === 'admin';
@@ -594,6 +691,7 @@ function VehicleCard({
 
   const canAdd = isStaff && stage >= 3 && stage <= 5;
   const canEditVehicle = isStaff && !sub.closedAt;
+  const billedVehicleIds = new Set(sub.invoices.flatMap((inv) => inv.vehicleIds ?? []));
 
   return (
     <div className="card" id="assign-vehicle">
@@ -631,6 +729,11 @@ function VehicleCard({
                 {canEditVehicle ? (
                   <button type="button" className="btn bs bsm" onClick={() => onEditVehicle(v.id)}>
                     Edit vehicle
+                  </button>
+                ) : null}
+                {isAdmin && canEditVehicle && !billedVehicleIds.has(v.id) ? (
+                  <button type="button" className="btn brd bsm" onClick={() => onDeleteVehicle(v.id, v.registration)}>
+                    Delete
                   </button>
                 ) : null}
                 {isAdmin && !w && stage >= 4 && stage <= 5 ? (
@@ -1259,14 +1362,6 @@ function localDateTimeValue(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function localDateValue(d = new Date()) {
-  return localDateTimeValue(d).slice(0, 10);
-}
-
-function localTimeValue(d = new Date()) {
-  return localDateTimeValue(d).slice(11, 16);
-}
-
 function AssignVehicleForm({
   disabled,
   onAssign,
@@ -1290,14 +1385,16 @@ function AssignVehicleForm({
   const vehicleTypes = useLookups('vehicleType');
   const logistics = useLookups('logistics');
   const teamRoles = useLookups('teamRole');
-  const [registration, setRegistration] = useState(vehicle?.registration ?? '');
+  const [registration, setRegistration] = useState(
+    (vehicle?.registration ?? '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
+  );
   const [vehicleType, setVehicleType] = useState(vehicle?.vehicleType ?? 'VT2');
   const [driverName, setDriverName] = useState(vehicle?.driverName ?? '');
   const [driverPhone, setDriverPhone] = useState(vehicle?.driverPhone ?? '');
   const [partner, setPartner] = useState(vehicle?.logisticsPartner ?? '');
   const initialExpected = vehicle?.expectedAt ? new Date(vehicle.expectedAt) : new Date();
-  const [expectedDate, setExpectedDate] = useState(localDateValue(initialExpected));
-  const [expectedTime, setExpectedTime] = useState(localTimeValue(initialExpected));
+  const [expectedDraft, setExpectedDraft] = useState(localDateTimeValue(initialExpected));
+  const [expectedAt, setExpectedAt] = useState(vehicle?.expectedAt ? localDateTimeValue(initialExpected) : '');
   const [remark, setRemark] = useState(vehicle?.changeRemark ?? '');
   const [team, setTeam] = useState<Array<{ name: string; role: string; phone: string }>>(() => {
     if (!vehicle?.team?.length) return [];
@@ -1324,8 +1421,12 @@ function AssignVehicleForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError('');
-        if (!expectedDate || !expectedTime) {
-          setError('Expected pickup date and time is required.');
+        if (!expectedAt) {
+          setError('Select expected pickup date and time, then press OK.');
+          return;
+        }
+        if (!/^[A-Z0-9]+$/.test(registration)) {
+          setError('Vehicle registration can only contain letters and numbers — no spaces or special characters.');
           return;
         }
         if (!driverPhone) {
@@ -1339,7 +1440,7 @@ function AssignVehicleForm({
         }
         const identityChanged =
           !!vehicle &&
-          (registration.trim().toUpperCase() !== vehicle.registration.toUpperCase() ||
+          (registration !== vehicle.registration.toUpperCase().replace(/[^A-Z0-9]/g, '') ||
             vehicleType !== vehicle.vehicleType);
         if (identityChanged && !remark.trim()) {
           setError(
@@ -1347,14 +1448,14 @@ function AssignVehicleForm({
           );
           return;
         }
-        const expectedAt = `${expectedDate}T${expectedTime}`;
+        const expectedPickup = expectedAt;
         onAssign({
           registration,
           vehicleType,
           driverName,
           driverPhone,
           logisticsPartner: partner || undefined,
-          expectedAt: expectedAt || undefined,
+          expectedAt: expectedPickup || undefined,
           changeRemark: remark.trim() || undefined,
           team: extra,
         });
@@ -1372,11 +1473,14 @@ function AssignVehicleForm({
           <input
             id="vh-reg"
             value={registration}
-            onChange={(e) => setRegistration(e.target.value)}
+            onChange={(e) => setRegistration(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             required
-            placeholder="KA-01-AB-1234"
+            placeholder="KA01AB1234"
+            autoComplete="off"
+            inputMode="text"
             style={{ fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase' }}
           />
+          <p className="hint" style={{ textAlign: 'left' }}>Letters and numbers only — no spaces or special characters</p>
         </div>
         <div className="fg">
           <label htmlFor="vh-type">Vehicle type</label>
@@ -1399,12 +1503,43 @@ function AssignVehicleForm({
           </select>
         </div>
         <div className="fg">
-          <label htmlFor="vh-exp-date">Expected pickup date</label>
-          <input id="vh-exp-date" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} required />
-        </div>
-        <div className="fg">
-          <label htmlFor="vh-exp-time">Expected pickup time</label>
-          <input id="vh-exp-time" type="time" value={expectedTime} onChange={(e) => setExpectedTime(e.target.value)} required />
+          <label htmlFor="vh-exp">Expected pickup date & time</label>
+          <div className="frow" style={{ alignItems: 'center', marginBottom: 0 }}>
+            <input
+              id="vh-exp"
+              type="datetime-local"
+              value={expectedDraft}
+              onChange={(e) => {
+                setExpectedDraft(e.target.value);
+                if (e.target.value !== expectedAt) setExpectedAt('');
+              }}
+              required={!expectedAt}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              id="vh-exp-ok"
+              className="btn bp bsm"
+              disabled={!expectedDraft}
+              onClick={() => {
+                if (!expectedDraft) {
+                  setError('Select date and time first.');
+                  return;
+                }
+                setExpectedAt(expectedDraft);
+                setError('');
+              }}
+            >
+              OK
+            </button>
+          </div>
+          {expectedAt ? (
+            <p className="ok-msg" style={{ margin: '.35rem 0 0' }}>
+              Confirmed pickup: {formatPickupConfirm(expectedAt)}
+            </p>
+          ) : (
+            <p className="hint" style={{ textAlign: 'left' }}>Select date and time, then press OK to confirm</p>
+          )}
         </div>
         <div className="fg">
           <label htmlFor="vh-drv">Driver name</label>
@@ -1523,7 +1658,9 @@ function WeighForm({
 
   const grossNum = parseFloat(gross) || 0;
   const tareNum = parseFloat(tare) || 0;
-  const netKg = grossNum > 0 && tareNum > 0 && grossNum > tareNum ? grossNum - tareNum : null;
+  const hasWeights = gross.trim() !== '' && tare.trim() !== '';
+  const netKg = hasWeights ? grossNum - tareNum : null;
+  const netInvalid = netKg !== null && !(netKg > 0);
 
   return (
     <form
@@ -1537,6 +1674,13 @@ function WeighForm({
           return;
         }
         if (manual) {
+          const recorded = Number(manualNet);
+          if (!(recorded > 0)) {
+            const msg = 'Net weight cannot be zero or negative. Enter a positive recorded weight.';
+            setFormError(msg);
+            window.alert(msg);
+            return;
+          }
           onWeigh({
             weighedAt: today,
             manual: true,
@@ -1548,6 +1692,12 @@ function WeighForm({
         } else {
           if (!slipPhotos.length) {
             setFormError('Attach at least one weighment slip photo.');
+            return;
+          }
+          if (netInvalid || netKg === null) {
+            const msg = 'Net weight cannot be zero or negative. Check gross and tare, then try again.';
+            setFormError(msg);
+            window.alert(msg);
             return;
           }
           onWeigh({
@@ -1608,7 +1758,7 @@ function WeighForm({
                 type="text"
                 value={netKg !== null ? netKg.toFixed(3) : '—'}
                 disabled
-                style={{ fontWeight: 700, color: netKg !== null ? 'var(--g)' : 'var(--g2)' }}
+                style={{ fontWeight: 700, color: netInvalid ? 'var(--rd)' : netKg !== null ? 'var(--g)' : 'var(--g2)' }}
               />
             </div>
           </div>
@@ -1626,8 +1776,8 @@ function WeighForm({
       <FileUpload
         kind="pickPhoto"
         label="Pickup photos"
-        hint="At least 1 photo · max 5 MB each · JPG/PNG"
-        accept="image/jpeg,image/png,image/webp"
+        hint="At least 1 photo · max 5 MB each · JPG, PNG, WEBP, HEIC"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,.jpg,.jpeg,.png,.webp,.heic,.heif"
         disabled={disabled}
         value={pickupPhotos}
         onChange={setPickupPhotos}
@@ -1637,7 +1787,7 @@ function WeighForm({
         <button
           type="submit"
           className="btn primary"
-          disabled={disabled || !pickupPhotos.length || (!manual && !slipPhotos.length)}
+          disabled={disabled || !pickupPhotos.length || (!manual && (!slipPhotos.length || netInvalid))}
         >
           {existing ? 'Save weighment' : 'Record weighment'}
         </button>
@@ -1646,73 +1796,81 @@ function WeighForm({
   );
 }
 
+type InvoiceFormBody = {
+  invoiceNo: string;
+  invoiceDate: string;
+  taxableAmount: number;
+  ewayBillNo: string;
+  ewayBillDate: string;
+  vehicleIds: string[];
+  taxRatePct: number;
+  billingWeight: number;
+  billingMode?: string;
+  invoiceFileId?: string;
+  ewayFileId?: string;
+  invoiceFileIds?: string[];
+  ewayFileIds?: string[];
+};
+
 function InvoiceForm({
   vehicles,
+  invoices,
+  invoice,
   disabled,
-  onCreate,
+  onSubmit,
   formId,
 }: {
   vehicles: Array<{ id: string; registration: string; weighment: { netKg: string } | null }>;
+  invoices: Array<{ id: string; billingWeight: string }>;
+  invoice?: InvoiceDetail;
   disabled: boolean;
   formId?: string;
-  onCreate: (body: {
-    invoiceNo: string;
-    invoiceDate: string;
-    taxableAmount: number;
-    ewayBillNo: string;
-    ewayBillDate: string;
-    vehicleIds: string[];
-    taxRatePct?: number;
-    billingWeight?: number;
-    deviationNote?: string;
-    billingMode?: string;
-    invoiceFileId?: string;
-    ewayFileId?: string;
-  }) => void;
+  onSubmit: (body: InvoiceFormBody) => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const taxRates = useLookups('taxRate');
-  const [invoiceNo, setInvoiceNo] = useState(`INV-${Date.now().toString().slice(-6)}`);
-  const [invoiceDate, setInvoiceDate] = useState(today);
-  const [taxableAmount, setTaxableAmount] = useState('10000');
-  const [taxRateId, setTaxRateId] = useState('TX18');
-  const [billingMode, setBillingMode] = useState<'urbeno' | 'client'>('urbeno');
-  const [eway, setEway] = useState('EWB-DEMO-001');
-  const [ewayDate, setEwayDate] = useState(today);
-  const [vehIds, setVehIds] = useState<string[]>(() => vehicles.map((v) => v.id));
-  const [billingWeight, setBillingWeight] = useState('');
-  const [weightTouched, setWeightTouched] = useState(false);
-  const [deviationNote, setDeviationNote] = useState('');
-  const [invoiceFileId, setInvoiceFileId] = useState('');
-  const [ewayFileId, setEwayFileId] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState(invoice?.invoiceNo ?? '');
+  const [invoiceDate, setInvoiceDate] = useState(dateInputValue(invoice?.invoiceDate));
+  const [taxableAmount, setTaxableAmount] = useState(
+    invoice?.taxablePaise != null ? String(paiseToRupees(Number(invoice.taxablePaise))) : '',
+  );
+  const [taxRateId, setTaxRateId] = useState('');
+  const [billingMode, setBillingMode] = useState<'urbeno' | 'client'>(
+    invoice?.billingMode === 'client' ? 'client' : 'urbeno',
+  );
+  const [eway, setEway] = useState(invoice?.ewayBillNo ?? '');
+  const [ewayDate, setEwayDate] = useState(dateInputValue(invoice?.ewayBillDate));
+  const [vehIds, setVehIds] = useState<string[]>(() =>
+    invoice?.vehicleIds?.length ? invoice.vehicleIds : vehicles.map((v) => v.id),
+  );
+  const [billingWeight, setBillingWeight] = useState(
+    invoice?.billingWeight != null && invoice.billingWeight !== '' ? String(Number(invoice.billingWeight)) : '',
+  );
+  const [invoiceFileIds, setInvoiceFileIds] = useState<string[]>(() => invoicePdfIds(invoice));
+  const [ewayFileIdList, setEwayFileIdList] = useState<string[]>(() => ewayPdfIds(invoice));
   const [error, setError] = useState('');
 
-  const selectedRate = taxRates.find((t) => t.id === taxRateId) ?? taxRates.find((t) => Number(t.rate) === 18);
-  const taxPct = Number(selectedRate?.rate ?? 18);
-  const taxable = Number(taxableAmount) || 0;
-  const taxValue = +(taxable * taxPct) / 100;
-  const totalValue = taxable + taxValue;
-  const vehNet = vehicles
-    .filter((v) => vehIds.includes(v.id))
-    .reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
-  const billWt = weightTouched ? Number(billingWeight) || 0 : vehNet;
-  const deviation = +(billWt - vehNet).toFixed(2);
-  const needsNote = Math.abs(deviation) >= 0.01;
-
   useEffect(() => {
-    if (!weightTouched) setBillingWeight(vehNet ? String(vehNet) : '');
-  }, [vehNet, weightTouched]);
+    if (!invoice || !taxRates.length || taxRateId) return;
+    const match = taxRates.find((t) => Number(t.rate) === Number(invoice.taxRatePct));
+    if (match) setTaxRateId(match.id);
+  }, [invoice, taxRates, taxRateId]);
 
-  useEffect(() => {
-    if (taxRates.length && !taxRates.some((t) => t.id === taxRateId)) {
-      const eighteen = taxRates.find((t) => Number(t.rate) === 18);
-      setTaxRateId(eighteen?.id ?? taxRates[0].id);
-    }
-  }, [taxRates, taxRateId]);
+  const selectedRate = taxRates.find((t) => t.id === taxRateId);
+  const taxPct = selectedRate ? Number(selectedRate.rate) : Number.NaN;
+  const taxable = Number(taxableAmount);
+  const taxValue = Number.isFinite(taxPct) && Number.isFinite(taxable) ? +(taxable * taxPct) / 100 : 0;
+  const totalValue = (Number.isFinite(taxable) ? taxable : 0) + taxValue;
+  const totalNet = vehicles.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
+  const alreadyBilled = invoices
+    .filter((inv) => inv.id !== invoice?.id)
+    .reduce((s, inv) => s + Number(inv.billingWeight ?? 0), 0);
+  const remaining = Math.round((totalNet - alreadyBilled) * 1000) / 1000;
+  const billWt = Number(billingWeight) || 0;
+  const remainingAfter = Math.round((remaining - billWt) * 1000) / 1000;
 
   function toggleVeh(id: string) {
     setVehIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-    setWeightTouched(false);
   }
 
   return (
@@ -1722,38 +1880,82 @@ function InvoiceForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError('');
+        if (!invoiceNo.trim()) {
+          setError('Invoice number is required.');
+          return;
+        }
+        if (!invoiceDate) {
+          setError('Invoice date is required.');
+          return;
+        }
+        if (invoiceDate > today) {
+          setError('Invoice date cannot be a future date.');
+          return;
+        }
+        if (!taxableAmount || Number.isNaN(taxable) || taxable < 0) {
+          setError('Taxable amount is required.');
+          return;
+        }
+        if (!taxRateId || !Number.isFinite(taxPct)) {
+          setError('Select a tax rate.');
+          return;
+        }
+        if (!eway.trim()) {
+          setError('E-way bill number is required.');
+          return;
+        }
+        if (!ewayDate) {
+          setError('E-way bill date is required.');
+          return;
+        }
+        if (ewayDate > today) {
+          setError('E-way bill date cannot be a future date.');
+          return;
+        }
+        if (!billingWeight || !(billWt > 0)) {
+          setError('Billing weight is required.');
+          return;
+        }
+        if (billWt - remaining > 0.001) {
+          setError(
+            `Billing weight (${billWt} kg) exceeds the remaining weighment (${remaining} kg). Total vehicle weighment is ${totalNet} kg.`,
+          );
+          return;
+        }
         if (!vehIds.length) {
           setError('Select at least one vehicle covered by this invoice.');
           return;
         }
-        if (needsNote && !deviationNote.trim()) {
-          setError(
-            `Billing weight (${billWt} kg) does not match the weighed vehicle net (${vehNet} kg). Record a deviation note.`,
-          );
-          return;
-        }
-        onCreate({
-          invoiceNo,
+        onSubmit({
+          invoiceNo: invoiceNo.trim(),
           invoiceDate,
           taxableAmount: taxable,
-          ewayBillNo: eway,
+          ewayBillNo: eway.trim(),
           ewayBillDate: ewayDate,
           vehicleIds: vehIds,
           taxRatePct: taxPct,
-          billingWeight: billWt || undefined,
-          deviationNote: needsNote ? deviationNote.trim() : undefined,
+          billingWeight: billWt,
           billingMode,
-          invoiceFileId: invoiceFileId || undefined,
-          ewayFileId: ewayFileId || undefined,
+          invoiceFileId: invoiceFileIds[0],
+          ewayFileId: ewayFileIdList[0],
+          invoiceFileIds,
+          ewayFileIds: ewayFileIdList,
         });
       }}
     >
-      <h3>Raise invoice</h3>
+      <h3>{invoice ? 'Edit invoice' : 'Raise invoice'}</h3>
       <p className="dim" style={{ fontSize: '.82rem', margin: '-.3rem 0 .7rem' }}>
         Each invoice needs its own e-way bill and progresses independently through MRN, recycling, certificate and
-        closure.
+        closure. Billing weights across all invoices must equal the total weighment of all vehicles.
       </p>
       {error ? <p className="error">{error}</p> : null}
+      <div className="fg">
+        <label htmlFor="iv-mode">Invoice mode</label>
+        <select id="iv-mode" value={billingMode} onChange={(e) => setBillingMode(e.target.value as 'urbeno' | 'client')}>
+          <option value="urbeno">Urbeno raises invoice (Urbeno → Client)</option>
+          <option value="client">Client raises invoice (Client → Urbeno)</option>
+        </select>
+      </div>
       <div className="fr2">
         <div className="fg">
           <label htmlFor="iv-no">Invoice no.</label>
@@ -1767,7 +1969,7 @@ function InvoiceForm({
         </div>
         <div className="fg">
           <label htmlFor="iv-dt">Invoice date</label>
-          <input id="iv-dt" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} required />
+          <input id="iv-dt" type="date" max={today} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} required />
         </div>
       </div>
       <div className="fr3">
@@ -1785,44 +1987,47 @@ function InvoiceForm({
         </div>
         <div className="fg">
           <label htmlFor="iv-tax">Tax rate</label>
-          <select id="iv-tax" value={taxRateId} onChange={(e) => setTaxRateId(e.target.value)}>
-            {taxRates.length ? (
-              taxRates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))
-            ) : (
-              <option value="TX18">GST 18%</option>
-            )}
+          <select id="iv-tax" value={taxRateId} onChange={(e) => setTaxRateId(e.target.value)} required>
+            <option value="">Select tax rate</option>
+            {taxRates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
           </select>
         </div>
         <div className="fg">
           <label htmlFor="iv-gst">Tax value (₹)</label>
-          <input id="iv-gst" value={formatINR(rupeesToPaise(taxValue))} disabled style={{ fontWeight: 700, color: 'var(--g2)' }} />
+          <input
+            id="iv-gst"
+            value={Number.isFinite(taxPct) && taxableAmount ? formatINR(rupeesToPaise(taxValue)) : ''}
+            disabled
+            placeholder="—"
+            style={{ fontWeight: 700, color: 'var(--g2)' }}
+          />
         </div>
       </div>
       <div className="fg">
         <label htmlFor="iv-tot">Total invoice value (₹)</label>
         <input
           id="iv-tot"
-          value={formatINR(rupeesToPaise(totalValue))}
+          value={Number.isFinite(taxPct) && taxableAmount ? formatINR(rupeesToPaise(totalValue)) : ''}
           disabled
+          placeholder="—"
           style={{ fontWeight: 800, color: 'var(--g2)', fontSize: '1rem' }}
         />
       </div>
-      <div className="dim" style={{ fontSize: '.74rem', margin: '-.3rem 0 .6rem' }}>
-        {formatINR(rupeesToPaise(taxable))} taxable + {formatINR(rupeesToPaise(taxValue))} at {taxPct}% ={' '}
-        {formatINR(rupeesToPaise(totalValue))}
-        {selectedRate?.description ? ` · ${selectedRate.description}` : ''}
-      </div>
-      <div className="fg">
-        <label htmlFor="iv-mode">Invoice mode</label>
-        <select id="iv-mode" value={billingMode} onChange={(e) => setBillingMode(e.target.value as 'urbeno' | 'client')}>
-          <option value="urbeno">Urbeno raises invoice (Urbeno → Client)</option>
-          <option value="client">Client raises invoice (Client → Urbeno)</option>
-        </select>
-      </div>
+      {Number.isFinite(taxPct) && taxableAmount ? (
+        <div className="dim" style={{ fontSize: '.74rem', margin: '-.3rem 0 .6rem' }}>
+          {formatINR(rupeesToPaise(taxable))} taxable + {formatINR(rupeesToPaise(taxValue))} at {taxPct}% ={' '}
+          {formatINR(rupeesToPaise(totalValue))}
+          {selectedRate?.description ? ` · ${selectedRate.description}` : ''}
+        </div>
+      ) : (
+        <div className="dim" style={{ fontSize: '.74rem', margin: '-.3rem 0 .6rem' }}>
+          Enter taxable amount and select a tax rate to calculate tax.
+        </div>
+      )}
       <div className="fr2">
         <div className="fg">
           <label htmlFor="iv-ew">E-way bill no.</label>
@@ -1836,7 +2041,7 @@ function InvoiceForm({
         </div>
         <div className="fg">
           <label htmlFor="iv-ewdt">E-way bill date</label>
-          <input id="iv-ewdt" type="date" value={ewayDate} onChange={(e) => setEwayDate(e.target.value)} required />
+          <input id="iv-ewdt" type="date" max={today} value={ewayDate} onChange={(e) => setEwayDate(e.target.value)} required />
         </div>
       </div>
       <div className="fr2">
@@ -1845,45 +2050,46 @@ function InvoiceForm({
           <input
             id="iv-wt"
             type="number"
-            step="0.01"
-            value={weightTouched ? billingWeight : vehNet ? String(vehNet) : billingWeight}
-            onChange={(e) => {
-              setWeightTouched(true);
-              setBillingWeight(e.target.value);
-            }}
+            step="0.001"
+            min="0"
+            value={billingWeight}
+            onChange={(e) => setBillingWeight(e.target.value)}
+            required
+            placeholder="Enter billed kg"
           />
           <div className="dim" style={{ fontSize: '.74rem', marginTop: '.2rem' }}>
-            {needsNote ? (
+            {billWt - remaining > 0.001 ? (
               <span style={{ color: 'var(--am)' }}>
-                ⚠ {deviation > 0 ? 'Exceeds' : 'Short of'} the weighed net by {Math.abs(deviation)} kg — a deviation
-                note is required
+                Exceeds remaining weighment by {Math.round((billWt - remaining) * 1000) / 1000} kg
+              </span>
+            ) : remainingAfter > 0.001 ? (
+              <span>
+                Remaining after this invoice: {remainingAfter} kg — add another invoice so the total matches weighment
               </span>
             ) : (
-              <span style={{ color: 'var(--g)' }}>✓ Matches the weighed vehicle net</span>
+              <span style={{ color: 'var(--g)' }}>✓ Matches remaining weighment</span>
             )}
           </div>
         </div>
         <div className="fg">
-          <label htmlFor="iv-vnet">Weighed vehicle net (kg)</label>
-          <input id="iv-vnet" value={vehNet ? vehNet.toFixed(2) : '—'} disabled style={{ fontWeight: 700, color: 'var(--g2)' }} />
+          <label htmlFor="iv-vnet">Total weighment (all vehicles)</label>
+          <input
+            id="iv-vnet"
+            value={totalNet ? totalNet.toFixed(3) : '—'}
+            disabled
+            style={{ fontWeight: 700, color: 'var(--g2)' }}
+          />
+          <div className="dim" style={{ fontSize: '.74rem', marginTop: '.2rem' }}>
+            Already billed {alreadyBilled.toFixed(3)} kg · remaining {remaining.toFixed(3)} kg
+          </div>
         </div>
       </div>
-      {needsNote ? (
-        <div className="fg">
-          <label htmlFor="iv-dev">
-            Deviation note * <span className="hint">billing weight differs from the weighed net — record why</span>
-          </label>
-          <textarea
-            id="iv-dev"
-            value={deviationNote}
-            onChange={(e) => setDeviationNote(e.target.value)}
-            placeholder="e.g. 6 kg of packaging returned to the client and excluded from billing."
-            style={{ minHeight: 48 }}
-          />
-        </div>
-      ) : null}
       <div className="fg">
         <label>Vehicles covered by this invoice *</label>
+        <p className="hint" style={{ textAlign: 'left', margin: '0 0 .3rem' }}>
+          Vehicle selection does not change billing weight. Weight is checked against the total weighment of all
+          vehicles.
+        </p>
         <div
           style={{
             display: 'flex',
@@ -1917,23 +2123,25 @@ function InvoiceForm({
         <FileUpload
           kind="invoice"
           label="Invoice PDF"
+          hint="You can attach more than one PDF"
           accept="application/pdf"
           disabled={disabled}
-          value={invoiceFileId ? [invoiceFileId] : []}
-          onChange={(ids) => setInvoiceFileId(ids[0] ?? '')}
+          value={invoiceFileIds}
+          onChange={setInvoiceFileIds}
         />
         <FileUpload
           kind="eway"
           label="E-way bill PDF"
+          hint="You can attach more than one PDF"
           accept="application/pdf"
           disabled={disabled}
-          value={ewayFileId ? [ewayFileId] : []}
-          onChange={(ids) => setEwayFileId(ids[0] ?? '')}
+          value={ewayFileIdList}
+          onChange={setEwayFileIdList}
         />
       </div>
       {formId ? null : (
         <button type="submit" className="btn primary" disabled={disabled}>
-          Create invoice
+          {invoice ? 'Save invoice' : 'Create invoice'}
         </button>
       )}
     </form>

@@ -8,13 +8,15 @@ import {
   rejectSubmission,
   updateSubmission,
 } from '../services/submission-service.js';
-import { addVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
+import { addVehicle, deleteVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 import {
   addPayment,
   closeInvoice,
   createInvoice,
   createMrn,
   createRecycling,
+  deleteInvoice,
+  updateInvoice,
   uploadCertificate,
 } from '../services/invoice-service.js';
 import { raiseQuery, replyToQuery } from '../services/query-service.js';
@@ -43,12 +45,19 @@ const createSubmissionSchema = z.object({
   approxQty: z.number().int().nonnegative().optional(),
   approxWeight: z.number().nonnegative().optional(),
   bomFileId: z.string().optional(),
+  bomFileIds: z.array(z.string()).optional(),
   notes: z.string().optional(),
   items: z.array(lineItemSchema).optional(),
 });
 
 const vehicleSchema = z.object({
-  registration: z.string().min(1),
+  registration: z
+    .string()
+    .min(1)
+    .transform((v) => v.replace(/[^A-Za-z0-9]/g, '').toUpperCase())
+    .refine((v) => /^[A-Z0-9]+$/.test(v), {
+      message: 'Vehicle registration can only contain letters and numbers — no spaces or special characters.',
+    }),
   vehicleType: z.string().min(1),
   logisticsPartner: z.string().optional(),
   driverName: z.string().min(1),
@@ -83,8 +92,8 @@ const invoiceSchema = z.object({
   invoiceNo: z.string().min(1),
   invoiceDate: z.string(),
   taxableAmount: z.number().nonnegative(),
-  taxRatePct: z.number().nonnegative().optional(),
-  billingWeight: z.number().nonnegative().optional(),
+  taxRatePct: z.number().min(0),
+  billingWeight: z.number().positive(),
   deviationNote: z.string().optional(),
   billingMode: z.string().optional(),
   ewayBillNo: z.string().min(1),
@@ -92,6 +101,8 @@ const invoiceSchema = z.object({
   vehicleIds: z.array(z.string()).optional(),
   invoiceFileId: z.string().optional(),
   ewayFileId: z.string().optional(),
+  invoiceFileIds: z.array(z.string()).optional(),
+  ewayFileIds: z.array(z.string()).optional(),
 });
 
 export async function lifecycleRoutes(app: FastifyInstance) {
@@ -136,6 +147,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           notes: z.string().optional(),
           ref: z.string().optional(),
           bomFileId: z.string().nullable().optional(),
+          bomFileIds: z.array(z.string()).optional(),
           items: z.array(lineItemSchema).optional(),
           siteId: z.string().min(1).optional(),
           requestDate: z.string().optional(),
@@ -167,6 +179,15 @@ export async function lifecycleRoutes(app: FastifyInstance) {
     }
   });
 
+  app.delete('/vehicles/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      return await deleteVehicle(request.user!, id);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
   app.post('/vehicles/:id/weighment', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
@@ -182,6 +203,25 @@ export async function lifecycleRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = invoiceSchema.parse(request.body);
       return await createInvoice(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.patch('/invoices/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = invoiceSchema.parse(request.body);
+      return await updateInvoice(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.delete('/invoices/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      return await deleteInvoice(request.user!, id);
     } catch (err) {
       return handleServiceError(err, reply);
     }

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dataApi, filesApi, lifecycleApi, type SessionUser } from '../api';
-import { FileThumb } from '../components/FileThumb';
+import { dataApi, lifecycleApi, type SessionUser } from '../api';
+import { FileUpload } from '../components/FileUpload';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { Modal } from '../components/Modal';
 
@@ -9,7 +9,6 @@ const BOM_MAX_MB = 10;
 
 export function NewRequestPage({ user }: { user: SessionUser }) {
   const nav = useNavigate();
-  const bomInput = useRef<HTMLInputElement>(null);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [clientId, setClientId] = useState(user.clientId ?? '');
@@ -22,7 +21,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   const [qtyTouched, setQtyTouched] = useState(false);
   const [wtTouched, setWtTouched] = useState(false);
   const [notes, setNotes] = useState('');
-  const [bom, setBom] = useState<{ id: string; name: string } | null>(null);
+  const [bomIds, setBomIds] = useState<string[]>([]);
   const [items, setItems] = useState<DraftLine[]>([{ ...EMPTY_LINE }]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -56,20 +55,6 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
     if (w && !wtTouched) setApproxWeight(w.toFixed(1));
   }, [items, qtyTouched, wtTouched]);
 
-  async function onBom(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    setError('');
-    try {
-      const rec = await filesApi.upload(file, 'bom');
-      setBom({ id: rec.id, name: rec.name });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not attach BoM');
-    } finally {
-      if (bomInput.current) bomInput.current.value = '';
-    }
-  }
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const named = namedDraftLines(items);
@@ -77,7 +62,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
       setError('Site, location, date, approximate quantity and weight are all required.');
       return;
     }
-    if (!named.length && !bom) {
+    if (!named.length && !bomIds.length) {
       setError('Add at least one line item, or attach a bill of materials.');
       return;
     }
@@ -93,7 +78,8 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
         approxQty: Number(approxQty),
         notes: notes.trim() || undefined,
         ref: ref.trim() || undefined,
-        bomFileId: bom?.id,
+        bomFileId: bomIds[0],
+        bomFileIds: bomIds,
         items: named,
       });
       nav(`/requests/${sub.id}`);
@@ -223,24 +209,14 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
             optional — CSV, Excel or PDF up to {BOM_MAX_MB} MB
           </span>
         </div>
-        {bom ? (
-          <div className="frow">
-            <FileThumb id={bom.id} kind="doc" name={bom.name} />
-            <button type="button" className="btn brd bsm" onClick={() => setBom(null)}>
-              ×
-            </button>
-          </div>
-        ) : null}
-        <label className="btn bs bsm" style={{ cursor: 'pointer' }}>
-          📤 Attach BoM
-          <input
-            ref={bomInput}
-            type="file"
-            accept=".csv,.xlsx,.xls,.pdf"
-            style={{ display: 'none' }}
-            onChange={(e) => void onBom(e.target.files)}
-          />
-        </label>
+        <FileUpload
+          kind="bom"
+          label="Attach BoM"
+          hint={`CSV, Excel or PDF up to ${BOM_MAX_MB} MB each — you can attach more than one file`}
+          accept=".csv,.xls,.xlsx,application/pdf,text/csv"
+          value={bomIds}
+          onChange={setBomIds}
+        />
 
         <LineItemsEditor items={items} onChange={setItems} hint="optional if BoM attached" />
 

@@ -39,7 +39,7 @@ export function maxMbForKind(kind: FileKind): number {
 
 const MIME_BY_KIND: Partial<Record<FileKind, string[]>> = {
   weighPhoto: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'],
-  pickPhoto: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'],
+  pickPhoto: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif', 'image/bmp'],
   planting: ['image/jpeg', 'image/png', 'image/webp'],
   processing: ['image/jpeg', 'image/png', 'image/webp'],
   certificate: ['application/pdf'],
@@ -56,9 +56,40 @@ const MIME_BY_KIND: Partial<Record<FileKind, string[]>> = {
   report: ['application/pdf'],
 };
 
-export function isMimeAllowed(kind: FileKind, mimeType: string): boolean {
+const MIME_ALIASES: Record<string, string> = {
+  'image/jpg': 'image/jpeg',
+  'image/pjpeg': 'image/jpeg',
+  'image/x-png': 'image/png',
+  'image/heif': 'image/heic',
+};
+
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heic',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  pdf: 'application/pdf',
+  csv: 'text/csv',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};
+
+function mimeFromFilename(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop()?.trim() ?? '';
+  return EXT_TO_MIME[ext] ?? '';
+}
+
+export function isMimeAllowed(kind: FileKind, mimeType: string, filename = ''): boolean {
   const allowed = MIME_BY_KIND[kind];
   if (!allowed) return true;
-  const mime = mimeType.toLowerCase();
-  return allowed.some((a) => mime === a || mime.startsWith(`${a};`));
+  const raw = (mimeType || '').toLowerCase().split(';')[0].trim();
+  const mime = MIME_ALIASES[raw] || raw;
+  if (mime && allowed.some((a) => mime === a || mime.startsWith(`${a};`))) return true;
+  const fromName = mimeFromFilename(filename);
+  if (fromName && allowed.includes(fromName)) return true;
+  return false;
 }

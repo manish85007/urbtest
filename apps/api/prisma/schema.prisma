@@ -178,6 +178,7 @@ model Submission {
   approxQty    Int       @default(0) @map("approx_qty")
   approxWeight Decimal   @default(0) @map("approx_weight") @db.Decimal(12, 3)
   bomFileId    String?   @map("bom_file_id")
+  bomFileIds   String[]  @default([]) @map("bom_file_ids")
   notes        String?
   createdBy    String    @map("created_by")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -282,8 +283,10 @@ model Invoice {
   billingMode   String    @default("urbeno") @map("billing_mode")
   ewayBillNo    String    @map("eway_bill_no")
   ewayBillDate  DateTime  @map("eway_bill_date") @db.Date
-  invoiceFileId String?   @map("invoice_file_id")
-  ewayFileId    String?   @map("eway_file_id")
+  invoiceFileId  String?   @map("invoice_file_id")
+  ewayFileId     String?   @map("eway_file_id")
+  invoiceFileIds String[]  @default([]) @map("invoice_file_ids")
+  ewayFileIds    String[]  @default([]) @map("eway_file_ids")
   vehicleIds    String[]  @default([]) @map("vehicle_ids")
   createdBy     String    @map("created_by")
   createdAt     DateTime  @default(now()) @map("created_at")

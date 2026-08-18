@@ -79,7 +79,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     expect(ack.derivedStage).toBeGreaterThanOrEqual(2);
 
     const { vehicle } = await addVehicle(admin, submissionId, {
-      registration: 'KA-INT-2026',
+      registration: 'KAINT2026',
       vehicleType: 'VT2',
       driverName: 'Test Driver',
       driverPhone: '+91 99000 00000',
@@ -89,7 +89,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
 
     await expect(
       updateVehicle(admin, vehicleId, {
-        registration: 'KA-INT-BROKE',
+        registration: 'KAINTBROKE',
         vehicleType: 'VT3',
         driverName: 'Test Driver',
         driverPhone: '+91 99000 00000',
@@ -98,7 +98,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     ).rejects.toThrow(/remark/i);
 
     await updateVehicle(admin, vehicleId, {
-      registration: 'KA-INT-BROKE',
+      registration: 'KAINTBROKE',
       vehicleType: 'VT3',
       driverName: 'Test Driver',
       driverPhone: '+91 99000 00000',
@@ -107,7 +107,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     });
 
     await updateVehicle(admin, vehicleId, {
-      registration: 'KA-INT-2026',
+      registration: 'KAINT2026',
       vehicleType: 'VT2',
       driverName: 'Test Driver',
       driverPhone: '+91 99000 00000',
@@ -131,6 +131,8 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       invoiceNo: `INV-INT-${Date.now()}`,
       invoiceDate: '2026-08-16',
       taxableAmount: 5000,
+      taxRatePct: 18,
+      billingWeight: 50,
       ewayBillNo: 'EWB-INT-001',
       ewayBillDate: '2026-08-16',
       vehicleIds: [vehicleId],

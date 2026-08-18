@@ -26,24 +26,35 @@ export async function filesRoutes(app: FastifyInstance) {
 
   app.post('/files', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const part = await request.file();
-      if (!part) {
-        return reply.badRequest('No file uploaded.');
+      const queryKind =
+        typeof (request.query as { kind?: string }).kind === 'string'
+          ? (request.query as { kind: string }).kind.trim()
+          : '';
+      let kindRaw = queryKind;
+      let filename = '';
+      let mimeType = '';
+      let buffer: Buffer | null = null;
+
+      for await (const part of request.parts()) {
+        if (part.type === 'file') {
+          filename = part.filename;
+          mimeType = part.mimetype;
+          buffer = await part.toBuffer();
+        } else if (part.fieldname === 'kind') {
+          kindRaw = String(part.value ?? '').trim();
+        }
       }
 
-      const kindField = part.fields.kind;
-      const kindRaw =
-        kindField && typeof kindField === 'object' && 'value' in kindField
-          ? String(kindField.value)
-          : '';
+      if (!buffer) {
+        return reply.badRequest('No file uploaded.');
+      }
       if (!FILE_KINDS.has(kindRaw)) {
         return reply.badRequest(`Invalid or missing file kind: ${kindRaw || '(empty)'}`);
       }
 
-      const buffer = await part.toBuffer();
       const result = await uploadFile(request.user!, {
-        filename: part.filename,
-        mimeType: part.mimetype,
+        filename,
+        mimeType,
         sizeBytes: buffer.length,
         buffer,
         kind: kindRaw as FileKind,
