@@ -37,7 +37,7 @@ export function PhoneField({
   function handleNationalChange(raw: string) {
     const digits = digitsOnly(raw).slice(0, 10);
     setDraft(digits);
-    onChange(digits ? formatE164(digits, cc) : '');
+    onChange(digits ? (digits.length === 10 ? formatE164(digits, cc) : digits) : '');
   }
 
   function handleCcChange(newCc: string) {

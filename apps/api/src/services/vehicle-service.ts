@@ -5,10 +5,11 @@ import { roundKg, toKg } from '../lib/decimal.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude } from '../lib/db-helpers.js';
 import { loadSubmissionForActor, requireStaff } from '../lib/access.js';
-import { withDerivedStages } from '../lib/stage-mapper.js';
+import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
 import { sendTransactionalEmail } from './email.js';
+import { stageLabel } from '@urb-tectrack/shared';
 
 export interface TeamMemberInput {
   name: string;
@@ -40,6 +41,22 @@ export interface WeighmentInput {
   pickupPhotoIds?: string[];
 }
 
+async function emailStageChange(
+  beforeStage: number,
+  refreshed: Awaited<ReturnType<typeof loadSubmissionForActor>>,
+  detail: string,
+) {
+  const afterStage = deriveSubmissionStage(refreshed);
+  if (afterStage === beforeStage) return;
+  await sendTransactionalEmail('request_stage_update', [refreshed.createdBy], {
+    request_id: refreshed.id,
+    site_name: refreshed.site.name,
+    contact_name: refreshed.createdBy,
+    stage_name: stageLabel(afterStage),
+    status_detail: detail,
+  });
+}
+
 export async function addVehicle(
   actor: SessionUser,
   submissionId: string,
@@ -47,6 +64,7 @@ export async function addVehicle(
 ) {
   requireStaff(actor);
   const sub = await loadSubmissionForActor(submissionId, actor);
+  const beforeStage = deriveSubmissionStage(sub);
   if (!sub.acknowledgedAt) {
     throw new AppError('Acknowledge the request before assigning vehicles.');
   }
@@ -104,6 +122,7 @@ export async function addVehicle(
     driver_phone: input.driverPhone,
     contact_name: refreshed.createdBy,
   });
+  await emailStageChange(beforeStage, refreshed, `Pickup scheduled for ${vehicle.registration}.`);
 
   return { vehicle, submission: withDerivedStages(refreshed) };
 }
@@ -120,9 +139,9 @@ export async function recordWeighment(
     include: { submission: true, weighment: true },
   });
   if (!vehicle) throw new AppError('Vehicle not found', 404);
-  if (vehicle.weighment) throw new AppError('This vehicle already has a weighment recorded.');
 
   const sub = await loadSubmissionForActor(vehicle.submissionId, actor);
+  const beforeStage = deriveSubmissionStage(sub);
 
   let data;
   if (input.manual) {
@@ -195,11 +214,17 @@ export async function recordWeighment(
     });
   }
 
-  const weighment = await prisma.weighment.create({
-    data: { vehicleId, ...data },
-  });
+  const weighment = vehicle.weighment
+    ? await prisma.weighment.update({
+        where: { vehicleId },
+        data,
+      })
+    : await prisma.weighment.create({
+        data: { vehicleId, ...data },
+      });
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);
+  await emailStageChange(beforeStage, refreshed, `Weighment recorded for ${vehicle.registration}.`);
   return { weighment, submission: withDerivedStages(refreshed) };
 }
 

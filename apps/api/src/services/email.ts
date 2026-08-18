@@ -7,6 +7,24 @@ import { deliverEmail } from './email-provider.js';
 const PORTAL_URL = process.env.PORTAL_URL ?? 'http://localhost:5173';
 
 const ADMIN_TEMPLATES = new Set(['request_new_admin']);
+const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: string }> = {
+  request_stage_update: {
+    name: 'Request Stage Update',
+    subject: 'Update on your request {{request_id}} — now at {{stage_name}}',
+    body:
+      'Dear {{contact_name}},\n\n' +
+      'Your Urb TecTrack request has moved to the next stage.\n\n' +
+      '  Request ID : {{request_id}}\n' +
+      '  Site       : {{site_name}}\n' +
+      '  New stage  : {{stage_name}}\n' +
+      '  Update     : {{status_detail}}\n\n' +
+      'You can review the latest status in your Urb TecTrack portal:\n' +
+      '{{portal_url}}\n\n' +
+      'Warm regards,\n' +
+      'Urbeno Private Limited\n' +
+      'Recycling Heroes™',
+  },
+};
 
 async function resolveRecipients(templateKey: string, to: string[]): Promise<string[]> {
   const filtered = to.filter(Boolean);
@@ -25,7 +43,11 @@ export async function sendTransactionalEmail(
   to: string[],
   vars: Record<string, unknown>,
 ) {
-  const template = await prisma.emailTemplate.findUnique({ where: { key: templateKey } });
+  const dbTemplate = await prisma.emailTemplate.findUnique({ where: { key: templateKey } });
+  const fallback = FALLBACK_TEMPLATES[templateKey];
+  const template = dbTemplate
+    ? { name: dbTemplate.name, subject: dbTemplate.subject, body: dbTemplate.body }
+    : fallback;
   if (!template) {
     await auditLog({
       actorEmail: 'system',

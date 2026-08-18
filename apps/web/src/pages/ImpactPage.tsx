@@ -1,27 +1,86 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SUSTAINABILITY } from '@urb-tectrack/shared';
-import { dataApi, filesApi, type ClientDashboardReport, type PeriodQuery } from '../api';
+import { dataApi, filesApi, type ClientDashboardReport, type PeriodQuery, type RegisterReport } from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
 
 export function ImpactPage() {
   const [report, setReport] = useState<ClientDashboardReport | null>(null);
+  const [staffReport, setStaffReport] = useState<RegisterReport | null>(null);
   const [error, setError] = useState('');
   const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
 
   useEffect(() => {
+    setError('');
     dataApi
       .reportsDashboard(undefined, period)
-      .then((r) => {
-        if (r.kind === 'client') setReport(r);
-        else setError('Sustainability impact is available to client users.');
+      .then(async (r) => {
+        if (r.kind === 'client') {
+          setReport(r);
+          setStaffReport(null);
+        }
+        else {
+          setReport(null);
+          setStaffReport(await dataApi.register('sustain', period));
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
   }, [period.period, period.fy, period.year, period.from, period.to]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!report) return <p className="muted">Loading sustainability impact…</p>;
+  if (!report && !staffReport) return <p className="muted">Loading sustainability impact…</p>;
 
+  if (staffReport) {
+    return (
+      <div>
+        <div className="f-row" style={{ marginBottom: '.9rem' }}>
+          <div>
+            <div className="h1">Sustainability</div>
+            <div className="p-mu" style={{ margin: 0 }}>
+              {staffReport.periodLabel} · portfolio sustainability summary for Urbeno operations
+            </div>
+          </div>
+          <div className="spacer" />
+          <PeriodPicker value={period} onChange={setPeriod} />
+          <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+            📄 How these numbers are built
+          </a>
+          <Link to="/heroes" className="btn bp">
+            Recycle Heroes →
+          </Link>
+        </div>
+
+        <div className="card">
+          <div className="section-hd">{staffReport.description}</div>
+          <p className="dim" style={{ fontSize: '.82rem' }}>
+            Scope: {staffReport.scopeLabel}
+          </p>
+          <div className="tw" style={{ marginTop: '.6rem' }}>
+            <table>
+              <thead>
+                <tr>
+                  {staffReport.head.map((head) => (
+                    <th key={head}>{head}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {staffReport.rows.map((row, idx) => (
+                  <tr key={idx}>
+                    {row.map((cell, cellIdx) => (
+                      <td key={cellIdx}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!report) return <p className="muted">Loading sustainability impact…</p>;
   const { impact } = report;
 
   return (

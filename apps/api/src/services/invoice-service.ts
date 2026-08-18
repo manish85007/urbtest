@@ -9,6 +9,7 @@ import {
   unpaidCloseMessage,
   formatMrnNumber,
   getFY,
+  stageLabel,
   type MaterialGroupCode,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
@@ -24,13 +25,29 @@ import {
   requireStaff,
   syncSubmissionClosure,
 } from '../lib/access.js';
-import { deriveInvoiceStage, withDerivedStages } from '../lib/stage-mapper.js';
+import { deriveInvoiceStage, deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { logSoD, sodCheck } from './compliance.js';
 import { assertFilesExist } from './file-service.js';
 import { assertCategoryCapacityOrOverride } from './category-capacity.js';
 import { sendTransactionalEmail } from './email.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
+
+async function emailStageChange(
+  beforeStage: number,
+  refreshed: Awaited<ReturnType<typeof loadSubmissionForActor>>,
+  detail: string,
+) {
+  const afterStage = deriveSubmissionStage(refreshed);
+  if (afterStage === beforeStage) return;
+  await sendTransactionalEmail('request_stage_update', [refreshed.createdBy], {
+    request_id: refreshed.id,
+    site_name: refreshed.site.name,
+    contact_name: refreshed.createdBy,
+    stage_name: stageLabel(afterStage),
+    status_detail: detail,
+  });
+}
 
 async function allocateMrnInTx(
   tx: Prisma.TransactionClient,
@@ -233,6 +250,7 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
 export async function createMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   requireFactory(actor, input.factoryId);
+  const beforeStage = deriveSubmissionStage(invoice.submission);
 
   if (invoice.mrn) throw new AppError('This invoice already has an MRN.');
 
@@ -319,6 +337,9 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
     invoice.submissionId,
   );
 
+  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+  await emailStageChange(beforeStage, refreshed, `MRN ${mrn.mrnNo} was created at ${factory.name}.`);
+
   return mrn;
 }
 
@@ -328,6 +349,7 @@ export async function createRecycling(
   input: RecyclingInput,
 ) {
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  const beforeStage = deriveSubmissionStage(invoice.submission);
   if (!invoice.mrn) throw new AppError('Create the MRN before recycling this invoice.');
   if (invoice.recycling) throw new AppError('This invoice already has a recycling record.');
 
@@ -472,6 +494,8 @@ export async function createRecycling(
     `${invoice.invoiceNo} processed — Form 6 ${recycling.form6No} issued`,
     invoice.submissionId,
   );
+  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+  await emailStageChange(beforeStage, refreshed, `Form 6 ${recycling.form6No} was issued.`);
 
   return recycling;
 }
@@ -483,6 +507,7 @@ export async function uploadCertificate(
 ) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  const beforeStage = deriveSubmissionStage(invoice.submission);
   if (!invoice.recycling) {
     throw new AppError('Complete recycling before uploading the Certificate of Destruction.');
   }
@@ -545,6 +570,13 @@ export async function uploadCertificate(
     },
   });
 
+  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+  await emailStageChange(
+    beforeStage,
+    refreshed,
+    `Certificate of Destruction ${certificate.certNo} was uploaded.`,
+  );
+
   return certificate;
 }
 
@@ -561,6 +593,7 @@ export async function closeInvoice(
   input: CloseInvoiceInput = {},
 ) {
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  const beforeStage = deriveSubmissionStage(invoice.submission);
   const stage = deriveInvoiceStage(invoice);
 
   if (invoice.closedAt) throw new AppError('This invoice is already closed.');
@@ -630,6 +663,8 @@ export async function closeInvoice(
     `${invoice.invoiceNo} closed by ${actor.name}${input.rating ? ` — rated ${input.rating}/5` : ''}`,
     invoice.submissionId,
   );
+  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+  await emailStageChange(beforeStage, refreshed, `${invoice.invoiceNo} was closed.`);
 
   return closed;
 }

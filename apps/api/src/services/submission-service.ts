@@ -270,9 +270,6 @@ export async function updateSubmission(
     if (actor.clientId !== sub.clientId) {
       throw new AppError('You can only edit your own requests.');
     }
-    if (!sub.rejectNote) {
-      throw new AppError('This request has not been sent back for changes.');
-    }
   } else {
     throw new AppError('You cannot edit this request.');
   }
@@ -332,7 +329,7 @@ export async function updateSubmission(
   if (actor.role === 'client') {
     await notifyAdmins(
       'sub.resubmit',
-      `Request ${updated.id} updated by client after changes were requested`,
+      `Request ${updated.id} updated by client${sub.rejectNote ? ' after changes were requested' : ''}`,
       updated.id,
     );
   }

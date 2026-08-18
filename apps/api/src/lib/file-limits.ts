@@ -38,7 +38,7 @@ export function maxMbForKind(kind: FileKind): number {
 }
 
 const MIME_BY_KIND: Partial<Record<FileKind, string[]>> = {
-  weighPhoto: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'],
+  weighPhoto: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'],
   pickPhoto: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'],
   planting: ['image/jpeg', 'image/png', 'image/webp'],
   processing: ['image/jpeg', 'image/png', 'image/webp'],

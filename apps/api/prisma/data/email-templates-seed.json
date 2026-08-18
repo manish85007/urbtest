@@ -49,6 +49,13 @@
     "variables": ["request_id", "site_name", "expected_date", "registration", "driver_name", "driver_phone", "contact_name", "client_name"]
   },
   {
+    "key": "request_stage_update",
+    "name": "Request Stage Update",
+    "subject": "Update on your request {{request_id}} — now at {{stage_name}}",
+    "body": "Dear {{contact_name}},\n\nYour Urb TecTrack request has moved to the next stage.\n\n  Request ID : {{request_id}}\n  Site       : {{site_name}}\n  New stage  : {{stage_name}}\n  Update     : {{status_detail}}\n\nYou can review the latest status in your Urb TecTrack portal:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "site_name", "stage_name", "status_detail", "contact_name", "portal_url"]
+  },
+  {
     "key": "password_reset",
     "name": "Password Reset Code",
     "subject": "Your Urb TecTrack password reset code",

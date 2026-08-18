@@ -5,7 +5,7 @@ import { dataApi, filesApi, lifecycleApi, type SessionUser, type SubmissionDetai
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
-import { FileRow, FileThumb } from '../components/FileThumb';
+import { FileRow } from '../components/FileThumb';
 import { QueryThread } from '../components/QueryThread';
 import { PhoneField } from '../components/PhoneField';
 import { Modal } from '../components/Modal';
@@ -356,7 +356,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         <Modal
           title={`Weighment — ${weighTarget.registration}`}
           onClose={() => setStep(null)}
-          okLabel="Record weighment"
+          okLabel={weighTarget.weighment ? 'Save weighment' : 'Record weighment'}
           form="weigh-form"
           busy={busy}
           wide
@@ -431,7 +431,7 @@ function RequestCard({
   const isClient = user.role === 'client';
   const isAdmin = user.role === 'admin';
   const closed = !!sub.closedAt;
-  const canEdit = !closed && (isAdmin || (isClient && sub.derivedStage === 1 && !!sub.rejectNote));
+  const canEdit = !closed && (isAdmin || (isClient && sub.derivedStage === 1));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
 
   return (
@@ -465,6 +465,10 @@ function RequestCard({
         <div className="tile">
           <div className="tile-l">Pickup Location</div>
           <div className="tile-v">{sub.location || '—'}</div>
+        </div>
+        <div className="tile">
+          <div className="tile-l">Request Date</div>
+          <div className="tile-v">{fmtDate(sub.requestDate)}</div>
         </div>
         <div className="tile">
           <div className="tile-l">Raised By</div>
@@ -1255,6 +1259,14 @@ function localDateTimeValue(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function localDateValue(d = new Date()) {
+  return localDateTimeValue(d).slice(0, 10);
+}
+
+function localTimeValue(d = new Date()) {
+  return localDateTimeValue(d).slice(11, 16);
+}
+
 function AssignVehicleForm({
   disabled,
   onAssign,
@@ -1283,9 +1295,9 @@ function AssignVehicleForm({
   const [driverName, setDriverName] = useState(vehicle?.driverName ?? '');
   const [driverPhone, setDriverPhone] = useState(vehicle?.driverPhone ?? '');
   const [partner, setPartner] = useState(vehicle?.logisticsPartner ?? '');
-  const [expectedAt, setExpectedAt] = useState(
-    vehicle?.expectedAt ? localDateTimeValue(new Date(vehicle.expectedAt)) : localDateTimeValue(),
-  );
+  const initialExpected = vehicle?.expectedAt ? new Date(vehicle.expectedAt) : new Date();
+  const [expectedDate, setExpectedDate] = useState(localDateValue(initialExpected));
+  const [expectedTime, setExpectedTime] = useState(localTimeValue(initialExpected));
   const [remark, setRemark] = useState(vehicle?.changeRemark ?? '');
   const [team, setTeam] = useState<Array<{ name: string; role: string; phone: string }>>(() => {
     if (!vehicle?.team?.length) return [];
@@ -1312,7 +1324,7 @@ function AssignVehicleForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError('');
-        if (!expectedAt) {
+        if (!expectedDate || !expectedTime) {
           setError('Expected pickup date and time is required.');
           return;
         }
@@ -1335,6 +1347,7 @@ function AssignVehicleForm({
           );
           return;
         }
+        const expectedAt = `${expectedDate}T${expectedTime}`;
         onAssign({
           registration,
           vehicleType,
@@ -1386,14 +1399,12 @@ function AssignVehicleForm({
           </select>
         </div>
         <div className="fg">
-          <label htmlFor="vh-exp">Expected pickup</label>
-          <input
-            id="vh-exp"
-            type="datetime-local"
-            value={expectedAt}
-            onChange={(e) => setExpectedAt(e.target.value)}
-            required
-          />
+          <label htmlFor="vh-exp-date">Expected pickup date</label>
+          <input id="vh-exp-date" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} required />
+        </div>
+        <div className="fg">
+          <label htmlFor="vh-exp-time">Expected pickup time</label>
+          <input id="vh-exp-time" type="time" value={expectedTime} onChange={(e) => setExpectedTime(e.target.value)} required />
         </div>
         <div className="fg">
           <label htmlFor="vh-drv">Driver name</label>
@@ -1432,6 +1443,7 @@ function AssignVehicleForm({
               value={t.role}
               onChange={(e) => setTeam((rows) => rows.map((r, j) => (j === i ? { ...r, role: e.target.value } : r)))}
             >
+              <option value="">Select role</option>
               {teamRoles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.label}
@@ -1462,7 +1474,7 @@ function AssignVehicleForm({
       <button
         type="button"
         className="btn bs bsm"
-        onClick={() => setTeam((rows) => [...rows, { name: '', role: teamRoles[1]?.id ?? teamRoles[0]?.id ?? 'TR2', phone: '' }])}
+        onClick={() => setTeam((rows) => [...rows, { name: '', role: '', phone: '' }])}
       >
         + Add Team Member
       </button>
@@ -1482,7 +1494,7 @@ function WeighForm({
   onWeigh,
   formId,
 }: {
-  vehicle: { registration: string };
+  vehicle: VehicleDetail;
   disabled: boolean;
   formId?: string;
   onWeigh: (body: {
@@ -1497,14 +1509,15 @@ function WeighForm({
     pickupPhotoIds: string[];
   }) => void;
 }) {
-  const [manual, setManual] = useState(false);
-  const [gross, setGross] = useState('');
-  const [tare, setTare] = useState('');
-  const [manualNet, setManualNet] = useState('');
-  const [slip, setSlip] = useState('');
-  const [reason, setReason] = useState('');
-  const [slipPhotos, setSlipPhotos] = useState<string[]>([]);
-  const [pickupPhotos, setPickupPhotos] = useState<string[]>([]);
+  const existing = vehicle.weighment;
+  const [manual, setManual] = useState(Boolean(existing?.manual));
+  const [gross, setGross] = useState(existing?.grossKg ? String(existing.grossKg) : '');
+  const [tare, setTare] = useState(existing?.tareKg ? String(existing.tareKg) : '');
+  const [manualNet, setManualNet] = useState(existing?.manual ? String(existing?.netKg ?? '') : '');
+  const [slip, setSlip] = useState(existing?.slipNumber ?? '');
+  const [reason, setReason] = useState(existing?.reason ?? '');
+  const [slipPhotos, setSlipPhotos] = useState<string[]>(existing?.slipPhotoIds ?? []);
+  const [pickupPhotos, setPickupPhotos] = useState<string[]>(existing?.pickupPhotoIds ?? []);
   const [formError, setFormError] = useState('');
   const today = new Date().toISOString().slice(0, 10);
 
@@ -1576,6 +1589,10 @@ function WeighForm({
         </>
       ) : (
         <>
+          <div className="fg">
+            <label>Weighment Slip # *</label>
+            <input value={slip} onChange={(e) => setSlip(e.target.value)} required placeholder="WS-0042" style={{ fontFamily: 'ui-monospace, monospace' }} />
+          </div>
           <div className="fr3">
             <div className="fg">
               <label>Gross Weight (kg) *</label>
@@ -1594,10 +1611,6 @@ function WeighForm({
                 style={{ fontWeight: 700, color: netKg !== null ? 'var(--g)' : 'var(--g2)' }}
               />
             </div>
-          </div>
-          <div className="fg">
-            <label>Weighment Slip # *</label>
-            <input value={slip} onChange={(e) => setSlip(e.target.value)} required placeholder="WS-0042" style={{ fontFamily: 'ui-monospace, monospace' }} />
           </div>
           <FileUpload
             kind="weighPhoto"
@@ -1626,7 +1639,7 @@ function WeighForm({
           className="btn primary"
           disabled={disabled || !pickupPhotos.length || (!manual && !slipPhotos.length)}
         >
-          Record weighment
+          {existing ? 'Save weighment' : 'Record weighment'}
         </button>
       )}
     </form>
