@@ -2,6 +2,9 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import sensible from '@fastify/sensible';
+import fastifyStatic from '@fastify/static';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { authRoutes } from './routes/auth.js';
 import { submissionRoutes } from './routes/submissions.js';
 import { lifecycleRoutes } from './routes/lifecycle.js';
@@ -59,6 +62,20 @@ export async function buildApp() {
 
   if (process.env.ENABLE_JOBS !== 'false') {
     startScheduler(app);
+  }
+
+  const webDist = process.env.WEB_DIST?.trim();
+  if (webDist && existsSync(webDist)) {
+    await app.register(fastifyStatic, {
+      root: resolve(webDist),
+      wildcard: false,
+    });
+    app.setNotFoundHandler((request, reply) => {
+      if (request.method === 'GET') {
+        return reply.sendFile('index.html');
+      }
+      return reply.status(404).send({ message: 'Not found' });
+    });
   }
 
   return app;

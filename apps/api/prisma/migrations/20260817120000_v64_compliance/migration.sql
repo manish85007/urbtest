@@ -19,6 +19,14 @@ FROM (
 ) s
 WHERE a.id = s.id;
 
+CREATE SEQUENCE IF NOT EXISTS "audit_log_seq_seq";
+SELECT setval(
+  'audit_log_seq_seq',
+  COALESCE((SELECT MAX(seq) FROM "audit_log"), 1),
+  (SELECT COUNT(*) > 0 FROM "audit_log")
+);
+UPDATE "audit_log" SET seq = nextval('audit_log_seq_seq') WHERE seq IS NULL;
+ALTER TABLE "audit_log" ALTER COLUMN "seq" SET DEFAULT nextval('audit_log_seq_seq');
 ALTER TABLE "audit_log" ALTER COLUMN "seq" SET NOT NULL;
 CREATE UNIQUE INDEX "audit_log_seq_key" ON "audit_log"("seq");
 

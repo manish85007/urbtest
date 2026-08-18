@@ -14,3 +14,6 @@ apps/api/uploads/
 apps/web/test-results/
 apps/web/playwright-report/
 apps/api/prisma/migrations/**/migration_lock.toml
+infra/cdk.out/
+infra/cdk.context.json
+*.tsbuildinfo

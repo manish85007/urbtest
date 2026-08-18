@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tectrack
+      POSTGRES_PASSWORD: tectrack_uat
+      POSTGRES_DB: tectrack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tectrack -d tectrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - uat-pg:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:3001"
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USER: tectrack
+      DATABASE_PASSWORD: tectrack_uat
+      DATABASE_NAME: tectrack
+      UAT_SEED: "true"
+      COOKIE_SECURE: "false"
+      EMAIL_PROVIDER: console
+      PORTAL_URL: http://localhost:8080
+      CORS_ORIGIN: http://localhost:8080
+      ENABLE_JOBS: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  uat-pg:
