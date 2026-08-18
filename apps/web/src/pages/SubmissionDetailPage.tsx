@@ -484,7 +484,15 @@ function RequestCard({
       </div>
       {sub.bomFileId ? (
         <div className="frow">
-          <FileThumb id={sub.bomFileId} kind="doc" name="BoM" />
+          <a
+            className="btn bs bsm"
+            href={filesApi.url(sub.bomFileId)}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontWeight: 400 }}
+          >
+            📄 View BoM
+          </a>
           {canEdit ? (
             <button type="button" className="btn brd bsm" disabled={busy} onClick={() => onBom(null)}>
               ×
@@ -803,6 +811,10 @@ function DetailsCard({ sub }: { sub: SubmissionDetail }) {
         <div className="dim mono" style={{ fontSize: '.72rem' }}>
           {sub.site.contactPhone || ''}
         </div>
+      </div>
+      <div className="tile" style={{ marginBottom: '.4rem' }}>
+        <div className="tile-l">Request Date</div>
+        <div className="tile-v">{fmtDate(sub.requestDate)}</div>
       </div>
       <div className="tile" style={{ marginBottom: '.4rem' }}>
         <div className="tile-l">Raised</div>
@@ -1300,6 +1312,10 @@ function AssignVehicleForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError('');
+        if (!expectedAt) {
+          setError('Expected pickup date and time is required.');
+          return;
+        }
         if (!driverPhone) {
           setError('Driver phone is required.');
           return;
@@ -1327,10 +1343,7 @@ function AssignVehicleForm({
           logisticsPartner: partner || undefined,
           expectedAt: expectedAt || undefined,
           changeRemark: remark.trim() || undefined,
-          team: [
-            { name: driverName, role: teamRoles[0]?.id ?? 'TR1', phone: driverPhone },
-            ...extra,
-          ],
+          team: extra,
         });
       }}
     >
@@ -1487,12 +1500,17 @@ function WeighForm({
   const [manual, setManual] = useState(false);
   const [gross, setGross] = useState('');
   const [tare, setTare] = useState('');
-  const [net, setNet] = useState('');
+  const [manualNet, setManualNet] = useState('');
   const [slip, setSlip] = useState('');
   const [reason, setReason] = useState('');
   const [slipPhotos, setSlipPhotos] = useState<string[]>([]);
   const [pickupPhotos, setPickupPhotos] = useState<string[]>([]);
+  const [formError, setFormError] = useState('');
   const today = new Date().toISOString().slice(0, 10);
+
+  const grossNum = parseFloat(gross) || 0;
+  const tareNum = parseFloat(tare) || 0;
+  const netKg = grossNum > 0 && tareNum > 0 && grossNum > tareNum ? grossNum - tareNum : null;
 
   return (
     <form
@@ -1500,69 +1518,96 @@ function WeighForm({
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onWeigh(
-          manual
-            ? {
-                weighedAt: today,
-                manual: true,
-                net: Number(net),
-                reason,
-                pickupPhotoIds: pickupPhotos,
-                slipPhotoIds: [],
-              }
-            : {
-                weighedAt: today,
-                gross: Number(gross),
-                tare: Number(tare),
-                slipNumber: slip,
-                slipPhotoIds: slipPhotos,
-                pickupPhotoIds: pickupPhotos,
-              },
-        );
+        setFormError('');
+        if (!pickupPhotos.length) {
+          setFormError('Attach at least one pickup photo.');
+          return;
+        }
+        if (manual) {
+          onWeigh({
+            weighedAt: today,
+            manual: true,
+            net: Number(manualNet),
+            reason,
+            pickupPhotoIds: pickupPhotos,
+            slipPhotoIds: [],
+          });
+        } else {
+          if (!slipPhotos.length) {
+            setFormError('Attach at least one weighment slip photo.');
+            return;
+          }
+          onWeigh({
+            weighedAt: today,
+            gross: Number(gross),
+            tare: Number(tare),
+            slipNumber: slip,
+            slipPhotoIds: slipPhotos,
+            pickupPhotoIds: pickupPhotos,
+          });
+        }
       }}
     >
       <h3>Weigh {vehicle.registration}</h3>
-      <label style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+      <label style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginBottom: '.7rem' }}>
         <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
         Manual weighment (no weighbridge)
       </label>
       {manual ? (
         <>
-          <label>
-            Recorded net (kg)
-            <input type="number" step="0.001" value={net} onChange={(e) => setNet(e.target.value)} required />
-          </label>
-          <label>
-            Reason
-            <input value={reason} onChange={(e) => setReason(e.target.value)} required placeholder="Why the weighbridge was not used" />
-          </label>
+          <div className="fr3">
+            <div className="fg">
+              <label>Recorded net (kg) *</label>
+              <input type="number" step="0.001" value={manualNet} onChange={(e) => setManualNet(e.target.value)} required />
+            </div>
+            <div className="fg">
+              <label>Method used *</label>
+              <select value={reason.startsWith('Method:') ? reason.split('|')[0].replace('Method:', '').trim() : ''} onChange={(e) => setReason(`Method: ${e.target.value}`)}>
+                {['Floor scale', 'Platform scale', 'Crane scale', 'Counted and weighed by unit', 'Client-supplied figure'].map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="fg">
+            <label>Why the weighbridge was not used *</label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} required rows={2} placeholder="e.g. Client site does not permit vehicles on the weighbridge; 42 kg weighed on the floor scale." />
+          </div>
         </>
       ) : (
         <>
+          <div className="fr3">
+            <div className="fg">
+              <label>Gross Weight (kg) *</label>
+              <input type="number" step="0.001" value={gross} onChange={(e) => setGross(e.target.value)} required />
+            </div>
+            <div className="fg">
+              <label>Tare Weight (kg) *</label>
+              <input type="number" step="0.001" value={tare} onChange={(e) => setTare(e.target.value)} required />
+            </div>
+            <div className="fg">
+              <label>Net Weight (kg)</label>
+              <input
+                type="text"
+                value={netKg !== null ? netKg.toFixed(3) : '—'}
+                disabled
+                style={{ fontWeight: 700, color: netKg !== null ? 'var(--g)' : 'var(--g2)' }}
+              />
+            </div>
+          </div>
+          <div className="fg">
+            <label>Weighment Slip # *</label>
+            <input value={slip} onChange={(e) => setSlip(e.target.value)} required placeholder="WS-0042" style={{ fontFamily: 'ui-monospace, monospace' }} />
+          </div>
           <FileUpload
             kind="weighPhoto"
             label="Weighment slip photos"
-            hint="At least 1 photo · max 5 MB each · JPG/PNG"
-            accept="image/jpeg,image/png,image/webp"
-            required
+            hint="At least 1 photo · max 5 MB each · JPG/PNG/PDF"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             disabled={disabled}
             value={slipPhotos}
             onChange={setSlipPhotos}
           />
-          <div className="fr3">
-            <label>
-              Gross (kg)
-              <input type="number" step="0.001" value={gross} onChange={(e) => setGross(e.target.value)} required />
-            </label>
-            <label>
-              Tare (kg)
-              <input type="number" step="0.001" value={tare} onChange={(e) => setTare(e.target.value)} required />
-            </label>
-            <label>
-              Slip no.
-              <input value={slip} onChange={(e) => setSlip(e.target.value)} required />
-            </label>
-          </div>
         </>
       )}
       <FileUpload
@@ -1570,11 +1615,11 @@ function WeighForm({
         label="Pickup photos"
         hint="At least 1 photo · max 5 MB each · JPG/PNG"
         accept="image/jpeg,image/png,image/webp"
-        required
         disabled={disabled}
         value={pickupPhotos}
         onChange={setPickupPhotos}
       />
+      {formError ? <p className="error">{formError}</p> : null}
       {formId ? null : (
         <button
           type="submit"

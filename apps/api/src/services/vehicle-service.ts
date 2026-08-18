@@ -8,6 +8,7 @@ import { loadSubmissionForActor, requireStaff } from '../lib/access.js';
 import { withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
+import { sendTransactionalEmail } from './email.js';
 
 export interface TeamMemberInput {
   name: string;
@@ -50,14 +51,11 @@ export async function addVehicle(
     throw new AppError('Acknowledge the request before assigning vehicles.');
   }
 
-  if (!input.team?.length) {
-    throw new AppError('Every vehicle needs at least one team member with name, role and phone.');
-  }
-
   const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
 
-  for (const member of input.team) {
-    if (!member.name?.trim() || !member.role?.trim() || !member.phone?.trim()) {
+  const extraTeam = (input.team ?? []).filter((m) => m.name?.trim() && m.phone?.trim());
+  for (const member of extraTeam) {
+    if (!member.role?.trim()) {
       throw new AppError('Every team member needs a name, role and phone.');
     }
     requireMobile(member.phone, 'Team member phone');
@@ -73,7 +71,7 @@ export async function addVehicle(
       driverPhone,
       expectedAt: input.expectedAt ? new Date(input.expectedAt) : null,
       team: {
-        create: input.team.map((m) => ({
+        create: extraTeam.map((m) => ({
           name: m.name.trim(),
           role: m.role.trim(),
           phone: requireMobile(m.phone, 'Team member phone'),
@@ -93,6 +91,20 @@ export async function addVehicle(
   });
 
   const refreshed = await loadSubmissionForActor(submissionId, actor);
+
+  await sendTransactionalEmail('vehicle_assigned', [refreshed.createdBy], {
+    request_id: refreshed.id,
+    client_name: refreshed.client.name,
+    site_name: refreshed.site.name,
+    expected_date: input.expectedAt
+      ? new Date(input.expectedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+      : '(TBD)',
+    registration: vehicle.registration,
+    driver_name: input.driverName.trim(),
+    driver_phone: input.driverPhone,
+    contact_name: refreshed.createdBy,
+  });
+
   return { vehicle, submission: withDerivedStages(refreshed) };
 }
 
@@ -209,13 +221,10 @@ export async function updateVehicle(
     throw new AppError('This request is closed — vehicle details can no longer be changed.');
   }
 
-  if (!input.team?.length) {
-    throw new AppError('Every vehicle needs at least one team member with name, role and phone.');
-  }
-
   const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
-  for (const member of input.team) {
-    if (!member.name?.trim() || !member.role?.trim() || !member.phone?.trim()) {
+  const extraTeam = (input.team ?? []).filter((m) => m.name?.trim() && m.phone?.trim());
+  for (const member of extraTeam) {
+    if (!member.role?.trim()) {
       throw new AppError('Every team member needs a name, role and phone.');
     }
     requireMobile(member.phone, 'Team member phone');
@@ -244,7 +253,7 @@ export async function updateVehicle(
         expectedAt: input.expectedAt ? new Date(input.expectedAt) : null,
         changeRemark: remark || vehicle.changeRemark,
         team: {
-          create: input.team.map((m) => ({
+          create: extraTeam.map((m) => ({
             name: m.name.trim(),
             role: m.role.trim(),
             phone: requireMobile(m.phone, 'Team member phone'),

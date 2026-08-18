@@ -211,6 +211,14 @@ export async function rejectSubmission(actor: SessionUser, submissionId: string,
     include: submissionInclude,
   });
 
+  await sendTransactionalEmail('request_changes', [updated.createdBy], {
+    request_id: updated.id,
+    client_name: updated.client.name,
+    site_name: updated.site.name,
+    reason: reason.trim(),
+    contact_name: updated.createdBy,
+  });
+
   await notifyUsers(
     [updated.createdBy],
     'sub.reject',

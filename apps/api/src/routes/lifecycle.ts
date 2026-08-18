@@ -63,7 +63,7 @@ const vehicleSchema = z.object({
         phone: z.string().min(1),
       }),
     )
-    .min(1),
+    .default([]),
 });
 
 const weighmentSchema = z.object({

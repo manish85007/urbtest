@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { COUNTRY_CODES, digitsOnly, formatE164, splitPhone } from '@urb-tectrack/shared';
 
 interface PhoneFieldProps {
@@ -9,7 +10,7 @@ interface PhoneFieldProps {
   placeholder?: string;
 }
 
-/** Country-code select + frozen 10-digit national number. Label stays on the 10-digit input for e2e. */
+/** Country-code select + 10-digit national number input. */
 export function PhoneField({
   label,
   value,
@@ -21,9 +22,27 @@ export function PhoneField({
   const parsed = splitPhone(value);
   const inputId = id ?? `ph-${label.replace(/\s+/g, '-').toLowerCase()}`;
 
-  function emit(cc: string, national: string) {
-    const n = digitsOnly(national).slice(0, 10);
-    onChange(n ? formatE164(n, cc) : '');
+  // Keep a local draft so that partial typing (< 10 digits) doesn't corrupt
+  // the controlled value via the E164 round-trip.
+  const [draft, setDraft] = useState(parsed.national);
+  const [cc, setCc] = useState(parsed.cc);
+
+  // Sync draft when parent resets the value (e.g. vehicle edit loads existing)
+  useEffect(() => {
+    setDraft(parsed.national);
+    setCc(parsed.cc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  function handleNationalChange(raw: string) {
+    const digits = digitsOnly(raw).slice(0, 10);
+    setDraft(digits);
+    onChange(digits ? formatE164(digits, cc) : '');
+  }
+
+  function handleCcChange(newCc: string) {
+    setCc(newCc);
+    onChange(draft ? formatE164(draft, newCc) : '');
   }
 
   return (
@@ -35,8 +54,8 @@ export function PhoneField({
       <div className="phone-in">
         <select
           aria-label="ISD country code"
-          value={parsed.cc}
-          onChange={(e) => emit(e.target.value, parsed.national)}
+          value={cc}
+          onChange={(e) => handleCcChange(e.target.value)}
         >
           {COUNTRY_CODES.map((c) => (
             <option key={c.cc} value={c.cc}>
@@ -52,9 +71,9 @@ export function PhoneField({
           maxLength={10}
           pattern="[0-9]{10}"
           placeholder={placeholder}
-          value={parsed.national}
+          value={draft}
           required={required}
-          onChange={(e) => emit(parsed.cc, digitsOnly(e.target.value).slice(0, 10))}
+          onChange={(e) => handleNationalChange(e.target.value)}
         />
       </div>
     </div>
