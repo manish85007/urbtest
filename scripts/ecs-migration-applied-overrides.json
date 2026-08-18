@@ -1,0 +1,12 @@
+{
+  "containerOverrides": [
+    {
+      "name": "web",
+      "command": [
+        "node",
+        "-e",
+        "import{spawnSync as s}from'node:child_process';const u=process.env.DATABASE_USER||'tectrack',p=process.env.DATABASE_PASSWORD||'',h=process.env.DATABASE_HOST,n=process.env.DATABASE_NAME||'tectrack';process.env.DATABASE_URL=`postgresql://${encodeURIComponent(u)}:${encodeURIComponent(p)}@${h}:5432/${n}?schema=public`;function r(...a){console.log('> prisma',a.join(' '));const x=s('pnpm',['--filter','@urb-tectrack/api','exec','prisma',...a],{stdio:'inherit',env:process.env});if(x.status)process.exit(x.status??1)}r('migrate','resolve','--applied','20260817120000_v64_compliance');r('migrate','deploy');"
+      ]
+    }
+  ]
+}

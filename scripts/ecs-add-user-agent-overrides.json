@@ -1,0 +1,12 @@
+{
+  "containerOverrides": [
+    {
+      "name": "web",
+      "command": [
+        "node",
+        "-e",
+        "import { spawnSync as s } from 'node:child_process'; const u=process.env.DATABASE_USER||'tectrack'; const p=process.env.DATABASE_PASSWORD||''; const h=process.env.DATABASE_HOST; const n=process.env.DATABASE_NAME||'tectrack'; process.env.DATABASE_URL=`postgresql://${encodeURIComponent(u)}:${encodeURIComponent(p)}@${h}:5432/${n}?schema=public`; const sql='ALTER TABLE \"security_events\" ADD COLUMN IF NOT EXISTS \"user_agent\" TEXT;'; const x=s('pnpm',['exec','prisma','db','execute','--schema','prisma/schema.prisma','--stdin'],{input:sql,stdio:['pipe','inherit','inherit'],env:process.env,cwd:'/app/apps/api'}); process.exit(x.status??1);"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: tectrack-uat-migrate
+  namespace: '2980436817'
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cloudsql-instances: project-2f31bdd7-f00c-4dd0-8d9:asia-south1:tectrack-uat
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          serviceAccountName: tectrack-uat@project-2f31bdd7-f00c-4dd0-8d9.iam.gserviceaccount.com
+          timeoutSeconds: 600
+          maxRetries: 1
+          containers:
+            - name: migrate
+              image: asia-south1-docker.pkg.dev/project-2f31bdd7-f00c-4dd0-8d9/tectrack/app:uat
+              command: ["node"]
+              args:
+                - -e
+                - |
+                  import { spawnSync as s } from 'node:child_process';
+                  const u = process.env.DATABASE_USER || 'postgres';
+                  const p = process.env.DATABASE_PASSWORD || '';
+                  const n = process.env.DATABASE_NAME || 'tectrack';
+                  const cloudSql = process.env.CLOUD_SQL_CONNECTION_NAME || '';
+                  const socket = cloudSql.startsWith('/') ? cloudSql : `/cloudsql/${cloudSql}`;
+                  process.env.DATABASE_URL = `postgresql://${encodeURIComponent(u)}:${encodeURIComponent(p)}@localhost/${n}?host=${encodeURIComponent(socket)}&schema=public`;
+                  function run(args, allowFail = false) {
+                    console.log('>', args.join(' '));
+                    const x = s(args[0], args.slice(1), { stdio: 'inherit', env: process.env, cwd: '/app/apps/api' });
+                    if (x.status && !allowFail) process.exit(x.status);
+                  }
+                  run(['pnpm','exec','prisma','db','execute','--schema','prisma/schema.prisma','--file','prisma/migrations/20260817120000_v64_compliance/migration.sql']);
+                  run(['pnpm','exec','prisma','migrate','resolve','--applied','20260817120000_v64_compliance'], true);
+                  run(['pnpm','exec','prisma','db','execute','--schema','prisma/schema.prisma','--file','prisma/migrations/20260818130000_uat_fixes/migration.sql']);
+                  run(['pnpm','exec','prisma','migrate','resolve','--applied','20260818130000_uat_fixes'], true);
+                  run(['pnpm','exec','prisma','migrate','deploy']);
+              env:
+                - name: DATABASE_USER
+                  value: postgres
+                - name: DATABASE_NAME
+                  value: tectrack
+                - name: CLOUD_SQL_CONNECTION_NAME
+                  value: project-2f31bdd7-f00c-4dd0-8d9:asia-south1:tectrack-uat
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: latest
+                      name: tectrack-db-password

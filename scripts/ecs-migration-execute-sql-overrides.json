@@ -1,0 +1,12 @@
+{
+  "containerOverrides": [
+    {
+      "name": "web",
+      "command": [
+        "node",
+        "-e",
+        "import{spawnSync as s}from'node:child_process';const u=process.env.DATABASE_USER||'tectrack',p=process.env.DATABASE_PASSWORD||'',h=process.env.DATABASE_HOST,n=process.env.DATABASE_NAME||'tectrack';process.env.DATABASE_URL=`postgresql://${encodeURIComponent(u)}:${encodeURIComponent(p)}@${h}:5432/${n}?schema=public`;function r(...a){console.log('>',a.join(' '));const x=s(a[0],a.slice(1),{stdio:'inherit',env:process.env,cwd:'/app/apps/api'});if(x.status)process.exit(x.status??1)}r('pnpm','exec','prisma','db','execute','--schema','prisma/schema.prisma','--file','prisma/migrations/20260817120000_v64_compliance/migration.sql');r('pnpm','exec','prisma','migrate','resolve','--applied','20260817120000_v64_compliance');r('pnpm','exec','prisma','db','execute','--schema','prisma/schema.prisma','--file','prisma/migrations/20260818130000_uat_fixes/migration.sql');r('pnpm','exec','prisma','migrate','resolve','--applied','20260818130000_uat_fixes');"
+      ]
+    }
+  ]
+}
