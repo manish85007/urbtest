@@ -34,6 +34,7 @@ interface InvoiceLifecyclePanelProps {
   onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
   onEditInvoice?: () => void;
   onDeleteInvoice?: () => void;
+  canDeleteInvoice?: boolean;
 }
 
 function payCls(key: PayStatusKey): string {
@@ -61,6 +62,7 @@ export function InvoiceLifecyclePanel({
   onAction,
   onEditInvoice,
   onDeleteInvoice,
+  canDeleteInvoice = true,
 }: InvoiceLifecyclePanelProps) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const isFactory = user.role === 'factory' || user.role === 'admin';
@@ -122,7 +124,17 @@ export function InvoiceLifecyclePanel({
             </button>
           ) : null}
           {onDeleteInvoice ? (
-            <button type="button" className="btn brd bsm" disabled={disabled} onClick={onDeleteInvoice}>
+            <button
+              type="button"
+              className="btn brd bsm"
+              disabled={disabled || !canDeleteInvoice}
+              title={
+                canDeleteInvoice
+                  ? 'Delete this invoice'
+                  : 'Delete is unavailable after goods receipt (MRN). Edit is still available.'
+              }
+              onClick={onDeleteInvoice}
+            >
               Delete
             </button>
           ) : null}

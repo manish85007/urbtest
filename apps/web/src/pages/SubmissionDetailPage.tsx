@@ -62,8 +62,12 @@ function ewayPdfIds(inv?: InvoiceDetail | null) {
   return inv.ewayFileId ? [inv.ewayFileId] : [];
 }
 
-function invoiceMutable(inv: InvoiceDetail) {
-  return !inv.closedAt && !inv.mrn && !inv.recycling && !inv.certificates?.length;
+function invoiceEditable(inv: InvoiceDetail, requestClosed?: string | null) {
+  return !requestClosed && !inv.closedAt;
+}
+
+function invoiceDeletable(inv: InvoiceDetail, requestClosed?: string | null) {
+  return invoiceEditable(inv, requestClosed) && !inv.mrn && !inv.recycling && !inv.certificates?.length;
 }
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
@@ -289,6 +293,44 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                     + Invoice
                   </button>
                 ) : null}
+                {isAdmin && activeInv && invoiceEditable(activeInv, sub.closedAt) ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn bs bsm"
+                      disabled={busy}
+                      onClick={() => setStep({ kind: 'invoice', invoiceId: activeInv.id })}
+                    >
+                      Edit invoice
+                    </button>
+                    <button
+                      type="button"
+                      className="btn brd bsm"
+                      disabled={busy || !invoiceDeletable(activeInv, sub.closedAt)}
+                      title={
+                        invoiceDeletable(activeInv, sub.closedAt)
+                          ? 'Delete this invoice'
+                          : 'Delete is unavailable after goods receipt (MRN). Edit is still available.'
+                      }
+                      onClick={() => {
+                        if (!invoiceDeletable(activeInv, sub.closedAt)) return;
+                        if (
+                          !window.confirm(
+                            `Delete invoice ${activeInv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
+                          )
+                        ) {
+                          return;
+                        }
+                        void act(
+                          () => lifecycleApi.deleteInvoice(activeInv.id),
+                          `Invoice ${activeInv.invoiceNo} removed.`,
+                        );
+                      }}
+                    >
+                      Delete invoice
+                    </button>
+                  </>
+                ) : null}
               </div>
               {activeInv ? (
                 <InvoiceLifecyclePanel
@@ -300,13 +342,19 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                   disabled={busy}
                   onAction={act}
                   onEditInvoice={
-                    isAdmin && invoiceMutable(activeInv)
+                    isAdmin && invoiceEditable(activeInv, sub.closedAt)
                       ? () => setStep({ kind: 'invoice', invoiceId: activeInv.id })
                       : undefined
                   }
                   onDeleteInvoice={
-                    isAdmin && invoiceMutable(activeInv)
+                    isAdmin && invoiceEditable(activeInv, sub.closedAt)
                       ? () => {
+                          if (!invoiceDeletable(activeInv, sub.closedAt)) {
+                            setError(
+                              'Delete is unavailable after goods receipt (MRN). You can still edit invoice details.',
+                            );
+                            return;
+                          }
                           if (
                             !window.confirm(
                               `Delete invoice ${activeInv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
@@ -321,6 +369,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                         }
                       : undefined
                   }
+                  canDeleteInvoice={invoiceDeletable(activeInv, sub.closedAt)}
                 />
               ) : null}
             </div>
@@ -472,6 +521,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           wide
         >
           <InvoiceForm
+            key={invoiceTarget?.id ?? 'new'}
             formId="invoice-form"
             vehicles={sub.vehicles}
             invoices={sub.invoices}
@@ -1851,10 +1901,13 @@ function InvoiceForm({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!invoice || !taxRates.length || taxRateId) return;
-    const match = taxRates.find((t) => Number(t.rate) === Number(invoice.taxRatePct));
-    if (match) setTaxRateId(match.id);
-  }, [invoice, taxRates, taxRateId]);
+    if (!invoice || !taxRates.length) return;
+    setTaxRateId((current) => {
+      if (current && taxRates.some((t) => t.id === current)) return current;
+      const match = taxRates.find((t) => Number(t.rate) === Number(invoice.taxRatePct));
+      return match?.id ?? current;
+    });
+  }, [invoice, taxRates]);
 
   const selectedRate = taxRates.find((t) => t.id === taxRateId);
   const taxPct = selectedRate ? Number(selectedRate.rate) : Number.NaN;
@@ -1897,9 +1950,13 @@ function InvoiceForm({
           return;
         }
         if (!taxRateId || !Number.isFinite(taxPct)) {
-          setError('Select a tax rate.');
-          return;
+          const fallbackPct = Number(invoice?.taxRatePct);
+          if (!Number.isFinite(fallbackPct)) {
+            setError('Select a tax rate.');
+            return;
+          }
         }
+        const resolvedTaxPct = Number.isFinite(taxPct) ? taxPct : Number(invoice?.taxRatePct);
         if (!eway.trim()) {
           setError('E-way bill number is required.');
           return;
@@ -1933,7 +1990,7 @@ function InvoiceForm({
           ewayBillNo: eway.trim(),
           ewayBillDate: ewayDate,
           vehicleIds: vehIds,
-          taxRatePct: taxPct,
+          taxRatePct: resolvedTaxPct,
           billingWeight: billWt,
           billingMode,
           invoiceFileId: invoiceFileIds[0],
@@ -1987,7 +2044,7 @@ function InvoiceForm({
         </div>
         <div className="fg">
           <label htmlFor="iv-tax">Tax rate</label>
-          <select id="iv-tax" value={taxRateId} onChange={(e) => setTaxRateId(e.target.value)} required>
+          <select id="iv-tax" value={taxRateId} onChange={(e) => setTaxRateId(e.target.value)} required={!invoice}>
             <option value="">Select tax rate</option>
             {taxRates.map((t) => (
               <option key={t.id} value={t.id}>

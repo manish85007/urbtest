@@ -197,23 +197,27 @@ function assertOverallBillingWeight(billWt: number, totalNet: number, alreadyBil
   }
 }
 
-function assertInvoiceMutable(invoice: {
+function assertInvoiceEditable(invoice: { closedAt: Date | null }) {
+  if (invoice.closedAt) {
+    throw new AppError('This invoice is closed and can no longer be changed.');
+  }
+}
+
+function assertInvoiceDeletable(invoice: {
   closedAt: Date | null;
   mrn: unknown;
   recycling: unknown;
   certificates: unknown[];
 }) {
-  if (invoice.closedAt) {
-    throw new AppError('This invoice is closed and can no longer be changed.');
-  }
+  assertInvoiceEditable(invoice);
   if (invoice.mrn) {
-    throw new AppError('Goods have been received against this invoice — it can no longer be edited or deleted.');
+    throw new AppError('Goods have been received against this invoice — delete is no longer allowed. You can still edit invoice details.');
   }
   if (invoice.recycling) {
-    throw new AppError('This invoice has recycling records and can no longer be edited or deleted.');
+    throw new AppError('This invoice has recycling records and cannot be deleted. You can still edit invoice details.');
   }
   if (invoice.certificates.length) {
-    throw new AppError('A certificate has been uploaded for this invoice — it can no longer be edited or deleted.');
+    throw new AppError('A certificate has been uploaded for this invoice — it cannot be deleted. You can still edit invoice details.');
   }
 }
 
@@ -302,7 +306,7 @@ export async function createInvoice(
 export async function updateInvoice(actor: SessionUser, invoiceId: string, input: CreateInvoiceInput) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
-  assertInvoiceMutable(invoice);
+  assertInvoiceEditable(invoice);
   const sub = await loadSubmissionForActor(invoice.submissionId, actor);
 
   const nextNo = input.invoiceNo.trim();
@@ -374,7 +378,7 @@ export async function updateInvoice(actor: SessionUser, invoiceId: string, input
 export async function deleteInvoice(actor: SessionUser, invoiceId: string) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
-  assertInvoiceMutable(invoice);
+  assertInvoiceDeletable(invoice);
   const sub = await loadSubmissionForActor(invoice.submissionId, actor);
 
   await prisma.invoice.delete({ where: { id: invoiceId } });
