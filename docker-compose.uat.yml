@@ -1,6 +1,9 @@
+name: urb-tectrack-uat
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: urb-tectrack-uat-db
     environment:
       POSTGRES_USER: tectrack
       POSTGRES_PASSWORD: tectrack_uat
@@ -14,6 +17,7 @@ services:
       - uat-pg:/var/lib/postgresql/data
 
   app:
+    container_name: urb-tectrack-uat-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,3 +40,4 @@ services:
 
 volumes:
   uat-pg:
+    name: urb-tectrack_uat-pg
