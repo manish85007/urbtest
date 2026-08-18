@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { STAGES, getFY, listFiscalYears } from '@urb-tectrack/shared';
+import { VIEW_PHASES, viewPhaseForStage, getFY, listFiscalYears } from '@urb-tectrack/shared';
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
 import { StageBadge } from '../components/StageProgress';
 import { fmtDate, num } from '../lib/format';
@@ -18,6 +18,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const stage = params.get('stage') ?? '';
+  const phase = params.get('phase') ?? '';
   const [clientId, setClientId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [fy, setFy] = useState('');
@@ -49,6 +50,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
+      if (phase && String(viewPhaseForStage(r.stage)) !== phase) return false;
       if (stage && String(r.stage) !== stage) return false;
       if (clientId && r.clientId !== clientId) return false;
       if (siteId && r.siteId !== siteId) return false;
@@ -62,7 +64,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
       }
       return true;
     });
-  }, [rows, q, stage, clientId, siteId, fy]);
+  }, [rows, q, stage, phase, clientId, siteId, fy]);
 
   return (
     <div>
@@ -90,16 +92,17 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
           <div className="fg">
             <label>Stage</label>
             <select
-              value={stage}
+              value={phase}
               onChange={(e) => {
                 const next = new URLSearchParams(params);
-                if (e.target.value) next.set('stage', e.target.value);
-                else next.delete('stage');
+                next.delete('stage');
+                if (e.target.value) next.set('phase', e.target.value);
+                else next.delete('phase');
                 setParams(next, { replace: true });
               }}
             >
               <option value="">All stages</option>
-              {STAGES.map((s) => (
+              {VIEW_PHASES.map((s) => (
                 <option key={s.n} value={String(s.n)}>
                   {s.n}. {s.l}
                 </option>

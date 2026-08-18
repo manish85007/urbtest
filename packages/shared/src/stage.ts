@@ -54,3 +54,12 @@ export function stageLabel(stage: number): string {
   };
   return labels[stage] ?? 'Unknown';
 }
+
+/** Request-page grouping: nine derived stages shown as five user-facing phases. */
+export function viewPhaseForStage(stage: number): number {
+  if (stage <= 2) return 1;
+  if (stage <= 4) return 2;
+  if (stage <= 6) return 3;
+  if (stage <= 8) return 4;
+  return 5;
+}

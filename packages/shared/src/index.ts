@@ -1,3 +1,5 @@
+import { viewPhaseForStage } from './stage.js';
+
 export * from './fiscal-year.js';
 export * from './report-period.js';
 export * from './stage.js';
@@ -24,6 +26,55 @@ export const STAGES = [
   { n: 8, k: 'cod', l: 'CoD Upload', ic: '🏅', by: 'Admin', d: 'Certificate uploaded + emailed' },
   { n: 9, k: 'done', l: 'Closed', ic: '🎉', by: 'Client', d: 'Requestor acknowledged closure' },
 ] as const;
+
+export const VIEW_PHASES = [
+  {
+    n: 1,
+    stages: [1, 2],
+    l: 'Request Details',
+    ic: '📝',
+    by: 'Client / Admin',
+    d: 'Raise and acknowledge the pickup request',
+  },
+  {
+    n: 2,
+    stages: [3, 4],
+    l: 'Vehicles & Weighment',
+    ic: '🚚',
+    by: 'Admin',
+    d: 'Assign vehicles and record weighment',
+  },
+  {
+    n: 3,
+    stages: [5, 6],
+    l: 'Invoicing & Material Receiving',
+    ic: '🧾',
+    by: 'Admin / Factory',
+    d: 'Raise invoices and record goods receipt (MRN)',
+  },
+  {
+    n: 4,
+    stages: [7, 8],
+    l: 'Recycling & Compliance',
+    ic: '♻️',
+    by: 'Factory / Admin',
+    d: 'Issue Form 6, then upload the Certificate of Destruction',
+  },
+  {
+    n: 5,
+    stages: [9],
+    l: 'Closed',
+    ic: '🎉',
+    by: 'Client',
+    d: 'Requestor acknowledged closure',
+  },
+] as const;
+
+export type ViewPhase = (typeof VIEW_PHASES)[number];
+
+export function viewPhaseOf(stage: number): ViewPhase {
+  return VIEW_PHASES[viewPhaseForStage(stage) - 1];
+}
 
 export const CATEGORY_GROUPS = {
   ITEW: { name: 'IT & Telecom Equipment', ord: 1 },

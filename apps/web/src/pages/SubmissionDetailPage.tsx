@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise } from '@urb-tectrack/shared';
+import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL } from '@urb-tectrack/shared';
 import {
   dataApi,
   filesApi,
@@ -13,6 +13,7 @@ import {
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
+import { WorkflowSection } from '../components/WorkflowSection';
 import { FileUpload } from '../components/FileUpload';
 import { FileRow } from '../components/FileThumb';
 import { QueryThread } from '../components/QueryThread';
@@ -77,7 +78,6 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
-  const [invTab, setInvTab] = useState('');
   const [step, setStep] = useState<StepModal | null>(null);
 
   const load = useCallback(() => {
@@ -91,13 +91,6 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!sub?.invoices.length) return;
-    if (!sub.invoices.some((i) => i.id === invTab)) {
-      setInvTab(sub.invoices[0].id);
-    }
-  }, [sub, invTab]);
 
   useEffect(() => {
     if (user.role === 'client' && sub?.derivedStage === 1 && sub.rejectNote) {
@@ -134,10 +127,16 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const isAdmin = user.role === 'admin';
   const stage = sub.derivedStage;
+  const phase = viewPhaseForStage(stage);
   const unweighed = sub.vehicles.filter((v) => !v.weighment);
-  const activeInv = sub.invoices.find((i) => i.id === invTab) ?? sub.invoices[0];
   const netKg = sub.vehicles.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
   const allWeighed = sub.vehicles.length > 0 && sub.vehicles.every((v) => v.weighment);
+  const hasMrn = sub.invoices.some((i) => i.mrn);
+  const hasCod = sub.invoices.some((i) => i.certificates.length > 0);
+  const phase2Locked = !sub.acknowledgedAt;
+  const phase3Locked = !allWeighed;
+  const phase4Locked = !hasMrn;
+  const phase5Locked = !hasCod;
   const weighTarget =
     step?.kind === 'weigh' ? sub.vehicles.find((v) => v.id === step.vehicleId) : unweighed[0];
   const vehicleTarget =
@@ -167,17 +166,17 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         <Link to="/requests" className="btn bs">
           ← Back
         </Link>
-        {isAdmin && stage === 1 ? (
+        {isAdmin && phase === 1 && stage === 1 ? (
           <button type="button" className="btn bp" disabled={busy} onClick={() => setStep({ kind: 'ack' })}>
             ✅ Acknowledge Request
           </button>
         ) : null}
-        {isStaff && stage === 3 ? (
+        {isStaff && phase === 2 && !sub.vehicles.length ? (
           <button type="button" className="btn bp" onClick={() => setStep({ kind: 'vehicle' })}>
             🚚 Assign Vehicle
           </button>
         ) : null}
-        {isAdmin && stage === 4 && unweighed.length ? (
+        {isAdmin && phase === 2 && unweighed.length ? (
           <button
             type="button"
             className="btn bp"
@@ -186,7 +185,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             ⚖️ Weigh ({unweighed.length} pending)
           </button>
         ) : null}
-        {isAdmin && stage === 5 && allWeighed ? (
+        {isAdmin && phase === 3 && allWeighed ? (
           <button type="button" className="btn bp" onClick={() => setStep({ kind: 'invoice' })}>
             {sub.invoices.length ? '🧾 Add Invoice' : '🧾 Raise Invoice'}
           </button>
@@ -216,182 +215,227 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
 
       <div className="detail-grid">
         <div>
-          <RequestCard
-            sub={sub}
-            user={user}
-            busy={busy}
-            onEdit={() => setStep({ kind: 'edit' })}
-            onBom={(bomFileIds) =>
-              act(
-                () =>
-                  lifecycleApi.updateSubmission(sub.id, {
-                    bomFileIds,
-                    bomFileId: bomFileIds[0] ?? null,
-                  }),
-                'Bill of materials updated.',
-              )
-            }
-          />
-
-          {isAdmin && stage === 1 ? (
-            <div className="card">
-              <div className="card-ttl">Acknowledge request</div>
-              <p className="p-mu">
-                Accepting this request moves it to Assign Vehicle and sends an acknowledgement email to
-                the requestor. Use the header action, or request changes.
-              </p>
-              <button type="button" className="btn ghost" disabled={busy} onClick={() => setStep({ kind: 'reject' })}>
-                Request changes
-              </button>
-            </div>
-          ) : null}
-
-          <VehicleCard
-            sub={sub}
-            user={user}
-            netKg={netKg}
-            onAddVehicle={() => setStep({ kind: 'vehicle' })}
-            onEditVehicle={(vehicleId) => setStep({ kind: 'vehicle', vehicleId })}
-            onWeighVehicle={(vehicleId) => setStep({ kind: 'weigh', vehicleId })}
-            onDeleteVehicle={(vehicleId, registration) => {
-              if (
-                !window.confirm(
-                  `Delete vehicle ${registration}? This removes an incorrect assignment and cannot be undone.`,
-                )
-              ) {
-                return;
-              }
-              void act(() => lifecycleApi.deleteVehicle(vehicleId), `Vehicle ${registration} removed.`);
-            }}
-          />
-
-          {sub.invoices.length > 0 ? (
-            <div className="card" style={{ padding: '.5rem' }}>
-              <div style={{ display: 'flex', gap: '.2rem', flexWrap: 'wrap', padding: '0 .2rem', borderBottom: '1px solid var(--bd)' }}>
-                {sub.invoices.map((inv) => (
-                  <button
-                    key={inv.id}
-                    type="button"
-                    className={`inv-tab ${inv.id === activeInv?.id ? 'on' : ''}`}
-                    onClick={() => {
-                      setInvTab(inv.id);
-                      document.getElementById(`inv-${inv.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
-                  >
-                    {inv.invoiceNo}{' '}
-                    {inv.mrn ? (
-                      <span className="badge bg-bl" style={{ marginLeft: '.2rem' }}>
-                        MRN
-                      </span>
-                    ) : (
-                      <span className="badge bg-am" style={{ marginLeft: '.2rem' }}>
-                        MRN pending
-                      </span>
-                    )}
-                  </button>
-                ))}
-                {isAdmin && allWeighed ? (
-                  <button
-                    type="button"
-                    className="inv-tab"
-                    style={{ color: 'var(--g)', fontWeight: 700 }}
-                    onClick={() => setStep({ kind: 'invoice' })}
-                  >
-                    + Invoice
-                  </button>
-                ) : null}
-                {isAdmin && activeInv && invoiceEditable(activeInv, sub.closedAt) ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn bs bsm"
-                      disabled={busy}
-                      onClick={() => setStep({ kind: 'invoice', invoiceId: activeInv.id })}
-                    >
-                      Edit invoice
-                    </button>
-                    <button
-                      type="button"
-                      className="btn brd bsm"
-                      disabled={busy || !invoiceDeletable(activeInv, sub.closedAt)}
-                      title={
-                        invoiceDeletable(activeInv, sub.closedAt)
-                          ? 'Delete this invoice'
-                          : 'Delete is unavailable after goods receipt (MRN). Edit is still available.'
-                      }
-                      onClick={() => {
-                        if (!invoiceDeletable(activeInv, sub.closedAt)) return;
-                        if (
-                          !window.confirm(
-                            `Delete invoice ${activeInv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
-                          )
-                        ) {
-                          return;
-                        }
-                        void act(
-                          () => lifecycleApi.deleteInvoice(activeInv.id),
-                          `Invoice ${activeInv.invoiceNo} removed.`,
-                        );
-                      }}
-                    >
-                      Delete invoice
-                    </button>
-                  </>
-                ) : null}
-              </div>
-          {sub.invoices.length > 1 ? (
-            <div className="dim" style={{ fontSize: '.78rem', padding: '.45rem .7rem 0' }}>
-              Each invoice has its own MRN. Open a tab or scroll to the invoice below — both notes stay on this
-              request.
-            </div>
-          ) : null}
-          {sub.invoices.map((inv) => (
-            <InvoiceLifecyclePanel
-              key={inv.id}
-              invoice={inv}
-              vehicles={sub.vehicles}
-              lineItems={sub.items ?? []}
-              payTermsDays={sub.client.payTermsDays ?? 30}
+          <WorkflowSection
+            phase={VIEW_PHASES[0]}
+            current={phase === 1}
+            done={phase > 1}
+          >
+            <RequestCard
+              sub={sub}
               user={user}
-              disabled={busy}
-              onAction={act}
-              onEditInvoice={
-                isAdmin && invoiceEditable(inv, sub.closedAt)
-                  ? () => setStep({ kind: 'invoice', invoiceId: inv.id })
-                  : undefined
+              busy={busy}
+              onEdit={() => setStep({ kind: 'edit' })}
+              onBom={(bomFileIds) =>
+                act(
+                  () =>
+                    lifecycleApi.updateSubmission(sub.id, {
+                      bomFileIds,
+                      bomFileId: bomFileIds[0] ?? null,
+                    }),
+                  'Bill of materials updated.',
+                )
               }
-              onDeleteInvoice={
-                isAdmin && invoiceEditable(inv, sub.closedAt)
-                  ? () => {
-                      if (!invoiceDeletable(inv, sub.closedAt)) {
-                        setError(
-                          'Delete is unavailable after goods receipt (MRN). You can still edit invoice details.',
-                        );
-                        return;
-                      }
-                      if (
-                        !window.confirm(
-                          `Delete invoice ${inv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
-                        )
-                      ) {
-                        return;
-                      }
-                      void act(() => lifecycleApi.deleteInvoice(inv.id), `Invoice ${inv.invoiceNo} removed.`);
-                    }
-                  : undefined
-              }
-              canDeleteInvoice={invoiceDeletable(inv, sub.closedAt)}
             />
-          ))}
-            </div>
-          ) : null}
 
-          <CertificatesCard sub={sub} user={user} />
-          <ComplianceCard sub={sub} isStaff={isStaff} />
+            {isAdmin && stage === 1 ? (
+              <div className="card">
+                <div className="card-ttl">Acknowledge request</div>
+                <p className="p-mu">
+                  Accepting this request moves it to Vehicles & Weighment and sends an acknowledgement
+                  email to the requestor.
+                </p>
+                <button type="button" className="btn ghost" disabled={busy} onClick={() => setStep({ kind: 'reject' })}>
+                  Request changes
+                </button>
+              </div>
+            ) : null}
+          </WorkflowSection>
+
+          <WorkflowSection
+            phase={VIEW_PHASES[1]}
+            current={phase === 2}
+            done={phase > 2}
+            locked={phase2Locked}
+            lockReason="Acknowledge the request before vehicles can be assigned."
+          >
+            <VehicleCard
+              sub={sub}
+              user={user}
+              netKg={netKg}
+              onAddVehicle={() => setStep({ kind: 'vehicle' })}
+              onEditVehicle={(vehicleId) => setStep({ kind: 'vehicle', vehicleId })}
+              onWeighVehicle={(vehicleId) => setStep({ kind: 'weigh', vehicleId })}
+              onDeleteVehicle={(vehicleId, registration) => {
+                if (
+                  !window.confirm(
+                    `Delete vehicle ${registration}? This removes an incorrect assignment and cannot be undone.`,
+                  )
+                ) {
+                  return;
+                }
+                void act(() => lifecycleApi.deleteVehicle(vehicleId), `Vehicle ${registration} removed.`);
+              }}
+            />
+          </WorkflowSection>
+
+          <WorkflowSection
+            phase={VIEW_PHASES[2]}
+            current={phase === 3}
+            done={phase > 3}
+            locked={phase3Locked}
+            lockReason="Assign vehicles and record weighment on every vehicle before invoicing."
+          >
+            {sub.invoices.length ? (
+              <>
+                {sub.invoices.length > 1 ? (
+                  <div className="tw" style={{ marginBottom: '.5rem' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Invoice</th>
+                          <th>Billed</th>
+                          <th>Payment</th>
+                          <th>MRN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sub.invoices.map((inv) => {
+                          const paid = inv.payments.reduce((s, p) => {
+                            try {
+                              return s + BigInt(p.amountPaise);
+                            } catch {
+                              return s;
+                            }
+                          }, 0n);
+                          const pay = getPayStatus(BigInt(inv.totalPaise), paid);
+                          return (
+                            <tr
+                              key={inv.id}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => {
+                                document.getElementById(`inv-${inv.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }}
+                            >
+                              <td className="mono">{inv.invoiceNo}</td>
+                              <td className="mono">{num(Number(inv.billingWeight))} kg</td>
+                              <td>
+                                <span className={`badge ${pay.key === 'paid' ? 'bg-g' : pay.key === 'partial' ? 'bg-am' : 'bg-rd'}`}>
+                                  {pay.label}
+                                </span>
+                              </td>
+                              <td>
+                                {inv.mrn ? (
+                                  <span className="badge bg-bl">{inv.mrn.mrnNo}</span>
+                                ) : (
+                                  <span className="badge bg-am">Pending</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+                {sub.invoices.map((inv) => (
+                  <InvoiceLifecyclePanel
+                    key={`bill-${inv.id}`}
+                    section="invoice-mrn"
+                    invoice={inv}
+                    vehicles={sub.vehicles}
+                    lineItems={sub.items ?? []}
+                    payTermsDays={sub.client.payTermsDays ?? 30}
+                    user={user}
+                    disabled={busy}
+                    onAction={act}
+                    onEditInvoice={
+                      isAdmin && invoiceEditable(inv, sub.closedAt)
+                        ? () => setStep({ kind: 'invoice', invoiceId: inv.id })
+                        : undefined
+                    }
+                    onDeleteInvoice={
+                      isAdmin && invoiceEditable(inv, sub.closedAt)
+                        ? () => {
+                            if (!invoiceDeletable(inv, sub.closedAt)) {
+                              setError(
+                                'Delete is unavailable after goods receipt (MRN). You can still edit invoice details.',
+                              );
+                              return;
+                            }
+                            if (
+                              !window.confirm(
+                                `Delete invoice ${inv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            void act(() => lifecycleApi.deleteInvoice(inv.id), `Invoice ${inv.invoiceNo} removed.`);
+                          }
+                        : undefined
+                    }
+                    canDeleteInvoice={invoiceDeletable(inv, sub.closedAt)}
+                  />
+                ))}
+              </>
+            ) : (
+              <div className="card">
+                <p className="dim" style={{ margin: 0, fontSize: '.85rem' }}>
+                  Weighment is complete. Raise an invoice to bill the material and open goods receipt (MRN).
+                </p>
+              </div>
+            )}
+          </WorkflowSection>
+
+          <WorkflowSection
+            phase={VIEW_PHASES[3]}
+            current={phase === 4}
+            done={phase > 4}
+            locked={phase4Locked}
+            lockReason="Create the MRN for each invoice before Form 6 and the Certificate of Destruction."
+          >
+            {sub.invoices.map((inv) => (
+              <InvoiceLifecyclePanel
+                key={`recy-${inv.id}`}
+                section="recycling"
+                invoice={inv}
+                vehicles={sub.vehicles}
+                lineItems={sub.items ?? []}
+                payTermsDays={sub.client.payTermsDays ?? 30}
+                user={user}
+                disabled={busy}
+                onAction={act}
+              />
+            ))}
+            <CertificatesCard sub={sub} />
+            <ComplianceCard sub={sub} isStaff={isStaff} />
+          </WorkflowSection>
+
+          <WorkflowSection
+            phase={VIEW_PHASES[4]}
+            current={phase === 5}
+            done={!!sub.closedAt}
+            locked={phase5Locked}
+            lockReason="Upload the Certificate of Destruction before the request can be closed."
+          >
+            {sub.invoices.map((inv) => (
+              <InvoiceLifecyclePanel
+                key={`close-${inv.id}`}
+                section="close"
+                invoice={inv}
+                vehicles={sub.vehicles}
+                lineItems={sub.items ?? []}
+                payTermsDays={sub.client.payTermsDays ?? 30}
+                user={user}
+                disabled={busy}
+                onAction={act}
+              />
+            ))}
+          </WorkflowSection>
         </div>
 
         <div>
           <DetailsCard sub={sub} />
+          <RecyclingSlaSidebar invoices={sub.invoices} />
           <QueryThread
             submissionId={sub.id}
             queries={sub.queries ?? []}
@@ -411,7 +455,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           onOk={() => act(() => lifecycleApi.acknowledge(sub.id), 'Request acknowledged.')}
         >
           <p style={{ fontSize: '.87rem', marginBottom: '.8rem' }}>
-            Accepting this request moves it to <b>Assign Vehicle</b> and sends an automatic acknowledgement
+            Accepting this request moves it to <b>Vehicles & Weighment</b> and sends an automatic acknowledgement
             email to the requestor.
           </p>
           <div className="card" style={{ background: 'var(--g5)', marginBottom: '.7rem' }}>
@@ -596,9 +640,9 @@ function RequestCard({
 
   return (
     <CollapsibleCard
-      title="📝 Request Details"
+      title="📝 Pickup"
       badge={showResubmit ? <span className="badge bg-am">Update in the popup</span> : undefined}
-      defaultOpen={sub.derivedStage < 3}
+      defaultOpen={sub.derivedStage <= 2}
       summary={`${num(Number(sub.approxWeight))} kg · ${sub.approxQty} units · ${fmtDate(sub.requestDate)}`}
       actions={
         canEdit ? (
@@ -759,9 +803,9 @@ function VehicleCard({
   return (
     <CollapsibleCard
       id="assign-vehicle"
-      title={`🚚 Vehicles & Weighment (${sub.vehicles.length})`}
+      title={`Assigned vehicles (${sub.vehicles.length})`}
       badge={netKg ? <span className="badge bg-g">{num(netKg)} kg net</span> : null}
-      defaultOpen={stage < 5}
+      defaultOpen={sub.derivedStage >= 3 && sub.derivedStage <= 4}
       summary={
         sub.vehicles.length
           ? sub.vehicles.map((v) => `${v.registration}${v.weighment ? ` ${num(Number(v.weighment.netKg))} kg` : ''}`).join(' · ')
@@ -1009,139 +1053,140 @@ function DetailsCard({ sub }: { sub: SubmissionDetail }) {
   );
 }
 
-function CertificatesCard({ sub, user }: { sub: SubmissionDetail; user: SessionUser }) {
-  const rows = sub.invoices.flatMap((inv) => inv.certificates.map((c) => ({ inv, c })));
-  const isAdmin = user.role === 'admin';
-  const eligible = sub.invoices.filter((i) => i.derivedStage >= 7);
-  const canUp = isAdmin && sub.invoices.some((i) => i.derivedStage >= 7 && !i.closedAt);
-  if (!sub.invoices.length) return null;
-  if (!rows.length && !canUp && !eligible.length) return null;
+function RecyclingSlaSidebar({ invoices }: { invoices: SubmissionDetail['invoices'] }) {
+  const rows = invoices
+    .map((inv) => {
+      const firstCert = inv.certificates[0]?.certDate ?? inv.certificates[0]?.mailedAt;
+      const sla = inv.mrn?.receivedAt
+        ? recyclingSla({
+            mrnReceivedAt: new Date(inv.mrn.receivedAt),
+            certificateAt: firstCert ? new Date(firstCert) : null,
+          })
+        : null;
+      return sla ? { inv, sla } : null;
+    })
+    .filter((row): row is NonNullable<typeof row> => !!row);
+  if (!rows.length) return null;
 
   return (
-    <div className="card" style={rows.length ? { background: 'var(--g3)', borderColor: 'var(--g4)' } : undefined}>
+    <CollapsibleCard
+      title="⏱️ Recycling SLA"
+      defaultOpen
+      summary={rows.map((r) => `${r.inv.invoiceNo} ${SLA_LABEL[r.sla.state]}`).join(' · ')}
+    >
+      {rows.map(({ inv, sla }) => {
+        const slaColor =
+          sla.state === 'met'
+            ? 'var(--g)'
+            : sla.state === 'warn'
+              ? 'var(--am)'
+              : sla.state === 'ok'
+                ? 'var(--bl)'
+                : 'var(--rd)';
+        return (
+          <div key={inv.id} className="sla-row">
+            <div className="inv-split-hd" style={{ marginBottom: '.35rem' }}>
+              <b className="mono" style={{ fontSize: '.8rem' }}>
+                {inv.invoiceNo}
+              </b>
+              <span className={`badge ${SLA_CLASS[sla.state]}`}>{SLA_LABEL[sla.state]}</span>
+            </div>
+            <div className="dim" style={{ fontSize: '.72rem', marginBottom: '.35rem' }}>
+              {sla.slaDays}-day target from material receipt
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '.35rem',
+                marginBottom: '.35rem',
+              }}
+            >
+              <div className="tile">
+                <div className="tile-l">Received</div>
+                <div className="tile-v" style={{ fontSize: '.82rem' }}>
+                  {fmtDate(sla.start.toISOString())}
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">Target</div>
+                <div className="tile-v" style={{ fontSize: '.82rem' }}>
+                  {fmtDate(sla.targetDate)}
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">{sla.done ? 'Issued' : 'Elapsed'}</div>
+                <div className="tile-v" style={{ fontSize: '.82rem', color: slaColor }}>
+                  {sla.done ? fmtDate(sla.endAt?.toISOString()) : `${sla.daysUsed} / ${sla.slaDays}d`}
+                </div>
+              </div>
+              <div className="tile">
+                <div className="tile-l">{sla.done ? 'Turnaround' : sla.remaining >= 0 ? 'Remaining' : 'Over'}</div>
+                <div className="tile-v" style={{ fontSize: '.82rem', color: slaColor }}>
+                  {sla.done ? `${sla.daysUsed}d` : `${Math.abs(sla.remaining)}d`}
+                </div>
+              </div>
+            </div>
+            <div className="bar">
+              <div className="bar-f" style={{ width: `${Math.min(100, sla.pct * 100)}%`, background: slaColor }} />
+              <div className="bar-t">{Math.round(Math.min(100, sla.pct * 100))}%</div>
+            </div>
+          </div>
+        );
+      })}
+    </CollapsibleCard>
+  );
+}
+
+function CertificatesCard({ sub }: { sub: SubmissionDetail }) {
+  const rows = sub.invoices.flatMap((inv) => inv.certificates.map((c) => ({ inv, c })));
+  if (!rows.length) return null;
+
+  return (
+    <div className="card" style={{ background: 'var(--g3)', borderColor: 'var(--g4)' }}>
       <div className="card-hd">
         <div className="card-ttl" style={{ color: 'var(--g2)' }}>
           🏅 Certificates of Destruction
         </div>
-        {rows.length ? <span className="badge bg-g">{rows.length}</span> : <span className="badge bg-am">None yet</span>}
-        <div className="spacer" />
-        {canUp ? (
-          <button
-            type="button"
-            className={`btn ${rows.length ? 'bs' : 'bp'} bsm`}
-            onClick={() => document.querySelector('.inv-panel')?.scrollIntoView()}
-          >
-            Go to invoice
-          </button>
-        ) : null}
+        <span className="badge bg-g">{rows.length}</span>
       </div>
-      {!rows.length ? (
-        <div className="dim" style={{ fontSize: '.83rem' }}>
-          Certificates are prepared outside the system and uploaded here. Upload as many as the client
-          needs — one per invoice, or several against a single invoice when the material belongs to
-          different teams. Each upload emails the client automatically.
-        </div>
-      ) : (
-        <div className="tw">
-          <table>
-            <thead>
-              <tr>
-                <th>Certificate</th>
-                <th>Department / Scope</th>
-                <th>Invoice</th>
-                <th>Issued</th>
-                <th>Emailed</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ inv, c }) => (
-                <tr key={c.id ?? c.certNo}>
-                  <td className="mono">
-                    <b>{c.certNo}</b>
-                    {c.note ? <div className="dim" style={{ fontSize: '.7rem' }}>{c.note}</div> : null}
-                  </td>
-                  <td>{c.department || <span className="dim">whole invoice</span>}</td>
-                  <td className="mono dim">{inv.invoiceNo}</td>
-                  <td className="dim">{fmtDate(c.certDate)}</td>
-                  <td>
-                    {c.mailedAt ? <span className="badge bg-g">✉️ sent</span> : <span className="dim">—</span>}
-                  </td>
-                  <td>
-                    {c.fileId ? (
-                      <a className="btn bp bsm" href={filesApi.url(c.fileId)} target="_blank" rel="noreferrer">
-                        ⬇
-                      </a>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {eligible.length ? (
-        <div style={{ marginTop: '.6rem', borderTop: '1px solid var(--g4)', paddingTop: '.55rem' }}>
-          <div style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--g2)', marginBottom: '.35rem' }}>
-            Closure — one acknowledgement per invoice
-          </div>
-          {eligible.map((inv) => {
-            const paid = inv.payments.reduce((s, p) => {
-              try {
-                return s + BigInt(p.amountPaise);
-              } catch {
-                return s;
-              }
-            }, 0n);
-            const pay = getPayStatus(BigInt(inv.totalPaise), paid);
-            if (inv.closedAt) {
-              return (
-                <div className="sub-card" style={{ background: '#fff' }} key={inv.id}>
-                  <div className="sub-card-hd">
-                    <b className="mono" style={{ fontSize: '.82rem' }}>
-                      {inv.invoiceNo}
-                    </b>
-                    <span className="badge bg-g">🎉 Closed</span>
-                    <div className="spacer" />
-                    <span className="dim" style={{ fontSize: '.73rem' }}>
-                      {fmtTS(inv.closedAt)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '.8rem', color: 'var(--g2)' }}>
-                    Acknowledged by {inv.closedBy || 'the requestor'}
-                    {inv.forceClosed ? ' (admin force-close)' : ''}
-                    {inv.closeRating ? ` · rated ${inv.closeRating}/5` : ''}
-                  </div>
-                  {inv.closeNote ? (
-                    <div style={{ fontSize: '.8rem', marginTop: '.2rem' }}>&ldquo;{inv.closeNote}&rdquo;</div>
+      <div className="tw">
+        <table>
+          <thead>
+            <tr>
+              <th>Certificate</th>
+              <th>Department / Scope</th>
+              <th>Invoice</th>
+              <th>Issued</th>
+              <th>Emailed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ inv, c }) => (
+              <tr key={c.id ?? c.certNo}>
+                <td className="mono">
+                  <b>{c.certNo}</b>
+                  {c.note ? <div className="dim" style={{ fontSize: '.7rem' }}>{c.note}</div> : null}
+                </td>
+                <td>{c.department || <span className="dim">whole invoice</span>}</td>
+                <td className="mono dim">{inv.invoiceNo}</td>
+                <td className="dim">{fmtDate(c.certDate)}</td>
+                <td>
+                  {c.mailedAt ? <span className="badge bg-g">✉️ sent</span> : <span className="dim">—</span>}
+                </td>
+                <td>
+                  {c.fileId ? (
+                    <a className="btn bp bsm" href={filesApi.url(c.fileId)} target="_blank" rel="noreferrer">
+                      ⬇
+                    </a>
                   ) : null}
-                </div>
-              );
-            }
-            const noCod = !inv.certificates.length;
-            return (
-              <div className="sub-card" style={{ background: '#fff' }} key={inv.id}>
-                <div className="sub-card-hd">
-                  <b className="mono" style={{ fontSize: '.82rem' }}>
-                    {inv.invoiceNo}
-                  </b>
-                  <span className={`badge ${pay.key === 'paid' ? 'bg-g' : pay.key === 'partial' ? 'bg-am' : 'bg-rd'}`}>
-                    {pay.label}
-                  </span>
-                  {noCod ? <span className="badge bg-am">awaiting certificate</span> : null}
-                </div>
-                <div className="dim" style={{ fontSize: '.78rem' }}>
-                  {noCod
-                    ? 'A certificate has to be uploaded before this invoice can be closed.'
-                    : pay.key !== 'paid'
-                      ? 'Payment is still outstanding — the invoice must be settled before closure.'
-                      : 'Ready for the requestor to review the certificate and acknowledge closure.'}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

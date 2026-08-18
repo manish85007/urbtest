@@ -94,7 +94,7 @@ test.describe('full lifecycle', () => {
     await login(page, 'admin@urbeno.in');
     await page.goto(`/requests/${submissionId}`);
 
-    await page.locator('.inv-panel').getByRole('button', { name: 'Upload Certificate' }).click();
+    await page.getByRole('button', { name: 'Upload Certificate' }).click();
     await page.locator('.modal input[type="file"]').first().setInputFiles(pdf);
     await expect(page.locator('.modal').getByText(/sample|\.pdf/i).first()).toBeVisible({ timeout: 15_000 });
     await page.getByLabel('Certificate no.').fill(`DCOD-E2E-${uniq}`);

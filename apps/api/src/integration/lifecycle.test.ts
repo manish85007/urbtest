@@ -196,6 +196,15 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     expect(corrected.managerSign).toBe('Factory Manager');
     expect(corrected.condition).toBe('Good — corrected');
 
+    const certTooSoon = await seedFile('certificate', admin.email);
+    await expect(
+      uploadCertificate(admin, invoiceId, {
+        certNo: `URB/EARLY/${Date.now()}`,
+        certDate: '2026-08-16',
+        fileId: certTooSoon.id,
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/Form 6/i) });
+
     await createRecycling(factory, invoiceId, {
       processedAt: '2026-08-16',
       factoryId: 'URB-BLR',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getFY, formatMrnNumber, formatForm6Number } from './fiscal-year.js';
-import { invStage, subStage } from './stage.js';
+import { invStage, subStage, viewPhaseForStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
 import { formatE164, isValidNational10, national10 } from './phone.js';
@@ -36,6 +36,18 @@ describe('stage derivation', () => {
         invoices: [{ hasMrn: true }, { hasRecycling: true, hasCertificate: true }],
       }),
     ).toBe(6);
+  });
+
+  it('groups derived stages into five request-page phases', () => {
+    expect(viewPhaseForStage(1)).toBe(1);
+    expect(viewPhaseForStage(2)).toBe(1);
+    expect(viewPhaseForStage(3)).toBe(2);
+    expect(viewPhaseForStage(4)).toBe(2);
+    expect(viewPhaseForStage(5)).toBe(3);
+    expect(viewPhaseForStage(6)).toBe(3);
+    expect(viewPhaseForStage(7)).toBe(4);
+    expect(viewPhaseForStage(8)).toBe(4);
+    expect(viewPhaseForStage(9)).toBe(5);
   });
 });
 

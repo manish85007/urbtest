@@ -4,9 +4,6 @@ import {
   getPayStatus,
   invoiceDue,
   paymentTermsLabel,
-  recyclingSla,
-  SLA_CLASS,
-  SLA_LABEL,
   type PayStatusKey,
 } from '@urb-tectrack/shared';
 import {
@@ -25,6 +22,8 @@ import { CollapsibleCard } from './CollapsibleCard';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 
+export type InvoicePanelSection = 'invoice-mrn' | 'recycling' | 'close';
+
 interface InvoiceLifecyclePanelProps {
   invoice: InvoiceDetail;
   vehicles: VehicleDetail[];
@@ -36,6 +35,7 @@ interface InvoiceLifecyclePanelProps {
   onEditInvoice?: () => void;
   onDeleteInvoice?: () => void;
   canDeleteInvoice?: boolean;
+  section?: InvoicePanelSection;
 }
 
 function payCls(key: PayStatusKey): string {
@@ -64,6 +64,7 @@ export function InvoiceLifecyclePanel({
   onEditInvoice,
   onDeleteInvoice,
   canDeleteInvoice = true,
+  section = 'invoice-mrn',
 }: InvoiceLifecyclePanelProps) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
   const isFactory = user.role === 'factory' || user.role === 'admin';
@@ -84,7 +85,6 @@ export function InvoiceLifecyclePanel({
   const taxPaise = asPaise(invoice.taxPaise);
   const pay = getPayStatus(totalPaise, paidPaise);
   const isPaid = pay.key === 'paid';
-  const stage = invoice.derivedStage;
   const due = invoice.invoiceDate
     ? invoiceDue(new Date(invoice.invoiceDate), payTermsDays)
     : null;
@@ -95,34 +95,33 @@ export function InvoiceLifecyclePanel({
       : vehicles;
   const billingKg = Number(invoice.billingWeight || 0);
   const vehicleNet = Number(invoice.vehicleNetKg ?? 0);
-  const firstCert = invoice.certificates[0]?.certDate ?? invoice.certificates[0]?.mailedAt;
-  const sla =
-    invoice.mrn?.receivedAt
-      ? recyclingSla({
-          mrnReceivedAt: new Date(invoice.mrn.receivedAt),
-          certificateAt: firstCert ? new Date(firstCert) : null,
-        })
-      : null;
-  const slaColor =
-    sla?.state === 'met'
-      ? 'var(--g)'
-      : sla?.state === 'warn'
-        ? 'var(--am)'
-        : sla?.state === 'ok'
-          ? 'var(--bl)'
-          : 'var(--rd)';
+  const canCreateMrn = isFactory && !invoice.mrn && !invoice.closedAt;
+  const canCreateForm6 = isFactory && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
+  const canUploadCod = isAdmin && !!invoice.recycling && !invoice.closedAt;
+  const panelId =
+    section === 'recycling' ? `inv-${invoice.id}-recy` : section === 'close' ? `inv-${invoice.id}-close` : `inv-${invoice.id}`;
 
   return (
-    <div className="inv-panel" id={`inv-${invoice.id}`} style={{ padding: '.7rem .3rem 0' }}>
+    <div className="inv-panel" id={panelId} style={{ padding: section === 'invoice-mrn' ? '.35rem 0 0' : '.2rem 0 0' }}>
+      {section === 'invoice-mrn' ? (
       <CollapsibleCard
-        title={`🧾 Invoice ${invoice.invoiceNo}`}
-        badge={<span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>}
-        defaultOpen={stage <= 5}
+        title={`Invoice ${invoice.invoiceNo}`}
+        badge={
+          <>
+            <span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>
+            {invoice.mrn ? (
+              <span className="badge bg-bl">MRN</span>
+            ) : (
+              <span className="badge bg-am">MRN pending</span>
+            )}
+          </>
+        }
+        defaultOpen={!invoice.mrn || !isPaid}
         style={{ marginBottom: '.6rem' }}
         summary={
           <span>
             {fmtDate(invoice.invoiceDate)} · {num(billingKg)} kg billed
-            {invoice.mrn ? ` · MRN ${invoice.mrn.mrnNo}` : ''}
+            {invoice.mrn ? ` · ${invoice.mrn.mrnNo}` : ' · awaiting goods receipt'}
           </span>
         }
         actions={
@@ -274,204 +273,172 @@ export function InvoiceLifecyclePanel({
             </div>
           </div>
         </div>
-      </CollapsibleCard>
-
-      <div className="card" style={{ marginBottom: '.6rem' }}>
-        <div className="card-hd">
-          <div className="card-ttl">💰 Payments</div>
-          <span className={`badge ${payCls(pay.key)}`}>
-            {formatINR(Number(paidPaise))} of {formatINR(Number(totalPaise))}
-          </span>
-          {pay.key !== 'paid' && due ? (
-            due.isOverdue ? (
-              <span className="badge bg-rd">overdue {due.overdue}d</span>
-            ) : (
-              <span className="badge bg-gy">due {fmtDate(due.dueDate)}</span>
-            )
-          ) : null}
-        </div>
-        <div className="dim" style={{ fontSize: '.75rem', marginBottom: '.4rem' }}>
-          Terms: {paymentTermsLabel(payTermsDays)}
-          {due ? ` · due ${fmtDate(due.dueDate)}` : ''}
-          {pay.key !== 'paid' && due?.isOverdue ? (
-            <>
-              {' · '}
-              <span style={{ color: 'var(--rd)', fontWeight: 700 }}>reminders sending daily</span>
-            </>
-          ) : null}
-        </div>
-        {!invoice.payments.length ? (
-          <div className="dim" style={{ fontSize: '.82rem' }}>
-            No payments recorded
-          </div>
-        ) : (
-          <div className="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>UTR / Ref</th>
-                  <th>Amount</th>
-                  <th>Date</th>
-                  <th>Mode</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.payments.map((p, i) => (
-                  <tr key={p.id ?? `${p.utr}-${i}`}>
-                    <td className="mono">{p.utr || '—'}</td>
-                    <td className="mono">{formatINR(Number(asPaise(p.amountPaise)))}</td>
-                    <td className="dim">{fmtDate(p.paidAt)}</td>
-                    <td>{lookupLabel(paymentModes, p.mode)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {isStaff && stage >= 5 && !isPaid && !invoice.closedAt ? (
-          <button type="button" className="btn bs bsm" onClick={() => setPanel('pay')}>
-            + Record Payment
-          </button>
+        {isStaff ? (
+          <MrnCard
+            embedded
+            invoice={invoice}
+            vehicles={covered}
+            canCreate={canCreateMrn}
+            canEdit={isAdmin && !!invoice.mrn && !invoice.closedAt}
+            onCreateClick={() => setPanel('mrn')}
+            onEditClick={() => setPanel('mrn')}
+          />
         ) : null}
-      </div>
-
-      {sla ? (
-        <div className="card" style={{ marginBottom: '.6rem' }}>
-          <div className="card-hd">
-            <div className="card-ttl">⏱️ Recycling SLA</div>
-            <span className={`badge ${SLA_CLASS[sla.state]}`}>{SLA_LABEL[sla.state]}</span>
-            <div className="spacer" />
-            <span className="dim" style={{ fontSize: '.76rem' }}>
-              {sla.slaDays}-day target from receipt of material
+        <div className="inv-split">
+          <div className="inv-split-hd">
+            <div className="inv-split-ttl">Payment</div>
+            <span className={`badge ${payCls(pay.key)}`}>
+              {formatINR(Number(paidPaise))} of {formatINR(Number(totalPaise))}
             </span>
-          </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(118px,1fr))',
-              gap: '.45rem',
-              marginBottom: '.45rem',
-            }}
-          >
-            <div className="tile">
-              <div className="tile-l">Material Received</div>
-              <div className="tile-v">{fmtDate(sla.start.toISOString())}</div>
-            </div>
-            <div className="tile">
-              <div className="tile-l">Certificate Target</div>
-              <div className="tile-v">{fmtDate(sla.targetDate)}</div>
-            </div>
-            <div className="tile">
-              <div className="tile-l">{sla.done ? 'Certificate Issued' : 'Days Elapsed'}</div>
-              <div className="tile-v" style={{ color: slaColor }}>
-                {sla.done ? fmtDate(sla.endAt?.toISOString()) : `${sla.daysUsed} of ${sla.slaDays}`}
-              </div>
-            </div>
-            <div className="tile">
-              <div className="tile-l">
-                {sla.done ? 'Turnaround' : sla.remaining >= 0 ? 'Days Remaining' : 'Days Over'}
-              </div>
-              <div className="tile-v" style={{ color: slaColor }}>
-                {sla.done ? `${sla.daysUsed} days` : Math.abs(sla.remaining)}
-              </div>
-            </div>
-          </div>
-          <div className="bar">
-            <div
-              className="bar-f"
-              style={{ width: `${Math.min(100, sla.pct * 100)}%`, background: slaColor }}
-            />
-            <div className="bar-t">{Math.round(Math.min(100, sla.pct * 100))}%</div>
-          </div>
-          <div className="dim" style={{ fontSize: '.75rem', marginTop: '.3rem' }}>
-            {sla.done
-              ? sla.breached
-                ? `Certificate issued ${sla.daysUsed - sla.slaDays} day${sla.daysUsed - sla.slaDays === 1 ? '' : 's'} beyond the ${sla.slaDays}-day target.`
-                : `Certificate issued within target, ${sla.slaDays - sla.daysUsed} day${sla.slaDays - sla.daysUsed === 1 ? '' : 's'} to spare.`
-              : sla.breached
-                ? `Past the ${sla.slaDays}-day target by ${sla.daysUsed - sla.slaDays} day${sla.daysUsed - sla.slaDays === 1 ? '' : 's'}. Issue the certificate to stop the clock.`
-                : 'The clock stops when the first Certificate of Destruction is issued against this invoice.'}
-          </div>
-        </div>
-      ) : null}
-
-      {isStaff ? (
-        <MrnCard
-          invoice={invoice}
-          vehicles={covered}
-          canCreate={isFactory && stage === 5 && !invoice.mrn}
-          canEdit={isAdmin && !!invoice.mrn && !invoice.closedAt}
-          onCreateClick={() => setPanel('mrn')}
-          onEditClick={() => setPanel('mrn')}
-        />
-      ) : null}
-
-      <RecyclingCard
-        invoice={invoice}
-        canCreate={isFactory && stage === 6 && !!invoice.mrn && !invoice.recycling}
-        isStaff={isStaff}
-        onCreateClick={() => setPanel('recy')}
-      />
-
-      {isAdmin && stage >= 7 && invoice.recycling && !invoice.closedAt ? (
-        <div className="card" style={{ marginBottom: '.6rem' }}>
-          <div className="card-hd">
-            <div className="card-ttl">🏅 Certificate of Destruction</div>
+            {pay.key !== 'paid' && due ? (
+              due.isOverdue ? (
+                <span className="badge bg-rd">overdue {due.overdue}d</span>
+              ) : (
+                <span className="badge bg-gy">due {fmtDate(due.dueDate)}</span>
+              )
+            ) : null}
             <div className="spacer" />
-            <button type="button" className="btn bp bsm" onClick={() => setPanel('cod')}>
-              Upload Certificate
-            </button>
+            {isStaff && !isPaid && !invoice.closedAt ? (
+              <button type="button" className="btn bs bsm" onClick={() => setPanel('pay')}>
+                + Record Payment
+              </button>
+            ) : null}
           </div>
-          {invoice.certificates.length ? (
+          <div className="dim" style={{ fontSize: '.75rem', marginBottom: invoice.payments.length ? '.4rem' : 0 }}>
+            {paymentTermsLabel(payTermsDays)}
+            {due ? ` · due ${fmtDate(due.dueDate)}` : ''}
+            {' · payment stays open on client terms and does not block Form 6 or the certificate'}
+          </div>
+          {invoice.payments.length ? (
             <div className="tw">
               <table>
                 <thead>
                   <tr>
-                    <th>Certificate</th>
-                    <th>Issued</th>
-                    <th>Emailed</th>
+                    <th>UTR / Ref</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th>Mode</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.certificates.map((c) => (
-                    <tr key={c.id ?? c.certNo}>
-                      <td className="mono">{c.certNo}</td>
-                      <td className="dim">{fmtDate(c.certDate)}</td>
-                      <td>{c.mailedAt ? <span className="badge bg-g">sent</span> : '—'}</td>
+                  {invoice.payments.map((p, i) => (
+                    <tr key={p.id ?? `${p.utr}-${i}`}>
+                      <td className="mono">{p.utr || '—'}</td>
+                      <td className="mono">{formatINR(Number(asPaise(p.amountPaise)))}</td>
+                      <td className="dim">{fmtDate(p.paidAt)}</td>
+                      <td>{lookupLabel(paymentModes, p.mode)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="dim" style={{ fontSize: '.83rem' }}>
-              Upload the signed PDF — the client is emailed automatically with it attached.
+          ) : null}
+        </div>
+      </CollapsibleCard>
+      ) : null}
+
+      {section === 'recycling' ? (
+        !invoice.mrn ? (
+          <div className="card" style={{ marginBottom: '.6rem' }}>
+            <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
+            <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
+              Record the MRN for this invoice before Form 6 can be issued.
+            </p>
+          </div>
+        ) : (
+          <>
+            <RecyclingCard
+              invoice={invoice}
+              canCreate={canCreateForm6}
+              isStaff={isStaff}
+              onCreateClick={() => setPanel('recy')}
+            />
+            {invoice.recycling ? (
+              <div className="card" style={{ marginBottom: '.6rem' }}>
+                <div className="card-hd">
+                  <div className="card-ttl">🏅 Certificate of Destruction</div>
+                  <div className="spacer" />
+                  {canUploadCod ? (
+                    <button type="button" className="btn bp bsm" onClick={() => setPanel('cod')}>
+                      Upload Certificate
+                    </button>
+                  ) : null}
+                </div>
+                {invoice.certificates.length ? (
+                  <div className="tw">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Certificate</th>
+                          <th>Issued</th>
+                          <th>Emailed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoice.certificates.map((c) => (
+                          <tr key={c.id ?? c.certNo}>
+                            <td className="mono">{c.certNo}</td>
+                            <td className="dim">{fmtDate(c.certDate)}</td>
+                            <td>{c.mailedAt ? <span className="badge bg-g">sent</span> : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="dim" style={{ fontSize: '.83rem' }}>
+                    Form 6 {invoice.recycling.form6No} is on file. Upload the signed certificate PDF — the
+                    client is emailed automatically.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="card" style={{ marginBottom: '.6rem' }}>
+                <div className="card-ttl">🏅 Certificate of Destruction</div>
+                <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
+                  Issue Form 6 first. The Certificate of Destruction is not available until Form 6 is generated.
+                </p>
+              </div>
+            )}
+            {isStaff && invoice.recycling ? (
+              <SerialPanel invoice={invoice} disabled={disabled} onAction={onAction} />
+            ) : null}
+          </>
+        )
+      ) : null}
+
+      {section === 'close' ? (
+        invoice.closedAt ? (
+          <p className="ok-msg sm">Closed {invoice.closedAt.slice(0, 10)}</p>
+        ) : !invoice.certificates.length ? (
+          <div className="card" style={{ marginBottom: '.6rem' }}>
+            <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
+            <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
+              Upload the Certificate of Destruction before this invoice can be closed.
+            </p>
+          </div>
+        ) : (isClient || isAdmin) && isPaid ? (
+          <div className="card" style={{ marginBottom: '.6rem' }}>
+            <div className="card-hd">
+              <div className="card-ttl">🎉 Review & Close — {invoice.invoiceNo}</div>
+              <div className="spacer" />
+              <button type="button" className="btn bp bsm" onClick={() => setPanel('close')}>
+                Review & Close
+              </button>
             </div>
-          )}
-        </div>
-      ) : null}
-
-      {isStaff && invoice.recycling ? (
-        <SerialPanel invoice={invoice} disabled={disabled} onAction={onAction} />
-      ) : null}
-
-      {(isClient || isAdmin) && stage >= 8 && !invoice.closedAt && isPaid && invoice.certificates.length > 0 ? (
-        <div className="card" style={{ marginBottom: '.6rem' }}>
-          <div className="card-hd">
-            <div className="card-ttl">🎉 Review & Close</div>
-            <div className="spacer" />
-            <button type="button" className="btn bp bsm" onClick={() => setPanel('close')}>
-              Review & Close
-            </button>
+            <div className="dim" style={{ fontSize: '.83rem' }}>
+              Confirm you have received the Certificate of Destruction, then acknowledge closure.
+            </div>
           </div>
-          <div className="dim" style={{ fontSize: '.83rem' }}>
-            Confirm you have received the Certificate of Destruction, then acknowledge closure.
+        ) : (
+          <div className="card" style={{ marginBottom: '.6rem' }}>
+            <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
+            <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
+              The certificate is on file. Closure waits until this invoice is paid — payment can be recorded
+              any time under the client’s terms and does not block earlier steps.
+            </p>
           </div>
-        </div>
-      ) : null}
-
-      {invoice.closedAt ? (
-        <p className="ok-msg sm">Closed {invoice.closedAt.slice(0, 10)}</p>
+        )
       ) : null}
 
       {panel === 'pay' ? (
@@ -602,6 +569,7 @@ function MrnCard({
   canEdit,
   onCreateClick,
   onEditClick,
+  embedded = false,
 }: {
   invoice: InvoiceDetail;
   vehicles: VehicleDetail[];
@@ -609,46 +577,35 @@ function MrnCard({
   canEdit: boolean;
   onCreateClick: () => void;
   onEditClick: () => void;
+  embedded?: boolean;
 }) {
   const m = invoice.mrn;
   if (!m && !canCreate) return null;
   const mats = Array.isArray(m?.materials) ? m.materials : [];
   const matQty = mats.reduce((s, x) => s + Number(x.q ?? 0), 0);
   const matWt = mats.reduce((s, x) => s + Number(x.w ?? 0), 0);
+  const actions = (
+    <>
+      {m ? (
+        <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
+          ⬇ Print MRN
+        </a>
+      ) : null}
+      {canEdit ? (
+        <button type="button" className="btn bs bsm" onClick={onEditClick}>
+          Edit MRN
+        </button>
+      ) : null}
+    </>
+  );
 
-  return (
-    <CollapsibleCard
-      title="📋 Material Receipt Note"
-      badge={m ? <span className="badge bg-bl mono">{m.mrnNo}</span> : <span className="badge bg-am">Pending</span>}
-      defaultOpen={!m || !invoice.recycling}
-      style={{ marginBottom: '.6rem' }}
-      summary={
-        m ? (
-          <span>
-            Invoice {invoice.invoiceNo} · {fmtDate(m.receivedAt)} · {num(matWt)} kg
-          </span>
-        ) : (
-          'Goods not yet received'
-        )
-      }
-      actions={
-        <>
-          {m ? (
-            <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
-              ⬇ Print MRN
-            </a>
-          ) : null}
-          {canEdit ? (
-            <button type="button" className="btn bs bsm" onClick={onEditClick}>
-              Edit MRN
-            </button>
-          ) : null}
-        </>
-      }
-    >
-      <div style={{ fontSize: '.73rem', color: 'var(--mu)', marginBottom: '.5rem' }}>
-        🔒 Internal gate document — one MRN per invoice, not visible in the client portal
-      </div>
+  const body = (
+    <>
+      {!embedded ? (
+        <div style={{ fontSize: '.73rem', color: 'var(--mu)', marginBottom: '.5rem' }}>
+          🔒 Internal gate document — one MRN per invoice, not visible in the client portal
+        </div>
+      ) : null}
       {!m ? (
         <>
           <div className="dim" style={{ fontSize: '.83rem' }}>
@@ -795,6 +752,41 @@ function MrnCard({
           </div>
         </>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="inv-split">
+        <div className="inv-split-hd">
+          <div className="inv-split-ttl">Material receiving</div>
+          {m ? <span className="badge bg-bl mono">{m.mrnNo}</span> : <span className="badge bg-am">Pending</span>}
+          <div className="spacer" />
+          {actions}
+        </div>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <CollapsibleCard
+      title="📋 Material Receipt Note"
+      badge={m ? <span className="badge bg-bl mono">{m.mrnNo}</span> : <span className="badge bg-am">Pending</span>}
+      defaultOpen={!m || !invoice.recycling}
+      style={{ marginBottom: '.6rem' }}
+      summary={
+        m ? (
+          <span>
+            Invoice {invoice.invoiceNo} · {fmtDate(m.receivedAt)} · {num(matWt)} kg
+          </span>
+        ) : (
+          'Goods not yet received'
+        )
+      }
+      actions={actions}
+    >
+      {body}
     </CollapsibleCard>
   );
 }
@@ -811,7 +803,6 @@ function RecyclingCard({
   onCreateClick: () => void;
 }) {
   const r = invoice.recycling;
-  if (!r && !canCreate) return null;
   const cats = r?.categories ?? [];
   const serials = r?.serials ?? [];
   const destroyed = serials.filter((s) => s.dcodNo).length;

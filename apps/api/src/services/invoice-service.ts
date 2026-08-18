@@ -811,7 +811,7 @@ export async function uploadCertificate(
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const beforeStage = deriveSubmissionStage(invoice.submission);
   if (!invoice.recycling) {
-    throw new AppError('Complete recycling before uploading the Certificate of Destruction.');
+    throw new AppError('Issue Form 6 before uploading the Certificate of Destruction.');
   }
 
   const certNo = input.certNo.trim();
