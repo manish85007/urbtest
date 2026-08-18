@@ -59,4 +59,33 @@ describe('simple-pdf', () => {
     expect(latin1).toContain('/WinAnsiEncoding');
     expect(latin1).toContain('Page 1 of 1');
   });
+
+  it('prints the invoice number on a document-style MRN letterhead', () => {
+    const buf = buildTextPdf(
+      'MATERIAL RECEIPT NOTE',
+      'Linked to invoice INV-1 · Request REQ-1 · one MRN per invoice',
+      [
+        {
+          heading: 'REFERENCE',
+          pairs: [['Invoice Number', 'INV-1', 'Invoice Date', '2026-08-16']],
+        },
+      ],
+      'MRN/URB-BLR/26-27/0001 · Invoice INV-1',
+      {
+        name: 'Urbeno Private Limited',
+        docNo: 'MRN/URB-BLR/26-27/0001',
+        docLabel: 'Invoice INV-1',
+        docDate: '2026-08-16',
+        variant: 'document',
+        logoMaxWidth: 155,
+        logoMaxHeight: 38,
+      },
+    );
+
+    const latin1 = buf.toString('latin1');
+    expect(latin1.startsWith('%PDF-1.4')).toBe(true);
+    expect(latin1).toContain('Invoice INV-1');
+    expect(latin1).toContain('MATERIAL RECEIPT NOTE');
+    expect(latin1).toContain('MRN/URB-BLR/26-27/0001');
+  });
 });

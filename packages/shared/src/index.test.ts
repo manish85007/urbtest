@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getFY, formatMrnNumber } from './fiscal-year.js';
+import { getFY, formatMrnNumber, formatForm6Number } from './fiscal-year.js';
 import { invStage, subStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
@@ -13,6 +13,11 @@ describe('fiscal year', () => {
 
   it('formats MRN numbers', () => {
     expect(formatMrnNumber('URB-BLR', '2627', 1)).toBe('MRN/URB-BLR/2627/0001');
+  });
+
+  it('formats Form 6 numbers that reset each April', () => {
+    expect(formatForm6Number('2627', 1)).toBe('F6/2627/0001');
+    expect(formatForm6Number('2526', 12)).toBe('F6/2526/0012');
   });
 });
 

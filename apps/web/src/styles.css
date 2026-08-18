@@ -71,6 +71,9 @@ body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sa
 .card{background:var(--cd);border:1px solid var(--bd);border-radius:12px;padding:.9rem;margin-bottom:.8rem}
 .card-hd{display:flex;align-items:center;gap:.5rem;margin-bottom:.7rem;flex-wrap:wrap}
 .card-ttl{font-weight:600;font-size:.95rem;color:var(--g2)}
+.collapse-toggle{width:28px;height:28px;border:1px solid var(--bd);border-radius:6px;background:#fff;color:var(--g2);font-size:1.15rem;font-weight:700;line-height:1;cursor:pointer;flex-shrink:0}
+.collapse-toggle:hover{border-color:var(--g);background:var(--g3)}
+.collapse-summary{font-size:.82rem;color:var(--mu);margin-top:-.2rem}
 .section-hd{font-weight:700;font-size:.88rem;color:var(--g2);padding-bottom:.35rem;border-bottom:1px solid var(--bd);margin-bottom:.6rem}
 .detail-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:.8rem}
 @media(max-width:900px){.detail-grid{grid-template-columns:1fr}}

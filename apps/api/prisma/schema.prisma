@@ -332,6 +332,13 @@ model MrnCounter {
   @@map("mrn_counters")
 }
 
+model Form6Counter {
+  fy        String @id @db.VarChar(4)
+  lastValue Int    @default(0) @map("last_value")
+
+  @@map("form6_counters")
+}
+
 model Mrn {
   id           String   @id @default(cuid())
   invoiceId    String   @unique @map("invoice_id")
@@ -358,7 +365,7 @@ model Mrn {
 model Recycling {
   id           String   @id @default(cuid())
   invoiceId    String   @unique @map("invoice_id")
-  form6No      String   @map("form6_no")
+  form6No      String   @unique @map("form6_no")
   processedAt  DateTime @map("processed_at") @db.Date
   factoryId    String   @map("factory_id") @db.VarChar(16)
   divertedPct  Decimal  @default(0) @map("diverted_pct") @db.Decimal(5, 2)
@@ -370,6 +377,7 @@ model Recycling {
   serialFileId String?  @map("serial_file_id")
   photoIds     String[] @default([]) @map("photo_ids")
   reportIds    String[] @default([]) @map("report_ids")
+  vehicleIds   String[] @default([]) @map("vehicle_ids")
   createdBy    String   @map("created_by")
   createdAt    DateTime @default(now()) @map("created_at")
 

@@ -113,9 +113,14 @@ export interface PdfLetterhead {
   kspcb?: string;
   docNo?: string;
   docDate?: string;
+  docLabel?: string;
+  barColor?: [number, number, number];
+  variant?: 'bar' | 'document';
   logoJpeg?: Buffer;
   logoWidth?: number;
   logoHeight?: number;
+  logoMaxWidth?: number;
+  logoMaxHeight?: number;
 }
 
 interface JpegLogo {
@@ -192,49 +197,96 @@ class Painter {
   }
 
   drawLetterhead(first: boolean) {
+    if (this.letterhead?.variant === 'document') {
+      this.drawDocumentLetterhead(first);
+      return;
+    }
     const lh = this.letterhead!;
-    const barH = first ? 80 : 28;
+    const barH = first ? (this.jpeg && (lh.logoMaxWidth ?? 0) >= 120 ? 72 : 80) : 28;
     const barBottom = PAGE_H - barH;
-    this.fillRect(0, barBottom, PAGE_W, barH, GREEN);
+    const barColor = lh.barColor ?? GREEN;
+    this.fillRect(0, barBottom, PAGE_W, barH, barColor);
 
     let textX = MARGIN_X;
     if (first && this.jpeg) {
-      const maxH = 40;
-      const maxW = 44;
-      const scale = Math.min(maxH / this.jpeg.h, maxW / this.jpeg.w);
+      const maxH = lh.logoMaxHeight ?? 40;
+      const maxW = lh.logoMaxWidth ?? 44;
+      const scale = Math.min(maxH / this.jpeg.h, maxW / this.jpeg.w, 1);
       const w = this.jpeg.w * scale;
       const h = this.jpeg.h * scale;
       const x = 14;
       const y = barBottom + (barH - h) / 2;
       this.ops.push('q', `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm`, '/Im1 Do', 'Q');
-      textX = 14 + w + 10;
+      textX = 14 + w + 12;
     }
 
+    const onBar = WHITE;
+
     if (first) {
-      this.text('F2', 15, textX, PAGE_H - 20, lh.name, WHITE);
-      const brandLine = [lh.brand, lh.address].filter(Boolean).join('  |  ');
-      if (brandLine) this.text('F1', 8, textX, PAGE_H - 34, brandLine, WHITE);
-      const ids = [
-        lh.gst ? `GST ${lh.gst}` : '',
-        lh.cin ? `CIN ${lh.cin}` : '',
-        lh.phone ? `Ph ${lh.phone}` : '',
-      ]
-        .filter(Boolean)
-        .join('  |  ');
-      if (ids) this.text('F1', 7, textX, PAGE_H - 48, ids, WHITE);
-      const certs = [lh.cpcb, lh.kspcb].filter(Boolean).join('  |  ');
-      if (certs) this.text('F1', 7, textX, PAGE_H - 60, certs, WHITE);
+      if (!this.jpeg || (lh.logoMaxWidth ?? 0) < 120) {
+        this.text('F2', 15, textX, PAGE_H - 20, lh.name, onBar);
+        const brandLine = [lh.brand, lh.address].filter(Boolean).join('  |  ');
+        if (brandLine) this.text('F1', 8, textX, PAGE_H - 34, brandLine, onBar);
+        const ids = [
+          lh.gst ? `GST ${lh.gst}` : '',
+          lh.cin ? `CIN ${lh.cin}` : '',
+          lh.phone ? `Ph ${lh.phone}` : '',
+        ]
+          .filter(Boolean)
+          .join('  |  ');
+        if (ids) this.text('F1', 7, textX, PAGE_H - 48, ids, onBar);
+        const certs = [lh.cpcb, lh.kspcb].filter(Boolean).join('  |  ');
+        if (certs) this.text('F1', 7, textX, PAGE_H - 60, certs, onBar);
+      }
       if (lh.docNo) {
-        this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 22, lh.docNo, WHITE, 'r');
-        if (lh.docDate) this.text('F1', 7, PAGE_W - MARGIN_X, PAGE_H - 34, lh.docDate, WHITE, 'r');
+        this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, onBar, 'r');
+        if (lh.docLabel) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 32, lh.docLabel, onBar, 'r');
+        if (lh.docDate) this.text('F1', 7, PAGE_W - MARGIN_X, PAGE_H - 46, lh.docDate, onBar, 'r');
       }
       this.text('F2', 13, PAGE_W / 2, PAGE_H - barH - 22, this.title, BLACK, 'c');
       if (this.subtitle) this.text('F1', 8.5, PAGE_W / 2, PAGE_H - barH - 36, this.subtitle, MUTED, 'c');
       this.y = PAGE_H - barH - 52;
     } else {
-      this.text('F2', 10, textX, PAGE_H - 18, lh.name, WHITE);
-      if (lh.docNo) this.text('F1', 8, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, WHITE, 'r');
+      this.text('F2', 10, textX, PAGE_H - 18, lh.name, onBar);
+      if (lh.docNo) this.text('F1', 8, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, onBar, 'r');
       this.y = PAGE_H - barH - 18;
+    }
+  }
+
+  drawDocumentLetterhead(first: boolean) {
+    const lh = this.letterhead!;
+    const maxH = first ? (lh.logoMaxHeight ?? 36) : 20;
+    const maxW = first ? (lh.logoMaxWidth ?? 150) : 90;
+    let logoH = 0;
+    if (this.jpeg) {
+      const scale = Math.min(maxH / this.jpeg.h, maxW / this.jpeg.w, 1);
+      const w = this.jpeg.w * scale;
+      const h = this.jpeg.h * scale;
+      logoH = h;
+      const x = MARGIN_X;
+      const y = PAGE_H - 16 - h;
+      this.ops.push('q', `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm`, '/Im1 Do', 'Q');
+    } else if (first) {
+      this.text('F2', 14, MARGIN_X, PAGE_H - 22, lh.name, GREEN_DARK);
+      if (lh.brand) this.text('F1', 8, MARGIN_X, PAGE_H - 34, lh.brand, MUTED);
+      logoH = 28;
+    }
+
+    if (first) {
+      if (lh.docNo) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 20, lh.docNo, GREEN_DARK, 'r');
+      if (lh.docLabel) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 34, lh.docLabel, GREEN, 'r');
+      if (lh.docDate) this.text('F1', 7.5, PAGE_W - MARGIN_X, PAGE_H - 46, lh.docDate, MUTED, 'r');
+      const ruleY = PAGE_H - Math.max(logoH + 24, 58);
+      this.fillRect(MARGIN_X, ruleY, CONTENT_W, 1.5, GREEN);
+      this.text('F2', 13, PAGE_W / 2, ruleY - 18, this.title, GREEN_DARK, 'c');
+      if (this.subtitle) this.text('F1', 8.5, PAGE_W / 2, ruleY - 32, this.subtitle, MUTED, 'c');
+      this.y = ruleY - 48;
+    } else {
+      if (!this.jpeg) this.text('F2', 10, MARGIN_X, PAGE_H - 18, lh.name, GREEN_DARK);
+      if (lh.docNo) this.text('F1', 8, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, GREEN_DARK, 'r');
+      const ruleY = PAGE_H - Math.max(logoH + 20, 36);
+      this.fillRect(MARGIN_X, ruleY, CONTENT_W, 1, GREEN);
+      this.y = ruleY - 16;
     }
   }
 

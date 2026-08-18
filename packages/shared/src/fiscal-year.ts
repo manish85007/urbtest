@@ -54,3 +54,8 @@ export function formatMrnNumber(
 ): string {
   return `MRN/${factoryCode}/${fyShort}/${String(sequence).padStart(4, '0')}`;
 }
+
+/** Form 6 manifest number — FY (Apr–Mar) + 4-digit sequence resetting each April. */
+export function formatForm6Number(fyShort: string, sequence: number): string {
+  return `F6/${fyShort}/${String(sequence).padStart(4, '0')}`;
+}

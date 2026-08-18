@@ -8,6 +8,7 @@ import {
   rupeesToPaise,
   unpaidCloseMessage,
   formatMrnNumber,
+  formatForm6Number,
   getFY,
   stageLabel,
   type MaterialGroupCode,
@@ -16,7 +17,6 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { roundKg, round2, toKg } from '../lib/decimal.js';
 import { prisma } from '../lib/prisma.js';
-import { nextSequence } from '../lib/db-helpers.js';
 import {
   loadInvoiceForActor,
   loadSubmissionForActor,
@@ -67,6 +67,37 @@ async function allocateMrnInTx(
     mrnNo: formatMrnNumber(factoryId, fy.short, counter.lastValue),
     sequence: counter.lastValue,
   };
+}
+
+async function allocateForm6InTx(tx: Prisma.TransactionClient, processedAt: Date) {
+  const fy = getFY(processedAt);
+  if (!fy) throw new AppError('Invalid processing date for Form 6 numbering.');
+
+  const counter = await tx.form6Counter.upsert({
+    where: { fy: fy.short },
+    create: { fy: fy.short, lastValue: 1 },
+    update: { lastValue: { increment: 1 } },
+  });
+
+  return formatForm6Number(fy.short, counter.lastValue);
+}
+
+function resolveForm6Vehicles(
+  invoice: Awaited<ReturnType<typeof loadInvoiceForActor>>,
+  inputIds?: string[],
+) {
+  const allowed = invoice.submission.vehicles.filter(
+    (v) => !invoice.vehicleIds.length || invoice.vehicleIds.includes(v.id),
+  );
+  const allowedIds = new Set(allowed.map((v) => v.id));
+  const selected = [...new Set(inputIds?.length ? inputIds : [...allowedIds])];
+  if (!selected.length) {
+    throw new AppError('Select at least one vehicle for this Form 6.');
+  }
+  if (selected.some((id) => !allowedIds.has(id))) {
+    throw new AppError('A selected vehicle is not linked to this invoice.');
+  }
+  return selected;
 }
 
 export interface CreateInvoiceInput {
@@ -128,6 +159,7 @@ export interface RecyclingInput {
   reportIds?: string[];
   serialFileId?: string;
   serials?: Array<{ serialNo: string; assetTag?: string; make?: string; model?: string }>;
+  vehicleIds?: string[];
 }
 
 export interface CertificateInput {
@@ -422,16 +454,9 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
   return payment;
 }
 
-export async function createMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
-  const invoice = await loadInvoiceForActor(invoiceId, actor);
-  requireFactory(actor, input.factoryId);
-  const beforeStage = deriveSubmissionStage(invoice.submission);
+type MrnMaterial = { n: string; q: number; w: number };
 
-  if (invoice.mrn) throw new AppError('This invoice already has an MRN.');
-
-  const factory = await prisma.factorySite.findUnique({ where: { id: input.factoryId } });
-  if (!factory) throw new AppError('Select a factory site.');
-
+function parseMrnMaterials(input: MrnInput): MrnMaterial[] {
   const materials = (input.materials ?? [])
     .map((m) => ({
       n: String(m.name ?? '').trim(),
@@ -442,16 +467,37 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   if (!materials.length) {
     throw new AppError('Record at least one material line counted at the gate.');
   }
+  return materials;
+}
 
+function assertReceivedEqualsBilled(materials: MrnMaterial[], billingWeight: unknown) {
+  const received = roundKg(materials.reduce((sum, m) => sum + toKg(m.w), 0));
+  const billed = roundKg(toKg(billingWeight));
+  if (Math.abs(received - billed) >= 0.001) {
+    throw new AppError(
+      `Material received (${received} kg) must equal the invoice billing weight (${billed} kg). Adjust the gate count so both figures match exactly.`,
+    );
+  }
+}
+
+function requireMrnSignatures(input: MrnInput) {
   const driverSign = input.driverSign?.trim() || '';
   const managerSign = input.managerSign?.trim() || '';
   const securitySign = input.securitySign?.trim() || '';
   if (!driverSign || !managerSign || !securitySign) {
-    throw new AppError('All three signatures are required on the gate document (driver, factory manager, security).');
+    throw new AppError(
+      'All three signatures are required on the gate document (driver, factory manager, security).',
+    );
   }
+  return { driverSign, managerSign, securitySign };
+}
 
-  const gatePhotoIds = [...new Set(input.gatePhotoIds ?? [])];
-  const materialPhotoIds = [...new Set(input.materialPhotoIds ?? [])];
+async function resolveMrnPhotos(
+  input: MrnInput,
+  existing?: { gatePhotoIds?: string[]; materialPhotoIds?: string[] },
+) {
+  const gatePhotoIds = [...new Set(input.gatePhotoIds ?? existing?.gatePhotoIds ?? [])];
+  const materialPhotoIds = [...new Set(input.materialPhotoIds ?? existing?.materialPhotoIds ?? [])];
   if (!gatePhotoIds.length) {
     throw new AppError('Upload at least one photograph of the vehicle at the gate.');
   }
@@ -460,7 +506,10 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   }
   await assertFilesExist(gatePhotoIds, ['pickPhoto']);
   await assertFilesExist(materialPhotoIds, ['processing', 'pickPhoto']);
+  return { gatePhotoIds, materialPhotoIds };
+}
 
+function assertInvoiceVehiclesWeighed(invoice: Awaited<ReturnType<typeof loadInvoiceForActor>>) {
   const invoiceVehs = invoice.submission.vehicles.filter(
     (v) => !invoice.vehicleIds.length || invoice.vehicleIds.includes(v.id),
   );
@@ -472,6 +521,23 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
       'Every vehicle on this invoice must have a recorded weighment before the MRN can be raised.',
     );
   }
+}
+
+export async function createMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  requireFactory(actor, input.factoryId);
+  const beforeStage = deriveSubmissionStage(invoice.submission);
+
+  if (invoice.mrn) throw new AppError('This invoice already has an MRN. Each invoice takes one MRN.');
+
+  const factory = await prisma.factorySite.findUnique({ where: { id: input.factoryId } });
+  if (!factory) throw new AppError('Select a factory site.');
+
+  const materials = parseMrnMaterials(input);
+  assertReceivedEqualsBilled(materials, invoice.billingWeight);
+  const { driverSign, managerSign, securitySign } = requireMrnSignatures(input);
+  const { gatePhotoIds, materialPhotoIds } = await resolveMrnPhotos(input);
+  assertInvoiceVehiclesWeighed(invoice);
 
   const receivedAt = new Date(input.receivedAt);
 
@@ -518,6 +584,51 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   return mrn;
 }
 
+export async function updateMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
+  requireAdmin(actor);
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  const existing = invoice.mrn;
+  if (!existing) throw new AppError('Create the MRN before editing it.');
+  if (invoice.closedAt) throw new AppError('This invoice is closed; the MRN cannot be changed.');
+  if (input.factoryId && input.factoryId !== existing.factoryId) {
+    throw new AppError('The receiving factory cannot be changed after the MRN is issued.');
+  }
+
+  const materials = parseMrnMaterials(input);
+  assertReceivedEqualsBilled(materials, invoice.billingWeight);
+  const { driverSign, managerSign, securitySign } = requireMrnSignatures(input);
+  const { gatePhotoIds, materialPhotoIds } = await resolveMrnPhotos(input, existing);
+  assertInvoiceVehiclesWeighed(invoice);
+
+  const receivedAt = new Date(input.receivedAt);
+
+  const mrn = await prisma.mrn.update({
+    where: { invoiceId },
+    data: {
+      receivedAt,
+      driverSign,
+      managerSign,
+      securitySign,
+      materials,
+      condition: input.condition?.trim() || 'Good',
+      note: input.note?.trim() || null,
+      gatePhotoIds,
+      materialPhotoIds,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'mrn.update',
+    entity: 'mrn',
+    entityId: mrn.mrnNo,
+    details: { submissionId: invoice.submissionId, invNo: invoice.invoiceNo },
+  });
+
+  return mrn;
+}
+
 export async function createRecycling(
   actor: SessionUser,
   invoiceId: string,
@@ -539,7 +650,17 @@ export async function createRecycling(
     );
   }
 
-  const categoryRows = [];
+    const categoryRows: Array<{
+      categoryId: number;
+      entryId: string;
+      groupCode: string;
+      weightKg: number;
+      recoveryFe: number;
+      recoveryNfe: number;
+      recoveryPl: number;
+      recoveryPcb: number;
+      overrideReason: string | null;
+    }> = [];
   let totalFe = 0;
   let totalNfe = 0;
   let totalPl = 0;
@@ -617,37 +738,43 @@ export async function createRecycling(
   if (input.reportIds?.length) await assertFilesExist(input.reportIds, ['report']);
   if (input.serialFileId) await assertFilesExist([input.serialFileId], ['serials']);
 
-  const form6No = await nextSequence('f6');
+  const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
+  const processedAt = new Date(input.processedAt);
 
-  const recycling = await prisma.recycling.create({
-    data: {
-      invoiceId,
-      form6No,
-      processedAt: new Date(input.processedAt),
-      factoryId,
-      divertedPct: input.divertedPct ?? 0,
-      devicesDestroyed: Math.max(0, Math.floor(Number(input.devicesDestroyed) || 0)),
-      recoveryFe: roundKg(totalFe),
-      recoveryNfe: roundKg(totalNfe),
-      recoveryPl: roundKg(totalPl),
-      recoveryPcb: roundKg(totalPcb),
-      photoIds: input.photoIds ?? [],
-      reportIds: input.reportIds ?? [],
-      serialFileId: input.serialFileId ?? null,
-      createdBy: actor.email,
-      categories: { create: categoryRows },
-      serials: input.serials?.length
-        ? {
-            create: input.serials.map((s) => ({
-              serialNo: s.serialNo,
-              assetTag: s.assetTag ?? null,
-              make: s.make ?? null,
-              model: s.model ?? null,
-            })),
-          }
-        : undefined,
-    },
-    include: { categories: true },
+  const recycling = await prisma.$transaction(async (tx) => {
+    const form6No = await allocateForm6InTx(tx, processedAt);
+
+    return tx.recycling.create({
+      data: {
+        invoiceId,
+        form6No,
+        processedAt,
+        factoryId,
+        divertedPct: input.divertedPct ?? 0,
+        devicesDestroyed: Math.max(0, Math.floor(Number(input.devicesDestroyed) || 0)),
+        recoveryFe: roundKg(totalFe),
+        recoveryNfe: roundKg(totalNfe),
+        recoveryPl: roundKg(totalPl),
+        recoveryPcb: roundKg(totalPcb),
+        photoIds: input.photoIds ?? [],
+        reportIds: input.reportIds ?? [],
+        serialFileId: input.serialFileId ?? null,
+        vehicleIds,
+        createdBy: actor.email,
+        categories: { create: categoryRows },
+        serials: input.serials?.length
+          ? {
+              create: input.serials.map((s) => ({
+                serialNo: s.serialNo,
+                assetTag: s.assetTag ?? null,
+                make: s.make ?? null,
+                model: s.model ?? null,
+              })),
+            }
+          : undefined,
+      },
+      include: { categories: true },
+    });
   });
 
   await auditLog({

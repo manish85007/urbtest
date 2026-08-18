@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CATEGORY_GROUPS,
+  formatForm6Number,
+  getFY,
   matTotal,
   recoveryFor,
   round2,
   type MaterialGroupCode,
 } from '@urb-tectrack/shared';
-import { dataApi, type CategorySummary } from '../api';
+import { dataApi, type CategorySummary, type VehicleDetail } from '../api';
 import { FileUpload } from './FileUpload';
 import { num } from '../lib/format';
 
@@ -22,8 +24,11 @@ type Recovery = { fe: number; nfe: number; pl: number; pcb: number };
 interface RecyclingFormProps {
   formId?: string;
   defaultFactoryId: string;
+  invoiceNo: string;
   billingWeight: number;
+  invoiceQty?: number;
   ewayBillNo?: string;
+  vehicles: VehicleDetail[];
   seedHints?: Array<{ name: string; qty: number; weightKg: number }>;
   disabled: boolean;
   onSubmit: (body: {
@@ -42,14 +47,18 @@ interface RecyclingFormProps {
     }>;
     photoIds?: string[];
     reportIds?: string[];
+    vehicleIds: string[];
   }) => void;
 }
 
 export function RecyclingForm({
   formId,
   defaultFactoryId,
+  invoiceNo,
   billingWeight,
+  invoiceQty = 0,
   ewayBillNo,
+  vehicles,
   seedHints,
   disabled,
   onSubmit,
@@ -58,7 +67,8 @@ export function RecyclingForm({
   const target = round2(billingWeight);
   const [factoryId, setFactoryId] = useState(defaultFactoryId);
   const [processedAt, setProcessedAt] = useState(today);
-  const [dest, setDest] = useState(String(seedHints?.reduce((s, m) => s + (m.qty || 0), 0) || 0));
+  const [dest, setDest] = useState(String(seedHints?.reduce((s, m) => s + (m.qty || 0), 0) || invoiceQty || 0));
+  const [vehicleIds, setVehicleIds] = useState<string[]>(() => vehicles.map((v) => v.id));
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [rows, setRows] = useState<SplitRow[]>([{ entryId: '', kg: String(target || ''), hint: seedHints?.[0]?.name }]);
   const [recovery, setRecovery] = useState<Record<string, Recovery>>({});
@@ -145,6 +155,10 @@ export function RecyclingForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError('');
+        if (!vehicleIds.length) {
+          setError('Select at least one vehicle to print on this Form 6.');
+          return;
+        }
         if (!merged.length) {
           setError('Split the received material into at least one authorised category.');
           return;
@@ -173,6 +187,7 @@ export function RecyclingForm({
           devicesDestroyed: parseInt(dest, 10) || 0,
           photoIds: photoIds.length ? photoIds : undefined,
           reportIds: reportIds.length ? reportIds : undefined,
+          vehicleIds,
           categories: recoveryRows.map((c) => ({
             entryId: c.entryId,
             groupCode: c.groupCode,
@@ -187,17 +202,29 @@ export function RecyclingForm({
       }}
     >
       <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.7rem' }}>
-        Recycling is recorded per invoice. Categories drive capacity utilisation and appear on Form 6 and the
-        certificate.
+        Form 6 is issued per invoice. Weight and quantity come from invoice {invoiceNo}. Select the vehicles
+        that belong on this manifest.
       </p>
       <div style={{ background: 'var(--g3)', padding: '.5rem .8rem', borderRadius: 8, fontSize: '.8rem', marginBottom: '.8rem' }}>
-        Invoice weight to account for: <b>{num(target)} kg</b>
-        {ewayBillNo ? (
-          <>
-            {' '}
-            · E-way bill: <b className="mono">{ewayBillNo}</b>
-          </>
-        ) : null}
+        Form 6 number: <b className="mono">{getFY(processedAt) ? formatForm6Number(getFY(processedAt)!.short, 0).replace(/0000$/, '[next]') : '—'}</b>
+        <div style={{ marginTop: '.2rem' }}>
+          Invoice <b className="mono">{invoiceNo}</b> · billed <b>{num(target)} kg</b>
+          {invoiceQty ? (
+            <>
+              {' '}
+              · qty <b>{invoiceQty}</b>
+            </>
+          ) : null}
+          {ewayBillNo ? (
+            <>
+              {' '}
+              · E-way bill: <b className="mono">{ewayBillNo}</b>
+            </>
+          ) : null}
+        </div>
+        <div className="dim" style={{ fontSize: '.73rem', marginTop: '.15rem' }}>
+          Number format F6/[FY]/[0001] — resets each April
+        </div>
       </div>
       <div className="fr2">
         <div className="fg">
@@ -218,6 +245,42 @@ export function RecyclingForm({
           <label htmlFor="rc-dest">Devices Destroyed</label>
           <input id="rc-dest" type="number" min={0} value={dest} onChange={(e) => setDest(e.target.value)} required />
         </div>
+      </div>
+
+      <div className="section-hd" style={{ marginTop: '.4rem' }}>
+        Vehicles on this Form 6
+      </div>
+      <div className="tw" style={{ marginBottom: '.6rem' }}>
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Vehicle</th>
+              <th>Driver</th>
+              <th>Net kg</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vehicles.map((v) => (
+              <tr key={v.id}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={vehicleIds.includes(v.id)}
+                    onChange={(e) =>
+                      setVehicleIds((cur) =>
+                        e.target.checked ? [...cur, v.id] : cur.filter((id) => id !== v.id),
+                      )
+                    }
+                  />
+                </td>
+                <td className="mono">{v.registration}</td>
+                <td>{v.driverName}</td>
+                <td className="mono">{v.weighment ? num(Number(v.weighment.netKg)) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="section-hd" style={{ marginTop: '.4rem' }}>

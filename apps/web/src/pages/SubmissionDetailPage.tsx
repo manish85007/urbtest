@@ -10,6 +10,7 @@ import {
   type SubmissionDetail,
   type VehicleDetail,
 } from '../api';
+import { CollapsibleCard } from '../components/CollapsibleCard';
 import { StageBadge, StageProgress } from '../components/StageProgress';
 import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
 import { FileUpload } from '../components/FileUpload';
@@ -272,15 +273,21 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                     key={inv.id}
                     type="button"
                     className={`inv-tab ${inv.id === activeInv?.id ? 'on' : ''}`}
-                    onClick={() => setInvTab(inv.id)}
+                    onClick={() => {
+                      setInvTab(inv.id);
+                      document.getElementById(`inv-${inv.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
                   >
                     {inv.invoiceNo}{' '}
-                    <span
-                      className={`badge ${inv.derivedStage >= 9 ? 'bg-g' : inv.derivedStage >= 6 ? 'bg-bl' : 'bg-am'}`}
-                      style={{ marginLeft: '.2rem' }}
-                    >
-                      {inv.derivedStage}
-                    </span>
+                    {inv.mrn ? (
+                      <span className="badge bg-bl" style={{ marginLeft: '.2rem' }}>
+                        MRN
+                      </span>
+                    ) : (
+                      <span className="badge bg-am" style={{ marginLeft: '.2rem' }}>
+                        MRN pending
+                      </span>
+                    )}
                   </button>
                 ))}
                 {isAdmin && allWeighed ? (
@@ -332,46 +339,50 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                   </>
                 ) : null}
               </div>
-              {activeInv ? (
-                <InvoiceLifecyclePanel
-                  invoice={activeInv}
-                  vehicles={sub.vehicles}
-                  lineItems={sub.items ?? []}
-                  payTermsDays={sub.client.payTermsDays ?? 30}
-                  user={user}
-                  disabled={busy}
-                  onAction={act}
-                  onEditInvoice={
-                    isAdmin && invoiceEditable(activeInv, sub.closedAt)
-                      ? () => setStep({ kind: 'invoice', invoiceId: activeInv.id })
-                      : undefined
-                  }
-                  onDeleteInvoice={
-                    isAdmin && invoiceEditable(activeInv, sub.closedAt)
-                      ? () => {
-                          if (!invoiceDeletable(activeInv, sub.closedAt)) {
-                            setError(
-                              'Delete is unavailable after goods receipt (MRN). You can still edit invoice details.',
-                            );
-                            return;
-                          }
-                          if (
-                            !window.confirm(
-                              `Delete invoice ${activeInv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
-                            )
-                          ) {
-                            return;
-                          }
-                          void act(
-                            () => lifecycleApi.deleteInvoice(activeInv.id),
-                            `Invoice ${activeInv.invoiceNo} removed.`,
-                          );
-                        }
-                      : undefined
-                  }
-                  canDeleteInvoice={invoiceDeletable(activeInv, sub.closedAt)}
-                />
-              ) : null}
+          {sub.invoices.length > 1 ? (
+            <div className="dim" style={{ fontSize: '.78rem', padding: '.45rem .7rem 0' }}>
+              Each invoice has its own MRN. Open a tab or scroll to the invoice below — both notes stay on this
+              request.
+            </div>
+          ) : null}
+          {sub.invoices.map((inv) => (
+            <InvoiceLifecyclePanel
+              key={inv.id}
+              invoice={inv}
+              vehicles={sub.vehicles}
+              lineItems={sub.items ?? []}
+              payTermsDays={sub.client.payTermsDays ?? 30}
+              user={user}
+              disabled={busy}
+              onAction={act}
+              onEditInvoice={
+                isAdmin && invoiceEditable(inv, sub.closedAt)
+                  ? () => setStep({ kind: 'invoice', invoiceId: inv.id })
+                  : undefined
+              }
+              onDeleteInvoice={
+                isAdmin && invoiceEditable(inv, sub.closedAt)
+                  ? () => {
+                      if (!invoiceDeletable(inv, sub.closedAt)) {
+                        setError(
+                          'Delete is unavailable after goods receipt (MRN). You can still edit invoice details.',
+                        );
+                        return;
+                      }
+                      if (
+                        !window.confirm(
+                          `Delete invoice ${inv.invoiceNo}? This removes the invoice and any payments recorded against it.`,
+                        )
+                      ) {
+                        return;
+                      }
+                      void act(() => lifecycleApi.deleteInvoice(inv.id), `Invoice ${inv.invoiceNo} removed.`);
+                    }
+                  : undefined
+              }
+              canDeleteInvoice={invoiceDeletable(inv, sub.closedAt)}
+            />
+          ))}
             </div>
           ) : null}
 
@@ -584,17 +595,19 @@ function RequestCard({
   const bomIds = bomFilesOf(sub);
 
   return (
-    <div className="card">
-      <div className="card-hd">
-        <div className="card-ttl">📝 Request Details</div>
-        <div className="spacer" />
-        {showResubmit ? <span className="badge bg-am">Update in the popup</span> : null}
-        {canEdit ? (
+    <CollapsibleCard
+      title="📝 Request Details"
+      badge={showResubmit ? <span className="badge bg-am">Update in the popup</span> : undefined}
+      defaultOpen={sub.derivedStage < 3}
+      summary={`${num(Number(sub.approxWeight))} kg · ${sub.approxQty} units · ${fmtDate(sub.requestDate)}`}
+      actions={
+        canEdit ? (
           <button type="button" className="btn bs bsm" onClick={onEdit}>
             ✏️ Edit
           </button>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       <div
         style={{
           display: 'grid',
@@ -709,7 +722,7 @@ function RequestCard({
           </table>
         </div>
       ) : null}
-    </div>
+    </CollapsibleCard>
   );
 }
 
@@ -744,17 +757,24 @@ function VehicleCard({
   const billedVehicleIds = new Set(sub.invoices.flatMap((inv) => inv.vehicleIds ?? []));
 
   return (
-    <div className="card" id="assign-vehicle">
-      <div className="card-hd">
-        <div className="card-ttl">🚚 Vehicles & Weighment ({sub.vehicles.length})</div>
-        <div className="spacer" />
-        {netKg ? <span className="badge bg-g">{num(netKg)} kg net</span> : null}
-        {canAdd ? (
+    <CollapsibleCard
+      id="assign-vehicle"
+      title={`🚚 Vehicles & Weighment (${sub.vehicles.length})`}
+      badge={netKg ? <span className="badge bg-g">{num(netKg)} kg net</span> : null}
+      defaultOpen={stage < 5}
+      summary={
+        sub.vehicles.length
+          ? sub.vehicles.map((v) => `${v.registration}${v.weighment ? ` ${num(Number(v.weighment.netKg))} kg` : ''}`).join(' · ')
+          : 'No vehicles assigned yet'
+      }
+      actions={
+        canAdd ? (
           <button type="button" className="btn bs bsm" onClick={onAddVehicle}>
             + Add Vehicle
           </button>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       {!sub.vehicles.length ? (
         <div className="dim" style={{ fontSize: '.83rem' }}>
           No vehicles assigned yet
@@ -935,16 +955,13 @@ function VehicleCard({
           <span className="mono">{num(netKg)} kg</span>
         </div>
       ) : null}
-    </div>
+    </CollapsibleCard>
   );
 }
 
 function DetailsCard({ sub }: { sub: SubmissionDetail }) {
   return (
-    <div className="card">
-      <div className="card-ttl" style={{ marginBottom: '.5rem' }}>
-        Details
-      </div>
+    <CollapsibleCard title="Details" defaultOpen={sub.derivedStage < 3} summary={`${sub.client.name} · ${sub.site.name}`}>
       <div className="tile" style={{ marginBottom: '.4rem' }}>
         <div className="tile-l">Client</div>
         <div className="tile-v">
@@ -988,7 +1005,7 @@ function DetailsCard({ sub }: { sub: SubmissionDetail }) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </CollapsibleCard>
   );
 }
 
@@ -1166,6 +1183,8 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
     }
   }
   if (!docs.length) return null;
+  const hasCod = docs.some((d) => d.kind === 'Certificate');
+  if (!hasCod) return null;
   const f6n = docs.filter((d) => d.kind === 'Form 6').length;
   const codn = docs.filter((d) => d.kind === 'Certificate').length;
 

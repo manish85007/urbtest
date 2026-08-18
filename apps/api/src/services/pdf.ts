@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { SUSTAINABILITY, getFY, type ReportPeriod } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { canSeeMrn, isStaff } from '../lib/auth-context.js';
@@ -9,6 +12,29 @@ import { auditLog } from './audit.js';
 import { getImpactReport, getRegisterReport, type RegisterType } from './reporting-service.js';
 import { getCompanyProfile } from './settings.js';
 import { readStoredFileSilent } from './file-service.js';
+
+function bundledUrbenoLogoJpeg(): Buffer | undefined {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(here, '../../assets/urbeno-logo.jpg'),
+    join(here, '../assets/urbeno-logo.jpg'),
+    join(process.cwd(), 'apps/api/assets/urbeno-logo.jpg'),
+    join(process.cwd(), 'assets/urbeno-logo.jpg'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return readFileSync(p);
+  }
+  return undefined;
+}
+
+function applyBrandLetterhead(letterhead: PdfLetterhead) {
+  const logo = bundledUrbenoLogoJpeg();
+  if (!logo) return;
+  letterhead.logoJpeg = logo;
+  letterhead.variant = 'document';
+  letterhead.logoMaxWidth = 155;
+  letterhead.logoMaxHeight = 38;
+}
 
 async function letterheadFromProfile(): Promise<{ co: Awaited<ReturnType<typeof getCompanyProfile>>; letterhead: PdfLetterhead }> {
   const co = await getCompanyProfile();
@@ -52,21 +78,27 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
   const sub = invoice.submission;
   const vehs = sub.vehicles.filter((v) => invoice.vehicleIds.includes(v.id) || !invoice.vehicleIds.length);
   const { co, letterhead } = await letterheadFromProfile();
+  applyBrandLetterhead(letterhead);
   letterhead.docNo = mrn.mrnNo;
-  letterhead.docDate = new Date().toISOString().slice(0, 10);
+  letterhead.docLabel = `Invoice ${invoice.invoiceNo}`;
+  letterhead.docDate = fmt(mrn.receivedAt);
   const mats = Array.isArray(mrn.materials)
     ? (mrn.materials as Array<{ n?: string; q?: number; w?: number }>)
     : [];
 
+  const receivedKg = mats.reduce((s, m) => s + Number(m.w ?? 0), 0);
+
   const buffer = buildTextPdf(
     'MATERIAL RECEIPT NOTE',
-    `Receiving facility: ${factory?.name ?? mrn.factoryId}`,
+    `Linked to invoice ${invoice.invoiceNo} · Request ${sub.id} · one MRN per invoice`,
     [
       {
         heading: 'REFERENCE',
         pairs: [
           ['Request ID', sub.id, 'Client PO / Ref', sub.ref || '—'],
           ['Invoice Number', invoice.invoiceNo, 'Invoice Date', fmt(invoice.invoiceDate)],
+          ['Invoice billing weight', `${num(invoice.billingWeight.toString())} kg`, 'Material received', `${num(receivedKg)} kg`],
+          ['MRN Number', mrn.mrnNo, 'Receiving facility', factory?.name ?? mrn.factoryId],
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'E-way Bill Date', fmt(invoice.ewayBillDate)],
           ['Client', `${sub.client.name} (${sub.clientId})`, 'Origin Site', sub.site.name],
           ['Received On', fmt(mrn.receivedAt), 'Condition', mrn.condition],
@@ -91,6 +123,8 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
           rows: mats.length
             ? mats.map((m) => [String(m.n || '—'), String(m.q ?? 0), num(m.w)])
             : [['—', '—', '—']],
+          total: ['TOTAL RECEIVED', '', num(receivedKg)],
+          aligns: ['l', 'r', 'r'],
         },
       },
       {
@@ -109,7 +143,7 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
         ],
       },
     ],
-    `${mrn.mrnNo} · ${co.name} · ${factory?.kspcbConsent || co.kspcb}`,
+    `${mrn.mrnNo} · Invoice ${invoice.invoiceNo} · ${co.name} · ${factory?.kspcbConsent || co.kspcb}`,
     letterhead,
   );
 
@@ -139,12 +173,23 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const pcb = Number(recy.recoveryPcb);
   const sum = fe + nfe + pl + pcb;
   const { co, letterhead } = await letterheadFromProfile();
+  applyBrandLetterhead(letterhead);
   letterhead.docNo = recy.form6No;
-  letterhead.docDate = new Date().toISOString().slice(0, 10);
+  letterhead.docLabel = `Invoice ${invoice.invoiceNo}`;
+  letterhead.docDate = fmt(recy.processedAt);
+
+  const formVehicles = sub.vehicles.filter((v) =>
+    recy.vehicleIds?.length
+      ? recy.vehicleIds.includes(v.id)
+      : invoice.vehicleIds.includes(v.id) || !invoice.vehicleIds.length,
+  );
+  const invoiceQty = Array.isArray(invoice.mrn?.materials)
+    ? (invoice.mrn!.materials as Array<{ q?: number }>).reduce((s, m) => s + Number(m.q ?? 0), 0)
+    : 0;
 
   const buffer = buildTextPdf(
     'FORM 6 — MANIFEST FOR E-WASTE',
-    'E-Waste (Management) Rules, 2022 · Rule 12 · one manifest per invoice',
+    `E-Waste (Management) Rules, 2022 · Rule 12 · linked to invoice ${invoice.invoiceNo}`,
     [
       {
         heading: 'CONSIGNMENT',
@@ -152,8 +197,23 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ['Manifest Number', recy.form6No, 'Processing Date', fmt(recy.processedAt)],
           ['Request ID', sub.id, 'Invoice Number', invoice.invoiceNo],
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'MRN Reference', invoice.mrn?.mrnNo || '—'],
+          ['Invoice billed weight', `${num(invoice.billingWeight.toString())} kg`, 'Invoice quantity', String(invoiceQty || recy.devicesDestroyed || '—')],
           ['Devices destroyed', String(recy.devicesDestroyed ?? 0), 'Serial records', String(recy.serials.length)],
         ],
+      },
+      {
+        heading: 'VEHICLES ON THIS MANIFEST',
+        table: {
+          headers: ['Vehicle', 'Driver', 'Net kg', 'Slip'],
+          rows: formVehicles.length
+            ? formVehicles.map((v) => [
+                v.registration,
+                v.driverName,
+                v.weighment ? num(v.weighment.netKg.toString()) : '—',
+                v.weighment?.slipNumber || '—',
+              ])
+            : [['—', '—', '—', '—']],
+        },
       },
       {
         heading: 'SENDER — BULK CONSUMER',

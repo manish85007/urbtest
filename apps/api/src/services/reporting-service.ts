@@ -802,7 +802,7 @@ export async function getRegisterReport(
         ];
       });
   } else if (type === 'form6') {
-    head = ['Form 6', 'Invoice', 'Request', 'Client', 'Processed', 'Facility', 'E-way Bill', 'Categories', 'Devices', 'Weight kg'];
+    head = ['Form 6', 'Invoice', 'Request', 'Client', 'Processed', 'Facility', 'E-way Bill', 'Vehicles', 'Categories', 'Devices', 'Weight kg'];
     const recys = await prisma.recycling.findMany({
       where: { invoice: { submission: scope } },
       include: {
@@ -824,6 +824,7 @@ export async function getRegisterReport(
         fmtDate(r.processedAt),
         r.factory.name,
         r.invoice.ewayBillNo || '',
+        r.vehicleIds.length || r.invoice.vehicleIds.length,
         r.categories.map((c) => c.entryId).join(' / '),
         r.serials.length,
         Number(r.categories.reduce((a, c) => a + Number(c.weightKg), 0).toFixed(3)),

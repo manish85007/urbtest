@@ -21,6 +21,7 @@ import { FileRow, FileThumb } from './FileThumb';
 import { Modal } from './Modal';
 import { MrnForm } from './MrnForm';
 import { RecyclingForm } from './RecyclingForm';
+import { CollapsibleCard } from './CollapsibleCard';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 
@@ -112,33 +113,43 @@ export function InvoiceLifecyclePanel({
           : 'var(--rd)';
 
   return (
-    <div className="inv-panel" style={{ padding: '.7rem .3rem 0' }}>
-      <div className="card" style={{ marginBottom: '.6rem' }}>
-        <div className="card-hd">
-          <div className="card-ttl">🧾 Invoice {invoice.invoiceNo}</div>
-          <span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>
-          <div className="spacer" />
-          {onEditInvoice ? (
-            <button type="button" className="btn bs bsm" disabled={disabled} onClick={onEditInvoice}>
-              Edit
-            </button>
-          ) : null}
-          {onDeleteInvoice ? (
-            <button
-              type="button"
-              className="btn brd bsm"
-              disabled={disabled || !canDeleteInvoice}
-              title={
-                canDeleteInvoice
-                  ? 'Delete this invoice'
-                  : 'Delete is unavailable after goods receipt (MRN). Edit is still available.'
-              }
-              onClick={onDeleteInvoice}
-            >
-              Delete
-            </button>
-          ) : null}
-        </div>
+    <div className="inv-panel" id={`inv-${invoice.id}`} style={{ padding: '.7rem .3rem 0' }}>
+      <CollapsibleCard
+        title={`🧾 Invoice ${invoice.invoiceNo}`}
+        badge={<span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>}
+        defaultOpen={stage <= 5}
+        style={{ marginBottom: '.6rem' }}
+        summary={
+          <span>
+            {fmtDate(invoice.invoiceDate)} · {num(billingKg)} kg billed
+            {invoice.mrn ? ` · MRN ${invoice.mrn.mrnNo}` : ''}
+          </span>
+        }
+        actions={
+          <>
+            {onEditInvoice ? (
+              <button type="button" className="btn bs bsm" disabled={disabled} onClick={onEditInvoice}>
+                Edit
+              </button>
+            ) : null}
+            {onDeleteInvoice ? (
+              <button
+                type="button"
+                className="btn brd bsm"
+                disabled={disabled || !canDeleteInvoice}
+                title={
+                  canDeleteInvoice
+                    ? 'Delete this invoice'
+                    : 'Delete is unavailable after goods receipt (MRN). Edit is still available.'
+                }
+                onClick={onDeleteInvoice}
+              >
+                Delete
+              </button>
+            ) : null}
+          </>
+        }
+      >
         <div
           style={{
             display: 'grid',
@@ -263,7 +274,7 @@ export function InvoiceLifecyclePanel({
             </div>
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
       <div className="card" style={{ marginBottom: '.6rem' }}>
         <div className="card-hd">
@@ -389,7 +400,9 @@ export function InvoiceLifecyclePanel({
           invoice={invoice}
           vehicles={covered}
           canCreate={isFactory && stage === 5 && !invoice.mrn}
+          canEdit={isAdmin && !!invoice.mrn && !invoice.closedAt}
           onCreateClick={() => setPanel('mrn')}
+          onEditClick={() => setPanel('mrn')}
         />
       ) : null}
 
@@ -480,21 +493,26 @@ export function InvoiceLifecyclePanel({
 
       {panel === 'mrn' ? (
         <Modal
-          title={`Create MRN — ${invoice.invoiceNo}`}
+          title={`${invoice.mrn ? 'Edit MRN' : 'Create MRN'} — ${invoice.invoiceNo}`}
           onClose={() => setPanel(null)}
-          okLabel="Record goods receipt (MRN)"
+          okLabel={invoice.mrn ? 'Save MRN corrections' : 'Record goods receipt (MRN)'}
           form="mrn-form"
           busy={disabled}
           wide
         >
           <MrnForm
             formId="mrn-form"
+            mode={invoice.mrn ? 'edit' : 'create'}
             invoice={invoice}
             vehicles={vehicles}
             lineItems={lineItems}
             userName={user.name}
             disabled={disabled}
-            onSubmit={(body) => run(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')}
+            onSubmit={(body) =>
+              invoice.mrn
+                ? run(() => lifecycleApi.updateMrn(invoice.id, body), 'MRN updated.')
+                : run(() => lifecycleApi.createMrn(invoice.id, body), 'MRN created.')
+            }
           />
         </Modal>
       ) : null}
@@ -511,8 +529,14 @@ export function InvoiceLifecyclePanel({
           <RecyclingForm
             formId="recy-form"
             defaultFactoryId={invoice.mrn?.factoryId ?? 'URB-BLR'}
+            invoiceNo={invoice.invoiceNo}
             billingWeight={Number(invoice.billingWeight)}
+            invoiceQty={
+              invoice.mrn?.materials?.reduce((s, m) => s + Number(m.q ?? 0), 0) ||
+              lineItems.reduce((s, it) => s + Number(it.qty || 0), 0)
+            }
             ewayBillNo={invoice.ewayBillNo}
+            vehicles={covered}
             seedHints={
               invoice.mrn?.materials?.length
                 ? invoice.mrn.materials.map((m) => ({
@@ -575,12 +599,16 @@ function MrnCard({
   invoice,
   vehicles,
   canCreate,
+  canEdit,
   onCreateClick,
+  onEditClick,
 }: {
   invoice: InvoiceDetail;
   vehicles: VehicleDetail[];
   canCreate: boolean;
+  canEdit: boolean;
   onCreateClick: () => void;
+  onEditClick: () => void;
 }) {
   const m = invoice.mrn;
   if (!m && !canCreate) return null;
@@ -589,23 +617,37 @@ function MrnCard({
   const matWt = mats.reduce((s, x) => s + Number(x.w ?? 0), 0);
 
   return (
-    <div className="card" style={{ marginBottom: '.6rem' }}>
-      <div className="card-hd">
-        <div className="card-ttl">📋 Material Receipt Note</div>
-        {m ? (
-          <span className="badge bg-bl mono">{m.mrnNo}</span>
+    <CollapsibleCard
+      title="📋 Material Receipt Note"
+      badge={m ? <span className="badge bg-bl mono">{m.mrnNo}</span> : <span className="badge bg-am">Pending</span>}
+      defaultOpen={!m || !invoice.recycling}
+      style={{ marginBottom: '.6rem' }}
+      summary={
+        m ? (
+          <span>
+            Invoice {invoice.invoiceNo} · {fmtDate(m.receivedAt)} · {num(matWt)} kg
+          </span>
         ) : (
-          <span className="badge bg-am">Pending</span>
-        )}
-        <div className="spacer" />
-        {m ? (
-          <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
-            ⬇ Print MRN
-          </a>
-        ) : null}
-      </div>
+          'Goods not yet received'
+        )
+      }
+      actions={
+        <>
+          {m ? (
+            <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
+              ⬇ Print MRN
+            </a>
+          ) : null}
+          {canEdit ? (
+            <button type="button" className="btn bs bsm" onClick={onEditClick}>
+              Edit MRN
+            </button>
+          ) : null}
+        </>
+      }
+    >
       <div style={{ fontSize: '.73rem', color: 'var(--mu)', marginBottom: '.5rem' }}>
-        🔒 Internal gate document — not visible in the client portal
+        🔒 Internal gate document — one MRN per invoice, not visible in the client portal
       </div>
       {!m ? (
         <>
@@ -630,12 +672,22 @@ function MrnCard({
             }}
           >
             <div className="tile">
+              <div className="tile-l">Linked invoice</div>
+              <div className="tile-v mono">{invoice.invoiceNo}</div>
+            </div>
+            <div className="tile">
               <div className="tile-l">Factory Site</div>
               <div className="tile-v">{m.factory?.name || m.factoryId}</div>
             </div>
             <div className="tile">
               <div className="tile-l">Received On</div>
               <div className="tile-v">{fmtDate(m.receivedAt)}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Billed / received</div>
+              <div className="tile-v mono">
+                {num(Number(invoice.billingWeight))} / {num(matWt)} kg
+              </div>
             </div>
             <div className="tile">
               <div className="tile-l">Received By</div>
@@ -743,7 +795,7 @@ function MrnCard({
           </div>
         </>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }
 
@@ -770,21 +822,28 @@ function RecyclingCard({
   const hasRecovery = recFe + recNfe + recPl + recPcb > 0;
 
   return (
-    <div className="card" style={{ marginBottom: '.6rem' }}>
-      <div className="card-hd">
-        <div className="card-ttl">♻️ Recycling</div>
-        {r ? (
-          <span className="badge bg-g mono">{r.form6No}</span>
+    <CollapsibleCard
+      title="♻️ Recycling / Form 6"
+      badge={r ? <span className="badge bg-g mono">{r.form6No}</span> : <span className="badge bg-am">Pending</span>}
+      defaultOpen={!r || !invoice.certificates.length}
+      style={{ marginBottom: '.6rem' }}
+      summary={
+        r ? (
+          <span>
+            Invoice {invoice.invoiceNo} · {fmtDate(r.processedAt)} · billed {num(Number(invoice.billingWeight))} kg
+          </span>
         ) : (
-          <span className="badge bg-am">Pending</span>
-        )}
-        <div className="spacer" />
-        {r ? (
+          'Awaiting processing'
+        )
+      }
+      actions={
+        r ? (
           <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
             ⬇ Form 6
           </a>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       {!r ? (
         <>
           <div className="dim" style={{ fontSize: '.83rem' }}>
@@ -807,6 +866,10 @@ function RecyclingCard({
             }}
           >
             <div className="tile">
+              <div className="tile-l">Linked invoice</div>
+              <div className="tile-v mono">{invoice.invoiceNo}</div>
+            </div>
+            <div className="tile">
               <div className="tile-l">Form 6 #</div>
               <div className="tile-v mono">{r.form6No}</div>
             </div>
@@ -817,6 +880,10 @@ function RecyclingCard({
             <div className="tile">
               <div className="tile-l">Facility</div>
               <div className="tile-v">{r.factory?.name || r.factoryId || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Invoice billed</div>
+              <div className="tile-v mono">{num(Number(invoice.billingWeight))} kg</div>
             </div>
             <div className="tile">
               <div className="tile-l">Devices Destroyed</div>
@@ -946,7 +1013,7 @@ function RecyclingCard({
           ) : null}
         </>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }
 

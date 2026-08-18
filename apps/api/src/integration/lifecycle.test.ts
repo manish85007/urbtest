@@ -14,6 +14,7 @@ import {
   createInvoice,
   createMrn,
   createRecycling,
+  updateMrn,
   uploadCertificate,
 } from '../services/invoice-service.js';
 
@@ -154,6 +155,46 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       gatePhotoIds: [gate.id],
       materialPhotoIds: [inside.id],
     });
+
+    await expect(
+      updateMrn(factory, invoiceId, {
+        factoryId: 'URB-BLR',
+        receivedAt: '2026-08-16',
+        driverSign: 'Driver',
+        managerSign: 'Manager',
+        securitySign: 'Security',
+        materials: [{ name: 'Mixed e-waste', qty: 10, weight: 50 }],
+        gatePhotoIds: [gate.id],
+        materialPhotoIds: [inside.id],
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/Admin/i) });
+
+    await expect(
+      updateMrn(admin, invoiceId, {
+        factoryId: 'URB-BLR',
+        receivedAt: '2026-08-16',
+        driverSign: 'Driver',
+        managerSign: 'Manager',
+        securitySign: 'Security',
+        materials: [{ name: 'Mixed e-waste', qty: 10, weight: 49 }],
+        gatePhotoIds: [gate.id],
+        materialPhotoIds: [inside.id],
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/billing weight/i) });
+
+    const corrected = await updateMrn(admin, invoiceId, {
+      factoryId: 'URB-BLR',
+      receivedAt: '2026-08-16',
+      driverSign: 'Driver',
+      managerSign: 'Factory Manager',
+      securitySign: 'Security',
+      materials: [{ name: 'Mixed e-waste', qty: 10, weight: 50 }],
+      condition: 'Good — corrected',
+      gatePhotoIds: [gate.id],
+      materialPhotoIds: [inside.id],
+    });
+    expect(corrected.managerSign).toBe('Factory Manager');
+    expect(corrected.condition).toBe('Good — corrected');
 
     await createRecycling(factory, invoiceId, {
       processedAt: '2026-08-16',

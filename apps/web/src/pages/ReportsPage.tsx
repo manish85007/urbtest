@@ -17,7 +17,7 @@ const KINDS: Array<{ id: RegisterType; label: string; description: string; staff
   { id: 'summary', label: 'Request Summary', description: 'Every request with stage, weight and dates' },
   { id: 'invoices', label: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding' },
   { id: 'mrn', label: 'MRN Register', description: 'Goods received at factory sites — internal', staffOnly: true },
-  { id: 'form6', label: 'Form 6 Log', description: 'Processing records with categories' },
+  { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories' },
   { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status' },
   { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category' },
   { id: 'sustain', label: 'Sustainability', description: 'Environmental impact with methodology' },

@@ -17,6 +17,7 @@ import {
   createRecycling,
   deleteInvoice,
   updateInvoice,
+  updateMrn,
   uploadCertificate,
 } from '../services/invoice-service.js';
 import { raiseQuery, replyToQuery } from '../services/query-service.js';
@@ -28,6 +29,27 @@ function handleServiceError(err: unknown, reply: FastifyReply) {
   }
   throw err;
 }
+
+const mrnBodySchema = z.object({
+  factoryId: z.string().min(1),
+  receivedAt: z.string(),
+  driverSign: z.string().optional(),
+  managerSign: z.string().optional(),
+  securitySign: z.string().optional(),
+  materials: z
+    .array(
+      z.object({
+        name: z.string(),
+        qty: z.number(),
+        weight: z.number(),
+      }),
+    )
+    .optional(),
+  condition: z.string().optional(),
+  note: z.string().optional(),
+  gatePhotoIds: z.array(z.string()).optional(),
+  materialPhotoIds: z.array(z.string()).optional(),
+});
 
 const lineItemSchema = z.object({
   name: z.string().min(1),
@@ -248,29 +270,18 @@ export async function lifecycleRoutes(app: FastifyInstance) {
   app.post('/invoices/:id/mrn', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
-      const body = z
-        .object({
-          factoryId: z.string().min(1),
-          receivedAt: z.string(),
-          driverSign: z.string().optional(),
-          managerSign: z.string().optional(),
-          securitySign: z.string().optional(),
-          materials: z
-            .array(
-              z.object({
-                name: z.string(),
-                qty: z.number(),
-                weight: z.number(),
-              }),
-            )
-            .optional(),
-          condition: z.string().optional(),
-          note: z.string().optional(),
-          gatePhotoIds: z.array(z.string()).optional(),
-          materialPhotoIds: z.array(z.string()).optional(),
-        })
-        .parse(request.body);
+      const body = mrnBodySchema.parse(request.body);
       return await createMrn(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.patch('/invoices/:id/mrn', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = mrnBodySchema.parse(request.body);
+      return await updateMrn(request.user!, id, body);
     } catch (err) {
       return handleServiceError(err, reply);
     }
@@ -302,6 +313,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           photoIds: z.array(z.string()).optional(),
           reportIds: z.array(z.string()).optional(),
           serialFileId: z.string().optional(),
+          vehicleIds: z.array(z.string()).optional(),
           serials: z
             .array(
               z.object({

@@ -423,6 +423,7 @@ export interface InvoiceDetail {
     }>;
     serials?: SerialRow[];
     serialFileId?: string | null;
+    vehicleIds?: string[];
   } | null;
   certificates: Array<{
     id?: string;
@@ -1208,6 +1209,26 @@ export const lifecycleApi = {
       body: JSON.stringify(body),
     }),
 
+  updateMrn: (
+    invoiceId: string,
+    body: {
+      factoryId: string;
+      receivedAt: string;
+      driverSign?: string;
+      managerSign?: string;
+      securitySign?: string;
+      materials?: Array<{ name: string; qty: number; weight: number }>;
+      condition?: string;
+      note?: string;
+      gatePhotoIds?: string[];
+      materialPhotoIds?: string[];
+    },
+  ) =>
+    api<{ mrnNo: string }>(`/invoices/${invoiceId}/mrn`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
   createRecycling: (
     invoiceId: string,
     body: {
@@ -1226,6 +1247,7 @@ export const lifecycleApi = {
       }>;
       photoIds?: string[];
       reportIds?: string[];
+      vehicleIds?: string[];
     },
   ) =>
     api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {
