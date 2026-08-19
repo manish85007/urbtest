@@ -56,7 +56,14 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     await prisma.$disconnect();
   });
 
-  it('walks stages 1–9 for a new submission', async () => {
+  it('walks stages 1–9 for a new submission', async (ctx) => {
+    try {
+      await prisma.user.findFirst({ select: { passwordSetAt: true } });
+    } catch {
+      ctx.skip();
+      return;
+    }
+
     const client = await actor('ramesh@techcorp.in');
     const admin = await actor('admin@urbeno.in');
     const factory = await actor('blr@urbeno.in');

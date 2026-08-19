@@ -3,6 +3,7 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { isMimeAllowed, maxBytesForKind, maxMbForKind } from '../lib/file-limits.js';
 import { prisma } from '../lib/prisma.js';
+import { assertFileAccess } from '../lib/file-access.js';
 import { getStorage } from '../lib/storage.js';
 import { auditLog } from './audit.js';
 import { recordSecurityEvent } from './security-log.js';
@@ -75,6 +76,8 @@ export async function uploadFile(actor: SessionUser, input: UploadInput) {
 export async function readFileBlob(actor: SessionUser, fileId: string) {
   const file = await prisma.storedFile.findUnique({ where: { id: fileId } });
   if (!file) throw new AppError('File not found.', 404);
+
+  await assertFileAccess(actor, file);
 
   const blob = await getStorage().read(file.storageKey);
   if (FILE_CLASS[file.kind] === 'restricted') {

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { isAppError } from '../lib/errors.js';
-import { attachSession, requireAuth } from '../middleware/session.js';
+import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
 import {
   acknowledgeSubmission,
   createSubmission,
@@ -414,13 +414,13 @@ export async function lifecycleRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/submissions/:id/compliance/email', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/submissions/:id/compliance/email', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
       const body = z
         .object({
-          certificateIds: z.array(z.string()).optional(),
-          form6InvoiceIds: z.array(z.string()).optional(),
+          certificateIds: z.array(z.string().min(1)).max(50).optional(),
+          form6InvoiceIds: z.array(z.string().min(1)).max(50).optional(),
         })
         .parse(request.body);
       return await sendComplianceDocuments(request.user!, id, body);
