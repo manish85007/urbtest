@@ -13,15 +13,23 @@ import {
 import { downloadCsvGrid } from '../lib/csv';
 import { PeriodPicker } from '../components/PeriodPicker';
 
-const KINDS: Array<{ id: RegisterType; label: string; description: string; staffOnly?: boolean; factoryOnly?: boolean; adminOnly?: boolean }> = [
-  { id: 'summary', label: 'Request Summary', description: 'Every request with stage, weight and dates', adminOnly: true },
-  { id: 'invoices', label: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding', adminOnly: true },
-  { id: 'mrn', label: 'MRN Register', description: 'Goods received at factory sites — internal', staffOnly: true },
-  { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories', staffOnly: true },
-  { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status', staffOnly: true },
-  { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category', staffOnly: true },
-  { id: 'sustain', label: 'Sustainability', description: 'Environmental impact with methodology', adminOnly: true },
-  { id: 'heroes', label: 'Recycle Heroes', description: 'Tonnage and tree milestones', adminOnly: true },
+const KINDS: Array<{
+  id: RegisterType;
+  label: string;
+  description: string;
+  /** Hidden from factory manager accounts */
+  factoryHidden?: boolean;
+  /** Hidden from client portal accounts */
+  clientHidden?: boolean;
+}> = [
+  { id: 'summary', label: 'Request Summary', description: 'Every request with stage, weight and dates', factoryHidden: true },
+  { id: 'invoices', label: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding', factoryHidden: true },
+  { id: 'mrn', label: 'MRN Register', description: 'Goods received at factory sites — internal', clientHidden: true },
+  { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories', clientHidden: true },
+  { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status', clientHidden: true },
+  { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category', clientHidden: true },
+  { id: 'sustain', label: 'Sustainability', description: 'Environmental impact with methodology', factoryHidden: true },
+  { id: 'heroes', label: 'Recycle Heroes', description: 'Tonnage and tree milestones', factoryHidden: true },
 ];
 
 const DISPLAY_CAP = 300;
@@ -32,10 +40,10 @@ interface ReportsPageProps {
 
 export function ReportsPage({ user }: ReportsPageProps) {
   const isStaff = user.role === 'admin' || user.role === 'factory';
-  const isAdmin = user.role === 'admin';
+  const isClient = user.role === 'client';
   const available = KINDS.filter((k) => {
-    if (k.adminOnly && !isAdmin) return false;
-    if (k.staffOnly && !isStaff) return false;
+    if (isClient && k.clientHidden) return false;
+    if (user.role === 'factory' && k.factoryHidden) return false;
     return true;
   });
   const [params, setParams] = useSearchParams();
