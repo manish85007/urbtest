@@ -156,7 +156,9 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
             <h1 className="h1">{sub.id}</h1>
             <StageBadge stage={stage} />
-            {sub.rejectNote && stage === 1 ? <span className="badge bg-rd">Changes requested</span> : null}
+            {sub.rejectNote && stage === 1 ? (
+              <span className="badge bg-am">Pending with Requestor</span>
+            ) : null}
           </div>
           <div className="p-mu" style={{ margin: '.15rem 0 0' }}>
             {sub.client.name} · {sub.site.name} · {sub.ref || 'no PO'} · raised {fmtDate(sub.requestDate)}

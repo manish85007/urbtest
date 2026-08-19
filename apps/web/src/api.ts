@@ -309,6 +309,7 @@ export interface SubmissionSummary {
   location?: string | null;
   ref?: string | null;
   stage: number;
+  returned?: boolean;
   invoiceCount: number;
   invoices?: Array<{ invoiceNo: string; stage: number }>;
   netKg?: number;
@@ -591,6 +592,7 @@ export interface ClientDashboardReport {
     siteId: string;
     siteName: string;
     stage: number;
+    returned?: boolean;
     netKg: number;
     approxWeight: number;
     requestDate: string;

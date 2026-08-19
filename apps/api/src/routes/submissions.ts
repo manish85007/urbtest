@@ -32,6 +32,9 @@ export async function submissionRoutes(app: FastifyInstance) {
         location: sub.location,
         ref: sub.ref,
         stage,
+        // Expose whether this request has been returned to the requestor so the
+        // UI can show "Pending with Requestor" instead of the generic stage badge.
+        returned: stage === 1 && !!sub.rejectNote,
         invoiceCount: sub.invoices.length,
         invoices: sub.invoices.map((inv) => ({
           invoiceNo: inv.invoiceNo,

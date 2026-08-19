@@ -391,6 +391,90 @@ function WorkQueue({
   );
 }
 
+/** Tiny SVG donut/pie chart — no external lib needed. */
+function PieChart({
+  slices,
+  size = 100,
+}: {
+  slices: Array<{ value: number; color: string; label: string }>;
+  size?: number;
+}) {
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  if (total === 0) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="38" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+      </svg>
+    );
+  }
+  const r = 38;
+  const cx = 50;
+  const cy = 50;
+  let startAngle = -Math.PI / 2;
+  const paths = slices.map((sl) => {
+    const pct = sl.value / total;
+    const sweep = 2 * Math.PI * pct;
+    const endAngle = startAngle + sweep;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const largeArc = sweep > Math.PI ? 1 : 0;
+    const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    startAngle = endAngle;
+    return { d, color: sl.color, label: sl.label, pct };
+  });
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      {paths.map((p, i) => (
+        <path key={i} d={p.d} fill={p.color}>
+          <title>
+            {p.label}: {(p.pct * 100).toFixed(1)}%
+          </title>
+        </path>
+      ))}
+      <circle cx={cx} cy={cy} r={16} fill="white" />
+    </svg>
+  );
+}
+
+/** Simple horizontal bar chart. */
+function BarChart({
+  bars,
+  maxVal,
+}: {
+  bars: Array<{ label: string; value: number; color: string }>;
+  maxVal: number;
+}) {
+  if (bars.length === 0) return null;
+  const barH = 20;
+  const gap = 6;
+  const labelW = 70;
+  const chartW = 180;
+  const height = bars.length * (barH + gap) - gap;
+
+  return (
+    <svg width={labelW + chartW + 50} height={height} style={{ overflow: 'visible' }}>
+      {bars.map((b, i) => {
+        const y = i * (barH + gap);
+        const w = maxVal > 0 ? (b.value / maxVal) * chartW : 0;
+        return (
+          <g key={i}>
+            <text x={labelW - 4} y={y + barH / 2 + 4} textAnchor="end" fontSize={10} fill="#6b7280">
+              {b.label}
+            </text>
+            <rect x={labelW} y={y} width={w} height={barH} rx={3} fill={b.color} />
+            <text x={labelW + w + 4} y={y + barH / 2 + 4} fontSize={10} fill="#374151">
+              {num(b.value)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function ClientDashboard({
   user,
   report,
@@ -408,8 +492,23 @@ function ClientDashboard({
   const siteName = report.sites.find((s) => s.id === siteId)?.name;
   const requests = report.requests;
 
+  // Pie chart: open vs closed requests
+  const reqSlices = [
+    { value: report.counts.open, color: '#3b82f6', label: 'Open' },
+    { value: report.counts.closed, color: '#22c55e', label: 'Completed' },
+  ];
+
+  // Sustainability bar chart (YTD)
+  const ecoMax = Math.max(impact.kg, impact.co2, 1);
+  const ecoBars = [
+    { label: `Recycled (kg)`, value: impact.kg, color: '#22c55e' },
+    { label: `CO₂ Avoided (kg)`, value: impact.co2, color: '#3b82f6' },
+    { label: `Landfill Saved (kg)`, value: impact.landfill, color: '#f59e0b' },
+  ];
+
   return (
     <>
+      {/* Header */}
       <div className="f-row" style={{ marginBottom: '.9rem' }}>
         <div>
           <div className="h1">Welcome, {first}</div>
@@ -429,8 +528,9 @@ function ClientDashboard({
         </Link>
       </div>
 
+      {/* Action alert: certificates ready */}
       {report.pendingClose.length > 0 ? (
-        <div className="card" style={{ background: 'var(--g3)', borderColor: 'var(--g4)' }}>
+        <div className="card" style={{ background: 'var(--g3)', borderColor: 'var(--g4)', marginBottom: '.8rem' }}>
           <div className="card-hd">
             <div className="card-ttl">🏅 Certificates ready for your review</div>
             <span className="badge bg-g">{report.pendingClose.length}</span>
@@ -470,63 +570,77 @@ function ClientDashboard({
         </div>
       ) : null}
 
-      <div className="stats" style={{ marginBottom: '1rem' }}>
-        <Link to="/requests" className="stat">
-          <div className="stat-l">Open Requests</div>
-          <div className="stat-v">{report.counts.open}</div>
-          <div className="stat-t">in progress</div>
-        </Link>
-        <Link to="/requests?stage=9" className="stat">
-          <div className="stat-l">Completed</div>
-          <div className="stat-v">{report.counts.closed}</div>
-          <div className="stat-t">lifecycle closed</div>
-        </Link>
-        <Link
-          to="/impact"
-          className="stat"
-          style={{ background: 'linear-gradient(135deg,#dcfce7,#f0fdf4)', borderColor: '#86efac' }}
-        >
-          <div className="stat-l" style={{ color: '#166534' }}>
-            Recycled {report.period.fy}
+      {/* Summary cards — 2 charts + key stats */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '.7rem',
+          marginBottom: '1rem',
+        }}
+      >
+        {/* Requests pie */}
+        <Link to="/requests" className="card" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <PieChart slices={reqSlices} size={80} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--g2)', marginBottom: '.3rem' }}>
+              {report.period.fy} Requests
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.15rem' }}>
+              {reqSlices.map((s) => (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.8rem' }}>
+                  <span
+                    style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }}
+                  />
+                  <span className="dim">{s.label}</span>
+                  <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{s.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="stat-v" style={{ color: '#14532d' }}>
-            {num(impact.kg)}
-          </div>
-          <div className="stat-t">kg</div>
         </Link>
-        <Link
-          to="/impact"
-          className="stat"
-          style={{ background: 'linear-gradient(135deg,#dbeafe,#eff6ff)', borderColor: '#93c5fd' }}
-        >
-          <div className="stat-l" style={{ color: '#1e40af' }}>
-            CO₂ Avoided
+
+        {/* Sustainability bar chart */}
+        <Link to="/impact" className="card" style={{ textDecoration: 'none' }}>
+          <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#166534', marginBottom: '.5rem' }}>
+            🌱 Sustainability {report.period.fy}
           </div>
-          <div className="stat-v" style={{ color: '#1e3a8a' }}>
-            {num(impact.co2, 0)}
-          </div>
-          <div className="stat-t">kg CO₂e</div>
+          <BarChart bars={ecoBars} maxVal={ecoMax} />
         </Link>
+
+        {/* Trees / milestone */}
         <Link
           to="/heroes"
-          className="stat"
-          style={{ background: 'linear-gradient(135deg,#fef9c3,#fefce8)', borderColor: '#fde047' }}
+          className="card"
+          style={{
+            textDecoration: 'none',
+            background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)',
+            borderColor: '#86efac',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            gap: '.25rem',
+          }}
         >
-          <div className="stat-l" style={{ color: '#854d0e' }}>
-            Trees Planted
-          </div>
-          <div className="stat-v" style={{ color: '#713f12' }}>
+          <div style={{ fontSize: '2rem' }}>🌳</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#14532d', lineHeight: 1 }}>
             {report.treesPlanted}
           </div>
-          <div className="stat-t">lifetime</div>
+          <div style={{ fontSize: '.78rem', color: '#166534', fontWeight: 600 }}>trees planted</div>
+          <div className="dim" style={{ fontSize: '.7rem' }}>
+            {num(report.lifetimeTonnes)} t recycled lifetime
+          </div>
         </Link>
       </div>
 
+      {/* Main content grid */}
       <div className="detail-grid">
         <div>
           <div className="card">
             <div className="card-hd">
-              <div className="card-ttl">Your Requests</div>
+              <div className="card-ttl">Recent Requests</div>
               <div className="spacer" />
               <Link to="/requests" className="btn bs bsm">
                 View all →
@@ -549,28 +663,32 @@ function ClientDashboard({
                     <tr>
                       <th>Request</th>
                       <th>Site</th>
-                      <th>Stage</th>
+                      <th>Status</th>
                       <th>Weight</th>
-                      <th>Raised</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {requests.slice(0, 12).map((s) => (
+                    {requests.slice(0, 8).map((s) => (
                       <tr key={s.id} className="click" onClick={() => nav(`/requests/${s.id}`)}>
                         <td>
                           <Link to={`/requests/${s.id}`} onClick={(e) => e.stopPropagation()}>
                             <b>{s.id}</b>
                           </Link>
                           <div className="dim" style={{ fontSize: '.72rem' }}>
-                            {s.ref || 'no PO'}
+                            {fmtDate(s.requestDate)}
                           </div>
                         </td>
                         <td className="dim">{s.siteName}</td>
                         <td>
-                          <StageBadge stage={s.stage} />
+                          {s.returned ? (
+                            <span className="badge bg-am" title="Returned — please update and resubmit">
+                              Pending with You
+                            </span>
+                          ) : (
+                            <StageBadge stage={s.stage} />
+                          )}
                         </td>
                         <td className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)} kg</td>
-                        <td className="dim">{fmtDate(s.requestDate)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -579,77 +697,73 @@ function ClientDashboard({
             )}
           </div>
         </div>
+
+        {/* Right column: sites compact list */}
         <div>
-          {report.sites.length ? (
-            <>
-              {report.sites.length > 1 ? (
-                <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--g2)', marginBottom: '.45rem' }}>
-                  Your Sites
-                </div>
-              ) : null}
-              {report.sites.map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  className="card"
-                  style={{
-                    marginBottom: '.5rem',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    width: '100%',
-                    font: 'inherit',
-                    color: 'inherit',
-                    borderColor: siteId === st.id ? 'var(--g)' : undefined,
-                    background: siteId === st.id ? 'var(--g3)' : undefined,
-                  }}
-                  onClick={() => onSite(siteId === st.id ? '' : st.id)}
-                >
-                  <div className="card-hd">
-                    <div className="card-ttl">{st.name}</div>
-                    {siteId === st.id ? <span className="badge bg-g">Filtered</span> : null}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: '.4rem' }}>
-                    <div className="tile">
-                      <div className="tile-l">Open</div>
-                      <div className="tile-v">{st.open}</div>
-                    </div>
-                    <div className="tile">
-                      <div className="tile-l">{report.period.fy} kg</div>
-                      <div className="tile-v">{num(st.fyKg)}</div>
-                    </div>
-                    <div className="tile">
-                      <div className="tile-l">Total</div>
-                      <div className="tile-v">{st.total}</div>
-                    </div>
-                    <div className="tile">
-                      <div className="tile-l">Next Pickup</div>
-                      <div className="tile-v" style={{ fontSize: '.78rem' }}>
-                        {st.nextPickup ? fmtDate(st.nextPickup) : '—'}
+          {report.sites.length > 1 ? (
+            <div className="card" style={{ marginBottom: '.6rem' }}>
+              <div className="card-hd">
+                <div className="card-ttl">Your Sites</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                {report.sites.map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: siteId === st.id ? 'var(--g3)' : 'transparent',
+                      border: '1px solid',
+                      borderColor: siteId === st.id ? 'var(--g)' : 'var(--bdr)',
+                      borderRadius: 7,
+                      padding: '.4rem .6rem',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      color: 'inherit',
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                    onClick={() => onSite(siteId === st.id ? '' : st.id)}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '.85rem' }}>{st.name}</div>
+                      <div className="dim" style={{ fontSize: '.72rem' }}>
+                        {st.open} open · {num(st.fyKg)} kg {report.period.fy}
                       </div>
                     </div>
-                  </div>
-                  <div className="dim" style={{ fontSize: '.72rem', marginTop: '.35rem' }}>
-                    {st.city || ''} · GST {st.gstin || '—'}
-                  </div>
-                </button>
-              ))}
-            </>
-          ) : null}
-          <div className="card" style={{ background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', borderColor: '#86efac' }}>
-            <div className="card-ttl" style={{ color: '#166534', marginBottom: '.5rem' }}>
-              🌳 Recycle Heroes
-            </div>
-            <div style={{ textAlign: 'center', padding: '.4rem 0' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#14532d' }}>{report.treesPlanted}</div>
-              <div style={{ fontSize: '.78rem', color: '#166534', fontWeight: 600 }}>trees planted on your behalf</div>
-              <div className="dim" style={{ fontSize: '.72rem', marginTop: '.3rem' }}>
-                {report.treesEarnedAll} earned · {num(report.lifetimeTonnes)} tonnes recycled
+                    {siteId === st.id ? (
+                      <span className="badge bg-g" style={{ flexShrink: 0 }}>
+                        Filtered
+                      </span>
+                    ) : (
+                      <span className="dim" style={{ fontSize: '.8rem' }}>
+                        →
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
-            <Link to="/heroes" className="btn bs bsm" style={{ width: '100%', justifyContent: 'center' }}>
-              View milestones →
-            </Link>
-          </div>
+          ) : null}
+
+          {/* Next pickup callout if exists */}
+          {report.sites.some((s) => s.nextPickup) ? (
+            <div className="card" style={{ marginBottom: '.6rem', borderColor: '#93c5fd', background: '#eff6ff' }}>
+              <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#1e40af', marginBottom: '.25rem' }}>
+                📅 Next Pickup
+              </div>
+              {report.sites
+                .filter((s) => s.nextPickup)
+                .slice(0, 3)
+                .map((s) => (
+                  <div key={s.id} style={{ fontSize: '.82rem', color: '#1e3a8a' }}>
+                    {s.name}: <b>{fmtDate(s.nextPickup!)}</b>
+                  </div>
+                ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </>

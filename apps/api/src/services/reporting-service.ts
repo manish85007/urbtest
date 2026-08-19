@@ -135,8 +135,11 @@ export async function getStaffDashboard(actor: SessionUser) {
 
   const reminderByKey = new Map(reminderLogs.map((r) => [r.key, r.count]));
 
+  // Only show genuinely-new requests (no rejectNote) in "Awaiting Acknowledgement".
+  // Returned requests (rejectNote set) are pending with the requestor and must NOT
+  // appear in the admin queue until the requestor resubmits (clears the rejectNote).
   const newRequests = submissions
-    .filter((s) => deriveSubmissionStage(s) === 1)
+    .filter((s) => deriveSubmissionStage(s) === 1 && !s.rejectNote)
     .map((s) => ({
       id: s.id,
       clientName: s.client.name,
@@ -340,16 +343,20 @@ export async function getImpactReport(
   ]);
 
   const visible = siteId ? allSubs.filter((s) => s.siteId === siteId) : allSubs;
-  const requests = visible.map((s) => ({
-    id: s.id,
-    siteId: s.siteId,
-    siteName: s.site.name,
-    stage: deriveSubmissionStage(s),
-    netKg: submissionNetKg(s),
-    approxWeight: Number(s.approxWeight),
-    requestDate: s.requestDate.toISOString().slice(0, 10),
-    ref: s.ref,
-  }));
+  const requests = visible.map((s) => {
+    const stage = deriveSubmissionStage(s);
+    return {
+      id: s.id,
+      siteId: s.siteId,
+      siteName: s.site.name,
+      stage,
+      returned: stage === 1 && !!s.rejectNote,
+      netKg: submissionNetKg(s),
+      approxWeight: Number(s.approxWeight),
+      requestDate: s.requestDate.toISOString().slice(0, 10),
+      ref: s.ref,
+    };
+  });
   const open = requests.filter((r) => r.stage < 9).length;
 
   const now = new Date();

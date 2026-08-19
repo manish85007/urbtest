@@ -7,8 +7,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
-  const [email, setEmail] = useState('admin@urbeno.in');
-  const [password, setPassword] = useState('demo');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reset, setReset] = useState(false);
@@ -216,17 +216,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           </form>
         )}
 
-        <div className="demo-logins">
-          <b>Demo logins</b> (password: <span className="mono">demo</span>)
-          <br />
-          admin@urbeno.in — Urbeno admin
-          <br />
-          ops@urbeno.in — Urbeno admin
-          <br />
-          kgf@urbeno.in — Factory manager (KGF)
-          <br />
-          ramesh@techcorp.in — Client (all sites)
-        </div>
       </div>
     </div>
   );

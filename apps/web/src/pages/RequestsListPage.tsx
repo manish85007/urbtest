@@ -206,7 +206,13 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                     {isStaff ? <td>{r.clientName}</td> : null}
                     <td className="dim">{r.siteName}</td>
                     <td>
-                      <StageBadge stage={r.stage} />
+                      {r.returned ? (
+                        <span className="badge bg-am" title="Returned to requestor — awaiting their update">
+                          Pending with Requestor
+                        </span>
+                      ) : (
+                        <StageBadge stage={r.stage} />
+                      )}
                     </td>
                     <td>
                       {r.invoices?.length ? (
