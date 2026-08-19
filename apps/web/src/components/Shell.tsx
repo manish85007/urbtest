@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authApi, type SessionUser } from '../api';
 import { navItems } from '../lib/nav';
+import { portalSubtitle } from '../lib/roles';
 import { LogoIcon } from './BrandMark';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
@@ -15,12 +16,7 @@ interface ShellProps {
 }
 
 function brandSub(user: SessionUser) {
-  if (user.role === 'client') return 'Client portal';
-  if (user.role === 'factory') {
-    const ids = user.factoryIds ?? [];
-    return ids.length ? `Urbeno · ${ids.join(', ')}` : 'Urbeno · All facilities';
-  }
-  return 'Urbeno · Operations';
+  return portalSubtitle(user.role, user.factoryIds ?? []);
 }
 
 function initials(name: string) {

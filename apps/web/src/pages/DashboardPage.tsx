@@ -9,6 +9,7 @@ import {
 } from '../api';
 import { StageBadge } from '../components/StageProgress';
 import { fmtDate, num } from '../lib/format';
+import { dashboardTitle } from '../lib/roles';
 
 interface DashboardPageProps {
   user: SessionUser;
@@ -31,7 +32,7 @@ function StaffDashboard({
     <>
       <div className="f-row" style={{ marginBottom: '.9rem' }}>
         <div>
-          <div className="h1">{user.role === 'factory' ? 'Factory Dashboard' : 'Operations Dashboard'}</div>
+          <div className="h1">{dashboardTitle(user.role)}</div>
           <div className="p-mu" style={{ margin: 0 }}>
             {fy} · {user.name}
             {user.role === 'factory' && (user.factoryIds ?? []).length
@@ -391,26 +392,52 @@ function WorkQueue({
   );
 }
 
-/** Tiny SVG donut/pie chart — no external lib needed. */
-function PieChart({
+/** Animate a number counting up when value changes. */
+function useAnimatedNumber(value: number, duration = 900) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (value === 0) {
+      setDisplay(0);
+      return;
+    }
+    const t0 = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / duration);
+      setDisplay(Math.round(value * p));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value, duration]);
+  return display;
+}
+
+/** Animated SVG donut chart. */
+function DonutChart({
   slices,
-  size = 100,
+  size = 180,
 }: {
   slices: Array<{ value: number; color: string; label: string }>;
   size?: number;
 }) {
   const total = slices.reduce((s, x) => s + x.value, 0);
-  if (total === 0) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="38" fill="none" stroke="#e5e7eb" strokeWidth="20" />
-      </svg>
-    );
-  }
   const r = 38;
   const cx = 50;
   const cy = 50;
   let startAngle = -Math.PI / 2;
+
+  if (total === 0) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" className="client-chart-pie-wrap">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="18" />
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize="8" fill="#9ca3af">
+          No data
+        </text>
+      </svg>
+    );
+  }
+
   const paths = slices.map((sl) => {
     const pct = sl.value / total;
     const sweep = 2 * Math.PI * pct;
@@ -422,56 +449,79 @@ function PieChart({
     const largeArc = sweep > Math.PI ? 1 : 0;
     const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
     startAngle = endAngle;
-    return { d, color: sl.color, label: sl.label, pct };
+    return { d, color: sl.color, label: sl.label, pct, value: sl.value };
   });
 
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100">
+    <svg width={size} height={size} viewBox="0 0 100 100" className="client-chart-pie-wrap">
       {paths.map((p, i) => (
-        <path key={i} d={p.d} fill={p.color}>
+        <path key={i} d={p.d} fill={p.color} opacity={0.92}>
           <title>
-            {p.label}: {(p.pct * 100).toFixed(1)}%
+            {p.label}: {p.value} ({(p.pct * 100).toFixed(0)}%)
           </title>
         </path>
       ))}
-      <circle cx={cx} cy={cy} r={16} fill="white" />
+      <circle cx={cx} cy={cy} r={22} fill="white" />
+      <text x={cx} y={cy - 2} textAnchor="middle" fontSize="11" fontWeight="700" fill="#27500A">
+        {total}
+      </text>
+      <text x={cx} y={cy + 8} textAnchor="middle" fontSize="5.5" fill="#7d857a">
+        total
+      </text>
     </svg>
   );
 }
 
-/** Simple horizontal bar chart. */
-function BarChart({
+/** Animated horizontal bar chart for sustainability metrics. */
+function EcoBarChart({
   bars,
   maxVal,
 }: {
-  bars: Array<{ label: string; value: number; color: string }>;
+  bars: Array<{ label: string; value: number; color: string; unit?: string }>;
   maxVal: number;
 }) {
   if (bars.length === 0) return null;
-  const barH = 20;
-  const gap = 6;
-  const labelW = 70;
-  const chartW = 180;
-  const height = bars.length * (barH + gap) - gap;
+  const barH = 28;
+  const gap = 10;
 
   return (
-    <svg width={labelW + chartW + 50} height={height} style={{ overflow: 'visible' }}>
+    <div style={{ width: '100%' }}>
       {bars.map((b, i) => {
-        const y = i * (barH + gap);
-        const w = maxVal > 0 ? (b.value / maxVal) * chartW : 0;
+        const pct = maxVal > 0 ? (b.value / maxVal) * 100 : 0;
         return (
-          <g key={i}>
-            <text x={labelW - 4} y={y + barH / 2 + 4} textAnchor="end" fontSize={10} fill="#6b7280">
+          <div key={i} className="client-chart-bar" style={{ marginBottom: gap }}>
+            <div style={{ fontSize: '.78rem', color: 'var(--mu)', marginBottom: '.25rem', fontWeight: 600 }}>
               {b.label}
-            </text>
-            <rect x={labelW} y={y} width={w} height={barH} rx={3} fill={b.color} />
-            <text x={labelW + w + 4} y={y + barH / 2 + 4} fontSize={10} fill="#374151">
-              {num(b.value)}
-            </text>
-          </g>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <div
+                style={{
+                  flex: 1,
+                  height: barH,
+                  background: '#f3f4f6',
+                  borderRadius: 7,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  className="client-chart-bar-fill"
+                  style={{
+                    width: `${pct}%`,
+                    height: '100%',
+                    background: b.color,
+                    animationDelay: `${0.1 + i * 0.15}s`,
+                  }}
+                />
+              </div>
+              <div style={{ minWidth: 72, textAlign: 'right', fontWeight: 800, fontSize: '.95rem', color: '#1c1b18' }}>
+                {num(b.value, b.unit === 'kg' ? 0 : 1)}
+                {b.unit ? ` ${b.unit}` : ''}
+              </div>
+            </div>
+          </div>
         );
       })}
-    </svg>
+    </div>
   );
 }
 
@@ -492,24 +542,26 @@ function ClientDashboard({
   const siteName = report.sites.find((s) => s.id === siteId)?.name;
   const requests = report.requests;
 
-  // Pie chart: open vs closed requests
+  const openCount = useAnimatedNumber(report.counts.open);
+  const closedCount = useAnimatedNumber(report.counts.closed);
+  const recycledKg = useAnimatedNumber(Math.round(impact.kg));
+  const treesCount = useAnimatedNumber(report.treesPlanted);
+
   const reqSlices = [
     { value: report.counts.open, color: '#3b82f6', label: 'Open' },
     { value: report.counts.closed, color: '#22c55e', label: 'Completed' },
   ];
-
-  // Sustainability bar chart (YTD)
-  const ecoMax = Math.max(impact.kg, impact.co2, 1);
+  const ecoMax = Math.max(impact.kg, impact.co2, impact.landfill, 1);
   const ecoBars = [
-    { label: `Recycled (kg)`, value: impact.kg, color: '#22c55e' },
-    { label: `CO₂ Avoided (kg)`, value: impact.co2, color: '#3b82f6' },
-    { label: `Landfill Saved (kg)`, value: impact.landfill, color: '#f59e0b' },
+    { label: 'Recycled', value: impact.kg, color: '#22c55e', unit: 'kg' },
+    { label: 'CO₂ Avoided', value: impact.co2, color: '#3b82f6', unit: 'kg' },
+    { label: 'Landfill Saved', value: impact.landfill, color: '#f59e0b', unit: 'kg' },
   ];
 
   return (
-    <>
+    <div className="client-dash">
       {/* Header */}
-      <div className="f-row" style={{ marginBottom: '.9rem' }}>
+      <div className="f-row" style={{ marginBottom: '1rem' }}>
         <div>
           <div className="h1">Welcome, {first}</div>
           <div className="p-mu" style={{ margin: 0 }}>
@@ -518,287 +570,234 @@ function ClientDashboard({
           </div>
         </div>
         <div className="spacer" />
-        {siteId ? (
-          <button type="button" className="btn bs" onClick={() => onSite('')}>
-            Clear site filter
-          </button>
-        ) : null}
         <Link to="/requests/new" className="btn bp">
           + New Request
         </Link>
       </div>
 
-      {/* Action alert: certificates ready */}
+      {/* Site filter chips */}
+      {report.sites.length > 1 ? (
+        <div className="client-site-chips">
+          <button type="button" className={`client-site-chip ${!siteId ? 'on' : ''}`} onClick={() => onSite('')}>
+            All sites
+          </button>
+          {report.sites.map((st) => (
+            <button
+              key={st.id}
+              type="button"
+              className={`client-site-chip ${siteId === st.id ? 'on' : ''}`}
+              onClick={() => onSite(siteId === st.id ? '' : st.id)}
+            >
+              {st.name} · {st.open} open
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Quick links to portal tabs */}
+      <div className="client-quick-grid">
+        <Link to="/requests" className="client-quick-tile">
+          <span className="client-quick-tile-ico">📋</span>
+          <span className="client-quick-tile-l">My Requests</span>
+          <span className="client-quick-tile-s">{report.counts.open} open · view all</span>
+        </Link>
+        <Link to="/impact" className="client-quick-tile">
+          <span className="client-quick-tile-ico">🌱</span>
+          <span className="client-quick-tile-l">Sustainability</span>
+          <span className="client-quick-tile-s">{num(impact.kg)} kg recycled {report.period.fy}</span>
+        </Link>
+        <Link to="/heroes" className="client-quick-tile">
+          <span className="client-quick-tile-ico">🌳</span>
+          <span className="client-quick-tile-l">Recycle Heroes</span>
+          <span className="client-quick-tile-s">{report.treesPlanted} trees planted</span>
+        </Link>
+        <Link to="/reports" className="client-quick-tile">
+          <span className="client-quick-tile-ico">📊</span>
+          <span className="client-quick-tile-l">Reports</span>
+          <span className="client-quick-tile-s">Form 6, certificates &amp; more</span>
+        </Link>
+      </div>
+
+      {/* Hero metrics */}
+      <div className="client-dash-hero">
+        <Link to="/requests" className="client-dash-metric">
+          <div className="client-dash-metric-v" style={{ color: '#3b82f6' }}>
+            {openCount}
+          </div>
+          <div className="client-dash-metric-l">Open Requests</div>
+        </Link>
+        <Link to="/requests?stage=9" className="client-dash-metric">
+          <div className="client-dash-metric-v" style={{ color: '#22c55e' }}>
+            {closedCount}
+          </div>
+          <div className="client-dash-metric-l">Completed</div>
+        </Link>
+        <Link to="/impact" className="client-dash-metric">
+          <div className="client-dash-metric-v">{recycledKg}</div>
+          <div className="client-dash-metric-l">Recycled kg · {report.period.fy}</div>
+        </Link>
+        <Link to="/heroes" className="client-dash-metric">
+          <div className="client-dash-metric-v" style={{ color: '#14532d' }}>
+            {treesCount}
+          </div>
+          <div className="client-dash-metric-l">Trees Planted</div>
+        </Link>
+      </div>
+
+      {/* Action alerts */}
       {report.pendingClose.length > 0 ? (
-        <div className="card" style={{ background: 'var(--g3)', borderColor: 'var(--g4)', marginBottom: '.8rem' }}>
+        <div className="card client-action-card alert" style={{ background: 'var(--g3)', borderColor: 'var(--g4)' }}>
           <div className="card-hd">
-            <div className="card-ttl">🏅 Certificates ready for your review</div>
+            <div className="card-ttl">🏅 Certificates ready — review &amp; close</div>
             <span className="badge bg-g">{report.pendingClose.length}</span>
           </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            {report.pendingClose.map((p) => (
+              <Link
+                key={p.invoiceNo}
+                to={`/requests/${p.submissionId}`}
+                className="client-quick-tile"
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <span>
+                  <b>{p.submissionId}</b> · <span className="mono">{p.invoiceNo}</span>
+                </span>
+                <span className="btn bp bsm">Review &amp; Close →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {report.pendingPickups.length > 0 ? (
+        <div className="card client-action-card" style={{ borderColor: '#93c5fd', background: '#eff6ff' }}>
+          <div className="card-hd">
+            <div className="card-ttl" style={{ color: '#1e40af' }}>
+              📅 Pending Pickups
+            </div>
+            <span className="badge" style={{ background: '#3b82f6', color: '#fff' }}>
+              {report.pendingPickups.length}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+            {report.pendingPickups.map((p) => (
+              <Link
+                key={`${p.submissionId}-${p.registration}`}
+                to={`/requests/${p.submissionId}`}
+                className="client-quick-tile"
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <span>
+                  <b style={{ color: '#1e40af' }}>{p.submissionId}</b>
+                  <span className="dim" style={{ fontSize: '.78rem', marginLeft: '.4rem' }}>
+                    {p.siteName} · {p.registration}
+                  </span>
+                </span>
+                <span style={{ fontWeight: 700, color: '#1e3a8a' }}>{fmtDate(p.expectedAt)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Big charts */}
+      <div className="client-chart-grid">
+        <Link to="/requests" className="card client-chart-card">
+          <h3>{report.period.fy} Request Status</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <DonutChart slices={reqSlices} size={180} />
+            <div style={{ flex: 1, minWidth: 120 }}>
+              {reqSlices.map((s) => (
+                <div
+                  key={s.label}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '.5rem',
+                    marginBottom: '.5rem',
+                    fontSize: '.88rem',
+                  }}
+                >
+                  <span style={{ width: 12, height: 12, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                  <span className="dim">{s.label}</span>
+                  <span style={{ fontWeight: 800, marginLeft: 'auto', fontSize: '1.1rem' }}>{s.value}</span>
+                </div>
+              ))}
+              <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
+                Tap to view all requests →
+              </div>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          to="/impact"
+          className="card client-chart-card"
+          style={{ background: 'linear-gradient(135deg,#f0fdf4,#fff)', borderColor: '#86efac' }}
+        >
+          <h3 style={{ color: '#166534' }}>🌱 Sustainability · {report.period.fy}</h3>
+          <EcoBarChart bars={ecoBars} maxVal={ecoMax} />
+          <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
+            View full impact report →
+          </div>
+        </Link>
+      </div>
+
+      {/* Recent requests — compact */}
+      <div className="card">
+        <div className="card-hd">
+          <div className="card-ttl">Recent Activity</div>
+          <div className="spacer" />
+          <Link to="/requests" className="btn bs bsm">
+            All requests →
+          </Link>
+        </div>
+        {requests.length === 0 ? (
+          <div className="empty">
+            <div className="empty-t">No requests yet</div>
+            <Link to="/requests/new" className="btn bp" style={{ marginTop: '.6rem' }}>
+              + New Request
+            </Link>
+          </div>
+        ) : (
           <div className="tw">
             <table>
               <thead>
                 <tr>
                   <th>Request</th>
-                  <th>Invoice</th>
-                  <th>Certificate(s)</th>
-                  <th>Issued</th>
-                  <th></th>
+                  <th>Site</th>
+                  <th>Status</th>
+                  <th>Weight</th>
                 </tr>
               </thead>
               <tbody>
-                {report.pendingClose.map((p) => (
-                  <tr key={p.invoiceNo}>
+                {requests.slice(0, 5).map((s) => (
+                  <tr key={s.id} className="click" onClick={() => nav(`/requests/${s.id}`)}>
                     <td>
-                      <Link to={`/requests/${p.submissionId}`}>
-                        <b>{p.submissionId}</b>
+                      <Link to={`/requests/${s.id}`} onClick={(e) => e.stopPropagation()}>
+                        <b>{s.id}</b>
                       </Link>
+                      <div className="dim" style={{ fontSize: '.72rem' }}>
+                        {fmtDate(s.requestDate)}
+                      </div>
                     </td>
-                    <td className="mono">{p.invoiceNo}</td>
-                    <td className="mono">{p.certificates.join(', ')}</td>
-                    <td className="dim">{p.issuedAt ? fmtDate(p.issuedAt) : '—'}</td>
+                    <td className="dim">{s.siteName}</td>
                     <td>
-                      <Link to={`/requests/${p.submissionId}`} className="btn bp bsm">
-                        Review &amp; Close
-                      </Link>
+                      {s.returned ? (
+                        <span className="badge bg-am">Pending with You</span>
+                      ) : (
+                        <StageBadge stage={s.stage} />
+                      )}
                     </td>
+                    <td className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)} kg</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      ) : null}
-
-      {/* Summary cards — 2 charts + key stats */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '.7rem',
-          marginBottom: '1rem',
-        }}
-      >
-        {/* Requests pie */}
-        <Link to="/requests" className="card" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <PieChart slices={reqSlices} size={80} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--g2)', marginBottom: '.3rem' }}>
-              {report.period.fy} Requests
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.15rem' }}>
-              {reqSlices.map((s) => (
-                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.8rem' }}>
-                  <span
-                    style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }}
-                  />
-                  <span className="dim">{s.label}</span>
-                  <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{s.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Link>
-
-        {/* Sustainability bar chart */}
-        <Link to="/impact" className="card" style={{ textDecoration: 'none' }}>
-          <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#166534', marginBottom: '.5rem' }}>
-            🌱 Sustainability {report.period.fy}
-          </div>
-          <BarChart bars={ecoBars} maxVal={ecoMax} />
-        </Link>
-
-        {/* Trees / milestone */}
-        <Link
-          to="/heroes"
-          className="card"
-          style={{
-            textDecoration: 'none',
-            background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)',
-            borderColor: '#86efac',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            gap: '.25rem',
-          }}
-        >
-          <div style={{ fontSize: '2rem' }}>🌳</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#14532d', lineHeight: 1 }}>
-            {report.treesPlanted}
-          </div>
-          <div style={{ fontSize: '.78rem', color: '#166534', fontWeight: 600 }}>trees planted</div>
-          <div className="dim" style={{ fontSize: '.7rem' }}>
-            {num(report.lifetimeTonnes)} t recycled lifetime
-          </div>
-        </Link>
+        )}
       </div>
-
-      {/* Main content grid */}
-      <div className="detail-grid">
-        <div>
-          <div className="card">
-            <div className="card-hd">
-              <div className="card-ttl">Recent Requests</div>
-              <div className="spacer" />
-              <Link to="/requests" className="btn bs bsm">
-                View all →
-              </Link>
-            </div>
-            {requests.length === 0 ? (
-              <div className="empty">
-                <div className="empty-t">No requests yet</div>
-                <div style={{ fontSize: '.85rem', marginBottom: '.7rem' }}>
-                  Raise your first e-waste collection request
-                </div>
-                <Link to="/requests/new" className="btn bp">
-                  + New Request
-                </Link>
-              </div>
-            ) : (
-              <div className="tw">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Request</th>
-                      <th>Site</th>
-                      <th>Status</th>
-                      <th>Weight</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.slice(0, 8).map((s) => (
-                      <tr key={s.id} className="click" onClick={() => nav(`/requests/${s.id}`)}>
-                        <td>
-                          <Link to={`/requests/${s.id}`} onClick={(e) => e.stopPropagation()}>
-                            <b>{s.id}</b>
-                          </Link>
-                          <div className="dim" style={{ fontSize: '.72rem' }}>
-                            {fmtDate(s.requestDate)}
-                          </div>
-                        </td>
-                        <td className="dim">{s.siteName}</td>
-                        <td>
-                          {s.returned ? (
-                            <span className="badge bg-am" title="Returned — please update and resubmit">
-                              Pending with You
-                            </span>
-                          ) : (
-                            <StageBadge stage={s.stage} />
-                          )}
-                        </td>
-                        <td className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)} kg</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right column: sites compact list */}
-        <div>
-          {report.sites.length > 1 ? (
-            <div className="card" style={{ marginBottom: '.6rem' }}>
-              <div className="card-hd">
-                <div className="card-ttl">Your Sites</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-                {report.sites.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: siteId === st.id ? 'var(--g3)' : 'transparent',
-                      border: '1px solid',
-                      borderColor: siteId === st.id ? 'var(--g)' : 'var(--bdr)',
-                      borderRadius: 7,
-                      padding: '.4rem .6rem',
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      color: 'inherit',
-                      textAlign: 'left',
-                      width: '100%',
-                    }}
-                    onClick={() => onSite(siteId === st.id ? '' : st.id)}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '.85rem' }}>{st.name}</div>
-                      <div className="dim" style={{ fontSize: '.72rem' }}>
-                        {st.open} open · {num(st.fyKg)} kg {report.period.fy}
-                      </div>
-                    </div>
-                    {siteId === st.id ? (
-                      <span className="badge bg-g" style={{ flexShrink: 0 }}>
-                        Filtered
-                      </span>
-                    ) : (
-                      <span className="dim" style={{ fontSize: '.8rem' }}>
-                        →
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Pending pickups — vehicles scheduled but not yet collected */}
-          {report.pendingPickups.length > 0 ? (
-            <div className="card" style={{ marginBottom: '.6rem', borderColor: '#93c5fd', background: '#eff6ff' }}>
-              <div className="card-hd" style={{ marginBottom: '.4rem' }}>
-                <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#1e40af' }}>
-                  📅 Pending Pickups
-                </div>
-                <span className="badge" style={{ background: '#3b82f6', color: '#fff' }}>
-                  {report.pendingPickups.length}
-                </span>
-              </div>
-              <div className="tw">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Request</th>
-                      <th>Site</th>
-                      <th>Vehicle</th>
-                      <th>Scheduled</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.pendingPickups.map((p) => (
-                      <tr key={`${p.submissionId}-${p.registration}`}>
-                        <td>
-                          <Link
-                            to={`/requests/${p.submissionId}`}
-                            style={{ fontWeight: 700, color: '#1e40af' }}
-                          >
-                            {p.submissionId}
-                          </Link>
-                        </td>
-                        <td className="dim" style={{ fontSize: '.8rem' }}>
-                          {p.siteName}
-                        </td>
-                        <td className="mono" style={{ fontSize: '.8rem' }}>
-                          {p.registration}
-                        </td>
-                        <td style={{ fontSize: '.82rem', fontWeight: 600, color: '#1e3a8a' }}>
-                          {fmtDate(p.expectedAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 

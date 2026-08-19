@@ -3,15 +3,16 @@ import { Link } from 'react-router-dom';
 import { authApi, dataApi, filesApi, type CompanyProfile, type SessionUser } from '../api';
 import { FileUpload } from '../components/FileUpload';
 import { COMPANY } from '../lib/company';
+import { roleLabel } from '../lib/roles';
 
 interface ProfilePageProps {
   user: SessionUser;
 }
 
 const ROLE_LABEL: Record<SessionUser['role'], string> = {
-  admin: 'Urbeno Admin',
-  factory: 'Factory Manager',
-  client: 'Client User',
+  admin: roleLabel('admin'),
+  factory: roleLabel('factory'),
+  client: roleLabel('client'),
 };
 
 function initials(name: string) {
@@ -231,7 +232,7 @@ function MfaCard() {
       <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0' }}>
         {status?.enrolled
           ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}.`
-          : 'Not enrolled. Administrators and factory managers should set this up.'}
+          : 'Not enrolled. Super Admins and factory managers should set this up.'}
       </p>
       {status?.passwordExpired ? (
         <p className="error">Your password is past the rotation period.</p>

@@ -138,7 +138,7 @@ export function UserFormModal({
         Role *
         <select value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
           <option value="client">Client user</option>
-          <option value="admin">Urbeno admin</option>
+          <option value="admin">Super Admin</option>
           <option value="factory">Factory manager</option>
         </select>
       </label>
@@ -193,7 +193,7 @@ export function UserFormModal({
         </div>
       ) : null}
       {role === 'admin' ? (
-        <p className="dim">Admins have full access to every client, site and factory.</p>
+        <p className="dim">Super Admins have full access to every client, site and factory.</p>
       ) : null}
 
       {featuresForRole.length > 0 ? (
