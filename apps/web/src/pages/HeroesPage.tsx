@@ -10,6 +10,7 @@ import {
   type SessionUser,
 } from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
+import { BarChart } from '../components/charts';
 import { num } from '../lib/format';
 import { useAnimatedNumber } from '../lib/useAnimatedNumber';
 import { type ForestFilter, HeroesForest } from './heroes/HeroesForest';
@@ -300,6 +301,11 @@ function HeroesAdmin() {
   const [ledgerClientId, setLedgerClientId] = useState('');
   const [plantFor, setPlantFor] = useState<string | null | undefined>(undefined);
   const [progressFor, setProgressFor] = useState<HeroesPlanting | null>(null);
+  const [forestFilter, setForestFilter] = useState<ForestFilter>('all');
+  const [selectedPlantingId, setSelectedPlantingId] = useState<string | null>(null);
+  const [clientFilter, setClientFilter] = useState<'all' | 'owed'>('all');
+  const ledgerRef = useRef<HTMLDivElement>(null);
+  const clientsRef = useRef<HTMLDivElement>(null);
 
   function load() {
     dataApi
@@ -315,10 +321,39 @@ function HeroesAdmin() {
     load();
   }, [period.period, period.fy, period.year, period.from, period.to, ledgerClientId]);
 
+  useEffect(() => {
+    if (!selectedPlantingId || !ledgerRef.current) return;
+    const el = ledgerRef.current.querySelector(`[data-planting-id="${selectedPlantingId}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedPlantingId]);
+
+  const totEarned = report?.totals.earnedAll ?? 0;
+  const totCo2 = report?.totals.seq.kg ?? 0;
+  const earnedAnim = useAnimatedNumber(totEarned);
+  const co2Anim = useAnimatedNumber(Math.round(totCo2));
+
   if (!report && !error) return <p className="muted">Loading Recycle Heroes…</p>;
   if (!report) return <p className="error">{error}</p>;
 
   const tot = report.totals;
+  const plantedAll = tot.byUrbeno + tot.byClient;
+
+  const filteredClients = report.clients
+    .filter((c) => (clientFilter === 'owed' ? c.owed > 0 : true))
+    .sort((a, b) => b.earnedAll - a.earnedAll);
+
+  const topClientBars = [...report.clients]
+    .sort((a, b) => b.earnedAll - a.earnedAll)
+    .slice(0, 6)
+    .map((c) => ({ label: c.name, value: c.earnedAll, color: '#22c55e' }));
+  const barMax = Math.max(...topClientBars.map((b) => b.value), 1);
+
+  const forestFilters: Array<{ id: ForestFilter; label: string; count: number }> = [
+    { id: 'all', label: 'All trees', count: plantedAll + tot.owed },
+    { id: 'urbeno', label: 'Urbeno', count: tot.byUrbeno },
+    { id: 'client', label: 'Client CSR', count: tot.byClient },
+    ...(tot.owed > 0 ? [{ id: 'pending' as const, label: 'Outstanding', count: tot.owed }] : []),
+  ];
 
   async function removePlanting(t: HeroesPlanting) {
     if (!confirm('Remove this planting record?')) return;
@@ -342,19 +377,24 @@ function HeroesAdmin() {
     }
   }
 
+  function selectClient(clientId: string) {
+    setLedgerClientId(clientId);
+    setSelectedPlantingId(null);
+    setTimeout(() => ledgerRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  }
+
   return (
-    <div>
-      <div className="f-row" style={{ marginBottom: '.9rem' }}>
+    <div className="heroes-admin">
+      <div className="heroes-client-hd f-row">
         <div>
           <div className="h1">🌳 Recycle Heroes</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            Tree ledger — {SUSTAINABILITY.treesPerTonne} tree per tonne completed, badge every{' '}
-            {SUSTAINABILITY.heroMilestone} trees
+            Global tree ledger — {SUSTAINABILITY.treesPerTonne} tree/tonne · badge every {SUSTAINABILITY.heroMilestone} trees
           </div>
         </div>
         <div className="spacer" />
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
-          📄 Download the methodology document
+          📄 Methodology
         </a>
         <button type="button" className="btn bp" onClick={() => setPlantFor(null)}>
           + Record Planting
@@ -363,51 +403,95 @@ function HeroesAdmin() {
       {error ? <p className="error">{error}</p> : null}
       {msg ? <p className="ok-msg">{msg}</p> : null}
 
-      <div className="stats" style={{ marginBottom: '1rem' }}>
-        <div className="stat">
-          <div className="stat-l">Trees Earned</div>
-          <div className="stat-v">{tot.earnedAll}</div>
-          <div className="stat-t">lifetime, all clients</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">Planted by Urbeno</div>
-          <div className="stat-v">{tot.byUrbeno}</div>
-          <div className="stat-t">against tonnage</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">Outstanding</div>
-          <div className="stat-v" style={{ color: tot.owed > 0 ? 'var(--am)' : 'var(--g2)' }}>
-            {tot.owed}
+      <section className="heroes-hero-card heroes-admin-hero">
+        <div className="heroes-hero-stats">
+          <div className="heroes-hero-count">
+            <span className="heroes-hero-count-v">{earnedAnim}</span>
+            <span className="heroes-hero-count-l">trees earned · all clients lifetime</span>
+            <span className="heroes-hero-count-s">
+              {tot.byUrbeno} planted by Urbeno · {tot.byClient} client CSR
+              {tot.owed > 0 ? ` · ${tot.owed} outstanding` : ''}
+            </span>
           </div>
-          <div className="stat-t">to plant</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">Client CSR Trees</div>
-          <div className="stat-v">{tot.byClient}</div>
-          <div className="stat-t">logged by clients</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">CO₂ Sequestered</div>
-          <div className="stat-v">{num(tot.seq.kg)}</div>
-          <div className="stat-t">
-            kg to date · {tot.seq.perDay.toFixed(2)}/day
+          <div className="heroes-filter-chips">
+            {forestFilters.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`heroes-filter-chip${forestFilter === f.id ? ' on' : ''}`}
+                onClick={() => {
+                  setForestFilter(f.id);
+                  setSelectedPlantingId(null);
+                }}
+              >
+                {f.label} <span className="heroes-filter-n">{f.count}</span>
+              </button>
+            ))}
           </div>
+        </div>
+        <HeroesForest
+          plantings={report.plantings}
+          byUrbeno={tot.byUrbeno}
+          byClient={tot.byClient}
+          owed={tot.owed}
+          plantedAll={plantedAll}
+          filter={forestFilter}
+          selectedPlantingId={selectedPlantingId}
+          onSelectPlanting={setSelectedPlantingId}
+        />
+      </section>
+
+      <div className="heroes-metric-grid">
+        <div className="heroes-metric-card blue">
+          <span className="heroes-metric-v">{num(co2Anim)}</span>
+          <span className="heroes-metric-l">CO₂ sequestered (kg)</span>
+          <span className="heroes-metric-s">{tot.seq.perDay.toFixed(2)} kg/day absorbing</span>
+        </div>
+        <button type="button" className="heroes-metric-card" onClick={() => { setClientFilter('owed'); clientsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}>
+          <span className="heroes-metric-v" style={{ color: tot.owed > 0 ? '#d97706' : 'var(--g2)' }}>{tot.owed}</span>
+          <span className="heroes-metric-l">Outstanding to plant</span>
+          <span className="heroes-metric-s">Click to filter clients with backlog</span>
+        </button>
+        <div className="heroes-metric-card">
+          <span className="heroes-metric-v">{report.clients.length}</span>
+          <span className="heroes-metric-l">Active clients</span>
+          <span className="heroes-metric-s">In tree programme</span>
+        </div>
+        <div className="heroes-metric-card">
+          <span className="heroes-metric-v">{report.plantings.length}</span>
+          <span className="heroes-metric-l">Planting records</span>
+          <span className="heroes-metric-s">{report.period.label || report.period.fy}</span>
         </div>
       </div>
 
-      <PeriodPicker variant="card" value={period} onChange={setPeriod} />
-
-      <div className="card" style={{ padding: '.4rem' }}>
-        <div style={{ padding: '.4rem .5rem', fontWeight: 700, fontSize: '.88rem', color: 'var(--g2)' }}>
-          Per-client position
+      <div className="admin-chart-grid heroes-admin-charts">
+        <div className="card admin-chart-card">
+          <h3>Top clients by trees earned</h3>
+          <BarChart bars={topClientBars} maxVal={barMax} />
         </div>
-        <div className="tw">
+        <PeriodPicker variant="card" value={period} onChange={setPeriod} />
+      </div>
+
+      <div className="card heroes-admin-clients" ref={clientsRef}>
+        <div className="card-hd">
+          <div className="card-ttl">Per-client position</div>
+          <div className="spacer" />
+          <div className="heroes-filter-chips" style={{ margin: 0 }}>
+            <button type="button" className={`heroes-filter-chip${clientFilter === 'all' ? ' on' : ''}`} onClick={() => setClientFilter('all')}>
+              All <span className="heroes-filter-n">{report.clients.length}</span>
+            </button>
+            <button type="button" className={`heroes-filter-chip${clientFilter === 'owed' ? ' on' : ''}`} onClick={() => setClientFilter('owed')}>
+              Outstanding <span className="heroes-filter-n">{report.clients.filter((c) => c.owed > 0).length}</span>
+            </button>
+          </div>
+        </div>
+        <div className="tw admin-table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Client</th>
                 <th>Tonnes (period)</th>
-                <th>Lifetime tonnes</th>
+                <th>Lifetime</th>
                 <th>Earned</th>
                 <th>Planted</th>
                 <th>Outstanding</th>
@@ -416,8 +500,13 @@ function HeroesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {report.clients.map((c) => (
-                <tr key={c.id}>
+              {filteredClients.map((c, i) => (
+                <tr
+                  key={c.id}
+                  className={`click admin-table-row heroes-client-row${ledgerClientId === c.id ? ' selected' : ''}${c.owed > 0 ? ' owed' : ''}`}
+                  style={{ animationDelay: `${i * 0.03}s` }}
+                  onClick={() => selectClient(ledgerClientId === c.id ? '' : c.id)}
+                >
                   <td>
                     <b>{c.name}</b> <span className="badge bg-gy">{c.id}</span>
                   </td>
@@ -427,9 +516,7 @@ function HeroesAdmin() {
                   <td className="mono">
                     {c.byUrbeno}
                     {c.byClient ? (
-                      <div className="dim" style={{ fontSize: '.7rem' }}>
-                        +{c.byClient} client CSR
-                      </div>
+                      <div className="dim" style={{ fontSize: '.7rem' }}>+{c.byClient} CSR</div>
                     ) : null}
                   </td>
                   <td className={`mono ${c.owed > 0 ? 'warn' : ''}`}>{c.owed}</td>
@@ -437,7 +524,14 @@ function HeroesAdmin() {
                     {c.badge ? <span className="badge bg-g">{c.badge} trees</span> : <span className="dim">—</span>}
                   </td>
                   <td>
-                    <button type="button" className="btn bs bsm" onClick={() => setPlantFor(c.id)}>
+                    <button
+                      type="button"
+                      className="btn bs bsm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlantFor(c.id);
+                      }}
+                    >
                       + Plant
                     </button>
                   </td>
@@ -446,32 +540,40 @@ function HeroesAdmin() {
             </tbody>
           </table>
         </div>
+        {ledgerClientId ? (
+          <div className="heroes-admin-filter-hint">
+            Showing ledger for <b>{report.clients.find((c) => c.id === ledgerClientId)?.name}</b>
+            <button type="button" className="btn brd bsm" style={{ marginLeft: '.5rem' }} onClick={() => setLedgerClientId('')}>
+              Clear filter
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      <div className="card">
+      <div className="card heroes-ledger" ref={ledgerRef}>
         <div className="card-hd">
-          <div className="card-ttl">Planting Ledger</div>
+          <div className="card-ttl">Planting ledger</div>
           <div className="spacer" />
           <select
             value={ledgerClientId}
             onChange={(e) => setLedgerClientId(e.target.value)}
-            style={{ maxWidth: 220, padding: '.3rem .5rem', fontSize: '.82rem' }}
+            className="heroes-admin-select"
           >
             <option value="">All clients</option>
             {report.clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
         {!report.plantings.length ? (
-          <div className="dim" style={{ fontSize: '.84rem' }}>
-            No plantings recorded
-          </div>
+          <div className="dim" style={{ fontSize: '.84rem' }}>No plantings recorded</div>
         ) : (
           report.plantings.map((t) => (
-            <div key={t.id} style={{ marginBottom: '.2rem' }}>
+            <div
+              key={t.id}
+              data-planting-id={t.id}
+              className={`heroes-tree-card-wrap${selectedPlantingId === t.id ? ' highlighted' : ''}`}
+            >
               <div className="dim" style={{ fontSize: '.74rem', fontWeight: 600, marginBottom: '.15rem' }}>
                 {t.clientName}
               </div>

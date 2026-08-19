@@ -7,9 +7,12 @@ import {
   type SessionUser,
   type StaffDashboardReport,
 } from '../api';
+import { BarChart, DonutChart } from '../components/charts';
 import { StageBadge } from '../components/StageProgress';
 import { fmtDate, num } from '../lib/format';
+import { useAnimatedNumber } from '../lib/useAnimatedNumber';
 import { dashboardTitle } from '../lib/roles';
+import { AdminDashboard } from './admin/AdminDashboard';
 
 interface DashboardPageProps {
   user: SessionUser;
@@ -392,139 +395,6 @@ function WorkQueue({
   );
 }
 
-/** Animate a number counting up when value changes. */
-function useAnimatedNumber(value: number, duration = 900) {
-  const [display, setDisplay] = useState(0);
-  useEffect(() => {
-    if (value === 0) {
-      setDisplay(0);
-      return;
-    }
-    const t0 = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - t0) / duration);
-      setDisplay(Math.round(value * p));
-      if (p < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value, duration]);
-  return display;
-}
-
-/** Animated SVG donut chart. */
-function DonutChart({
-  slices,
-  size = 180,
-}: {
-  slices: Array<{ value: number; color: string; label: string }>;
-  size?: number;
-}) {
-  const total = slices.reduce((s, x) => s + x.value, 0);
-  const r = 38;
-  const cx = 50;
-  const cy = 50;
-  let startAngle = -Math.PI / 2;
-
-  if (total === 0) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 100 100" className="client-chart-pie-wrap">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="18" />
-        <text x={cx} y={cy + 4} textAnchor="middle" fontSize="8" fill="#9ca3af">
-          No data
-        </text>
-      </svg>
-    );
-  }
-
-  const paths = slices.map((sl) => {
-    const pct = sl.value / total;
-    const sweep = 2 * Math.PI * pct;
-    const endAngle = startAngle + sweep;
-    const x1 = cx + r * Math.cos(startAngle);
-    const y1 = cy + r * Math.sin(startAngle);
-    const x2 = cx + r * Math.cos(endAngle);
-    const y2 = cy + r * Math.sin(endAngle);
-    const largeArc = sweep > Math.PI ? 1 : 0;
-    const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-    startAngle = endAngle;
-    return { d, color: sl.color, label: sl.label, pct, value: sl.value };
-  });
-
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className="client-chart-pie-wrap">
-      {paths.map((p, i) => (
-        <path key={i} d={p.d} fill={p.color} opacity={0.92}>
-          <title>
-            {p.label}: {p.value} ({(p.pct * 100).toFixed(0)}%)
-          </title>
-        </path>
-      ))}
-      <circle cx={cx} cy={cy} r={22} fill="white" />
-      <text x={cx} y={cy - 2} textAnchor="middle" fontSize="11" fontWeight="700" fill="#27500A">
-        {total}
-      </text>
-      <text x={cx} y={cy + 8} textAnchor="middle" fontSize="5.5" fill="#7d857a">
-        total
-      </text>
-    </svg>
-  );
-}
-
-/** Animated horizontal bar chart for sustainability metrics. */
-function EcoBarChart({
-  bars,
-  maxVal,
-}: {
-  bars: Array<{ label: string; value: number; color: string; unit?: string }>;
-  maxVal: number;
-}) {
-  if (bars.length === 0) return null;
-  const barH = 28;
-  const gap = 10;
-
-  return (
-    <div style={{ width: '100%' }}>
-      {bars.map((b, i) => {
-        const pct = maxVal > 0 ? (b.value / maxVal) * 100 : 0;
-        return (
-          <div key={i} className="client-chart-bar" style={{ marginBottom: gap }}>
-            <div style={{ fontSize: '.78rem', color: 'var(--mu)', marginBottom: '.25rem', fontWeight: 600 }}>
-              {b.label}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-              <div
-                style={{
-                  flex: 1,
-                  height: barH,
-                  background: '#f3f4f6',
-                  borderRadius: 7,
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  className="client-chart-bar-fill"
-                  style={{
-                    width: `${pct}%`,
-                    height: '100%',
-                    background: b.color,
-                    animationDelay: `${0.1 + i * 0.15}s`,
-                  }}
-                />
-              </div>
-              <div style={{ minWidth: 72, textAlign: 'right', fontWeight: 800, fontSize: '.95rem', color: '#1c1b18' }}>
-                {num(b.value, b.unit === 'kg' ? 0 : 1)}
-                {b.unit ? ` ${b.unit}` : ''}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function ClientDashboard({
   user,
   report,
@@ -736,7 +606,7 @@ function ClientDashboard({
           style={{ background: 'linear-gradient(135deg,#f0fdf4,#fff)', borderColor: '#86efac' }}
         >
           <h3 style={{ color: '#166534' }}>🌱 Sustainability · {report.period.fy}</h3>
-          <EcoBarChart bars={ecoBars} maxVal={ecoMax} />
+          <BarChart bars={ecoBars} maxVal={ecoMax} />
           <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
             View full impact report →
           </div>
@@ -819,7 +689,11 @@ export function DashboardPage({ user }: DashboardPageProps) {
       {!report ? (
         <p className="muted">Loading reports…</p>
       ) : report.kind === 'staff' ? (
-        <StaffDashboard user={user} report={report} />
+        user.role === 'admin' ? (
+          <AdminDashboard user={user} report={report} />
+        ) : (
+          <StaffDashboard user={user} report={report} />
+        )
       ) : (
         <ClientDashboard user={user} report={report} siteId={siteId} onSite={setSiteId} />
       )}
