@@ -719,7 +719,7 @@ export async function getRegisterReport(
 ): Promise<RegisterReport> {
   const meta = REGISTER_KINDS[type];
   const staff = isStaff(actor);
-  if (!staff && (type === 'mrn' || type === 'form6' || type === 'cod' || type === 'category')) {
+  if (!staff && type === 'mrn') {
     throw new AppError('This report is for Urbeno staff only.');
   }
   const ADMIN_ONLY_REPORTS: RegisterType[] = ['summary', 'invoices', 'sustain', 'heroes'];

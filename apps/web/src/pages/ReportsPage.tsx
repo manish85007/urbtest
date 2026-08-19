@@ -25,9 +25,9 @@ const KINDS: Array<{
   { id: 'summary', label: 'Request Summary', description: 'Every request with stage, weight and dates', factoryHidden: true },
   { id: 'invoices', label: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding', factoryHidden: true },
   { id: 'mrn', label: 'MRN Register', description: 'Goods received at factory sites — internal', clientHidden: true },
-  { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories', clientHidden: true },
-  { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status', clientHidden: true },
-  { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category', clientHidden: true },
+  { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories' },
+  { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status' },
+  { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category' },
   { id: 'sustain', label: 'Sustainability', description: 'Environmental impact with methodology', factoryHidden: true },
   { id: 'heroes', label: 'Recycle Heroes', description: 'Tonnage and tree milestones', factoryHidden: true },
 ];
