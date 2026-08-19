@@ -141,28 +141,28 @@ async function main() {
       name: 'Ramesh Kumar',
       role: UserRole.client,
       clientId: 'TCPL',
-      siteIds: [site.id],
+      siteIds: [],
     },
     {
       email: 'priya@techcorp.in',
       name: 'Priya Sharma',
       role: UserRole.client,
       clientId: 'TCPL',
-      siteIds: [site.id],
+      siteIds: [],
     },
     {
       email: 'meera@infosoft.in',
       name: 'Meera Iyer',
       role: UserRole.client,
       clientId: 'INFR',
-      siteIds: [infrSite.id],
+      siteIds: [],
     },
     {
       email: 'anand@bharatretail.in',
       name: 'Anand Desai',
       role: UserRole.client,
       clientId: 'BHRT',
-      siteIds: [bhrtSite.id],
+      siteIds: [],
     },
   ];
 
