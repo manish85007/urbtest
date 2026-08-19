@@ -153,6 +153,7 @@ export async function createUser(
     clientId?: string | null;
     factoryIds?: string[];
     siteIds?: string[];
+    featureAccess?: Record<string, boolean> | null;
   },
 ) {
   const email = input.email.trim().toLowerCase();
@@ -175,6 +176,7 @@ export async function createUser(
       clientId: input.role === 'client' ? input.clientId ?? null : null,
       factoryIds: input.role === 'factory' ? input.factoryIds ?? [] : [],
       siteIds: input.role === 'client' ? input.siteIds ?? [] : [],
+      featureAccess: input.featureAccess ?? Prisma.JsonNull,
     },
   });
 
@@ -224,6 +226,7 @@ export async function listUsers() {
       factoryIds: true,
       siteIds: true,
       active: true,
+      featureAccess: true,
     },
   });
 }
@@ -442,6 +445,7 @@ export async function updateUser(
     siteIds?: string[];
     active?: boolean;
     password?: string;
+    featureAccess?: Record<string, boolean> | null;
   },
 ) {
   const existing = await prisma.user.findUnique({ where: { id: userId } });
@@ -463,6 +467,7 @@ export async function updateUser(
       factoryIds: input.factoryIds,
       siteIds: input.siteIds,
       active: input.active,
+      featureAccess: input.featureAccess === undefined ? undefined : (input.featureAccess ?? Prisma.JsonNull),
     },
     select: {
       id: true,
@@ -473,6 +478,7 @@ export async function updateUser(
       factoryIds: true,
       siteIds: true,
       active: true,
+      featureAccess: true,
     },
   });
 

@@ -135,6 +135,7 @@ export async function mastersRoutes(app: FastifyInstance) {
           clientId: z.string().length(4).nullable().optional(),
           factoryIds: z.array(z.string()).optional(),
           siteIds: z.array(z.string()).optional(),
+          featureAccess: z.record(z.boolean()).nullable().optional(),
         })
         .parse(request.body);
       return await createUser(request.user!, body);
@@ -275,6 +276,7 @@ export async function mastersRoutes(app: FastifyInstance) {
           siteIds: z.array(z.string()).optional(),
           active: z.boolean().optional(),
           password: z.string().min(4).optional(),
+          featureAccess: z.record(z.boolean()).nullable().optional(),
         })
         .parse(request.body);
       return await updateUser(request.user!, userId, body);

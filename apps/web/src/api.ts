@@ -28,6 +28,7 @@ export interface SessionUser {
   clientId: string | null;
   factoryIds?: string[];
   siteIds?: string[];
+  featureAccess?: Record<string, boolean> | null;
 }
 
 export type RegisterType =
@@ -265,6 +266,7 @@ export interface UserRow {
   factoryIds: string[];
   siteIds?: string[];
   active: boolean;
+  featureAccess?: Record<string, boolean> | null;
 }
 
 export interface ClientDetail {
@@ -820,6 +822,7 @@ export const dataApi = {
     clientId?: string | null;
     factoryIds?: string[];
     siteIds?: string[];
+    featureAccess?: Record<string, boolean> | null;
   }) =>
     api<{ id: string; email: string; tempPassword?: string }>('/users', {
       method: 'POST',
@@ -905,6 +908,7 @@ export const dataApi = {
       factoryIds?: string[];
       siteIds?: string[];
       active?: boolean;
+      featureAccess?: Record<string, boolean> | null;
     },
   ) => api<UserRow>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   upsertFactory: (body: {
@@ -1191,12 +1195,24 @@ export const lifecycleApi = {
 
   addPayment: (
     invoiceId: string,
-    body: { utr: string; amount: number; tdsAmount?: number; paidAt: string; mode: string },
+    body: { utr: string; amount: number; tdsAmount?: number; paidAt: string; mode: string; note?: string },
   ) =>
     api<unknown>(`/invoices/${invoiceId}/payments`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  updatePayment: (
+    paymentId: string,
+    body: { utr: string; amount: number; tdsAmount?: number; paidAt: string; mode: string; note?: string },
+  ) =>
+    api<unknown>(`/payments/${paymentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deletePayment: (paymentId: string) =>
+    api<unknown>(`/payments/${paymentId}`, { method: 'DELETE' }),
 
   createMrn: (
     invoiceId: string,

@@ -438,6 +438,25 @@ export async function deleteInvoice(actor: SessionUser, invoiceId: string) {
   return { submission: withDerivedStages(refreshed) };
 }
 
+function assertPaymentWithinTotal(
+  totalPaise: bigint,
+  existingPayments: Array<{ amountPaise: bigint; tdsPaise: bigint }>,
+  newAmountPaise: bigint,
+  newTdsPaise: bigint,
+  excludeId?: string,
+) {
+  const already = existingPayments
+    .filter((p: any) => p.id !== excludeId)
+    .reduce((s, p) => s + p.amountPaise + p.tdsPaise, BigInt(0));
+  const total = already + newAmountPaise + newTdsPaise;
+  if (total > totalPaise) {
+    const overRs = Number(total - totalPaise) / 100;
+    throw new AppError(
+      `This payment would exceed the invoice total by ₹${overRs.toFixed(2)}. Reduce the amount.`,
+    );
+  }
+}
+
 export async function addPayment(actor: SessionUser, invoiceId: string, input: PaymentInput) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
@@ -450,12 +469,16 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
     throw new AppError('Enter the amount received, TDS deducted, or both.');
   }
 
+  const newAmountPaise = BigInt(rupeesToPaise(input.amount || 0));
+  const newTdsPaise = BigInt(rupeesToPaise(tdsAmount));
+  assertPaymentWithinTotal(invoice.totalPaise, invoice.payments, newAmountPaise, newTdsPaise);
+
   const payment = await prisma.payment.create({
     data: {
       invoiceId,
       utr: input.utr.trim(),
-      amountPaise: BigInt(rupeesToPaise(input.amount || 0)),
-      tdsPaise: BigInt(rupeesToPaise(tdsAmount)),
+      amountPaise: newAmountPaise,
+      tdsPaise: newTdsPaise,
       paidAt: new Date(input.paidAt),
       mode: input.mode,
       note: input.note?.trim() || null,
@@ -478,6 +501,73 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
   });
 
   return payment;
+}
+
+export async function updatePayment(actor: SessionUser, paymentId: string, input: PaymentInput) {
+  requireStaff(actor);
+  const existing = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { invoice: { include: { submission: { include: { client: true, site: true, invoices: true } }, payments: true } } },
+  });
+  if (!existing) throw new AppError('Payment not found.', 404);
+  const invoice = await loadInvoiceForActor(existing.invoiceId, actor);
+  assertLifecycleOpen(invoice);
+  assertNotFutureDate(input.paidAt, 'Payment date');
+
+  const tdsAmount = Number(input.tdsAmount ?? 0);
+  if (tdsAmount < 0) throw new AppError('TDS cannot be negative.');
+  if (!(Number(input.amount) > 0) && !(tdsAmount > 0)) {
+    throw new AppError('Enter the amount received, TDS deducted, or both.');
+  }
+
+  const newAmountPaise = BigInt(rupeesToPaise(input.amount || 0));
+  const newTdsPaise = BigInt(rupeesToPaise(tdsAmount));
+  assertPaymentWithinTotal(invoice.totalPaise, invoice.payments, newAmountPaise, newTdsPaise, paymentId);
+
+  const payment = await prisma.payment.update({
+    where: { id: paymentId },
+    data: {
+      utr: input.utr.trim(),
+      amountPaise: newAmountPaise,
+      tdsPaise: newTdsPaise,
+      paidAt: new Date(input.paidAt),
+      mode: input.mode,
+      note: input.note?.trim() || null,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'inv.payment.edit',
+    entity: 'invoice',
+    entityId: invoice.invoiceNo,
+    details: { submissionId: invoice.submissionId, paymentId, utr: payment.utr, amount: input.amount },
+  });
+
+  return payment;
+}
+
+export async function deletePayment(actor: SessionUser, paymentId: string) {
+  requireStaff(actor);
+  const existing = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { invoice: { include: { submission: { include: { client: true, site: true, invoices: true } }, payments: true } } },
+  });
+  if (!existing) throw new AppError('Payment not found.', 404);
+  const invoice = await loadInvoiceForActor(existing.invoiceId, actor);
+  assertLifecycleOpen(invoice);
+
+  await prisma.payment.delete({ where: { id: paymentId } });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'inv.payment.delete',
+    entity: 'invoice',
+    entityId: invoice.invoiceNo,
+    details: { submissionId: invoice.submissionId, paymentId, utr: existing.utr },
+  });
 }
 
 type MrnMaterial = { n: string; q: number; w: number };

@@ -8,6 +8,7 @@ export interface SessionUser {
   clientId: string | null;
   factoryIds: string[];
   siteIds: string[];
+  featureAccess: Record<string, boolean> | null;
 }
 
 export function toSessionUser(user: User): SessionUser {
@@ -19,7 +20,15 @@ export function toSessionUser(user: User): SessionUser {
     clientId: user.clientId,
     factoryIds: user.factoryIds,
     siteIds: user.siteIds,
+    featureAccess: (user.featureAccess as Record<string, boolean> | null) ?? null,
   };
+}
+
+/** Returns true if the user has a given feature flag explicitly enabled, or if no restrictions are set (null). */
+export function hasFeature(user: SessionUser, feature: string): boolean {
+  if (user.role === 'admin') return true;
+  if (!user.featureAccess) return true;
+  return user.featureAccess[feature] === true;
 }
 
 export function isStaff(user: SessionUser): boolean {

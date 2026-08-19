@@ -73,7 +73,8 @@ export function InvoiceLifecyclePanel({
   const isClient = user.role === 'client';
   const paymentModes = useLookups('paymentMode');
   const taxRates = useLookups('taxRate');
-  const [panel, setPanel] = useState<'pay' | 'mrn' | 'recy' | 'cod' | 'close' | null>(null);
+  const [panel, setPanel] = useState<'pay' | 'pay-edit' | 'mrn' | 'recy' | 'cod' | 'close' | null>(null);
+  const [editingPayment, setEditingPayment] = useState<typeof invoice.payments[0] | null>(null);
 
   async function run(fn: () => Promise<unknown>, success: string) {
     const ok = await onAction(fn, success);
@@ -300,7 +301,7 @@ export function InvoiceLifecyclePanel({
               )
             ) : null}
             <div className="spacer" />
-            {isStaff && !isPaid && !invoice.closedAt ? (
+            {isStaff && !invoice.closedAt ? (
               <button type="button" className="btn bs bsm" onClick={() => setPanel('pay')}>
                 + Record Payment
               </button>
@@ -321,6 +322,7 @@ export function InvoiceLifecyclePanel({
                   <th>TDS</th>
                   <th>Date</th>
                   <th>Mode</th>
+                  {isStaff && !invoice.closedAt ? <th></th> : null}
                 </tr>
                 </thead>
                 <tbody>
@@ -331,6 +333,28 @@ export function InvoiceLifecyclePanel({
                       <td className="mono">{Number(asPaise(p.tdsPaise)) ? formatINR(Number(asPaise(p.tdsPaise))) : '—'}</td>
                       <td className="dim">{fmtDate(p.paidAt)}</td>
                       <td>{lookupLabel(paymentModes, p.mode)}</td>
+                      {isStaff && !invoice.closedAt ? (
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            className="btn bs bsm"
+                            style={{ marginRight: '.25rem' }}
+                            onClick={() => { setEditingPayment(p); setPanel('pay-edit'); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn bd bsm"
+                            onClick={() => void run(
+                              () => lifecycleApi.deletePayment(p.id!),
+                              'Payment deleted.',
+                            )}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -427,12 +451,22 @@ export function InvoiceLifecyclePanel({
             <div className="card-hd">
               <div className="card-ttl">🎉 Review & Close — {invoice.invoiceNo}</div>
               <div className="spacer" />
-              <button type="button" className="btn bp bsm" onClick={() => setPanel('close')}>
-                Review & Close
-              </button>
+              {isAdmin ? (
+                <span title="Review & Close is a client action — the client must acknowledge receipt.">
+                  <button type="button" className="btn bs bsm" disabled style={{ opacity: 0.45, cursor: 'not-allowed' }}>
+                    Review & Close
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="btn bp bsm" onClick={() => setPanel('close')}>
+                  Review & Close
+                </button>
+              )}
             </div>
             <div className="dim" style={{ fontSize: '.83rem' }}>
-              Confirm you have received the Certificate of Destruction, then acknowledge closure.
+              {isAdmin
+                ? 'This invoice is ready to close. The client must sign off via their portal.'
+                : 'Confirm you have received the Certificate of Destruction, then acknowledge closure.'}
             </div>
           </div>
         ) : (
@@ -457,8 +491,31 @@ export function InvoiceLifecyclePanel({
           <PaymentForm
             formId="pay-form"
             amountDue={Number(totalPaise - paidPaise) / 100}
+            invoiceTotal={Number(totalPaise) / 100}
             disabled={disabled}
             onSubmit={(body) => run(() => lifecycleApi.addPayment(invoice.id, body), 'Payment recorded.')}
+          />
+        </Modal>
+      ) : null}
+
+      {panel === 'pay-edit' && editingPayment ? (
+        <Modal
+          title={`Edit Payment — ${invoice.invoiceNo}`}
+          onClose={() => { setPanel(null); setEditingPayment(null); }}
+          okLabel="Save changes"
+          form="pay-edit-form"
+          busy={disabled}
+        >
+          <PaymentForm
+            formId="pay-edit-form"
+            amountDue={Number(totalPaise - paidPaise + asPaise(editingPayment.amountPaise) + asPaise(editingPayment.tdsPaise)) / 100}
+            invoiceTotal={Number(totalPaise) / 100}
+            existing={editingPayment}
+            disabled={disabled}
+            onSubmit={(body) => run(
+              () => lifecycleApi.updatePayment(editingPayment.id!, body),
+              'Payment updated.',
+            )}
           />
         </Modal>
       ) : null}
@@ -1181,26 +1238,32 @@ function CertificateForm({
 function PaymentForm({
   formId,
   amountDue,
+  invoiceTotal,
+  existing,
   disabled,
   onSubmit,
 }: {
   formId?: string;
   amountDue: number;
+  invoiceTotal?: number;
+  existing?: { utr?: string; amountPaise: string; tdsPaise?: string; paidAt?: string; mode?: string; note?: string | null } | null;
   disabled: boolean;
-  onSubmit: (body: { utr: string; amount: number; tdsAmount: number; paidAt: string; mode: string }) => void;
+  onSubmit: (body: { utr: string; amount: number; tdsAmount: number; paidAt: string; mode: string; note?: string }) => void;
 }) {
   const today = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const todayYmd = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   const paymentModes = useLookups('paymentMode');
-  const [utr, setUtr] = useState('');
-  const [amount, setAmount] = useState(String(amountDue));
-  const [tdsAmount, setTdsAmount] = useState('0');
-  const [paidAt, setPaidAt] = useState(todayYmd);
-  const [mode, setMode] = useState('PM1');
+  const [utr, setUtr] = useState(existing?.utr ?? '');
+  const [amount, setAmount] = useState(existing ? String(Number(asPaise(existing.amountPaise)) / 100) : String(amountDue));
+  const [tdsAmount, setTdsAmount] = useState(existing ? String(Number(asPaise(existing.tdsPaise ?? '0')) / 100) : '0');
+  const [paidAt, setPaidAt] = useState(existing?.paidAt?.slice(0, 10) ?? todayYmd);
+  const [mode, setMode] = useState(existing?.mode ?? 'PM1');
+  const [note, setNote] = useState(existing?.note ?? '');
   const received = Number(amount) || 0;
   const tds = Number(tdsAmount) || 0;
   const settled = received + tds;
+  const overLimit = invoiceTotal !== undefined && settled > invoiceTotal + 0.005;
 
   return (
     <form
@@ -1208,10 +1271,11 @@ function PaymentForm({
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ utr, amount: received, tdsAmount: tds, paidAt, mode });
+        if (overLimit) return;
+        onSubmit({ utr, amount: received, tdsAmount: tds, paidAt, mode, note: note.trim() || undefined });
       }}
     >
-      <h3>Record payment</h3>
+      <h3>{existing ? 'Edit payment' : 'Record payment'}</h3>
       <div className="fr2">
         <label>
           Payment date
@@ -1238,17 +1302,28 @@ function PaymentForm({
           <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </label>
       </div>
-      <label>
-        TDS deducted (₹)
-        <input type="number" step="0.01" min="0" value={tdsAmount} onChange={(e) => setTdsAmount(e.target.value)} />
-      </label>
-      <div className="dim" style={{ fontSize: '.78rem' }}>
-        Outstanding on this invoice: {formatINR(amountDue * 100)}. Settled this entry: {formatINR(settled * 100)}{' '}
-        (amount received + TDS). Payment or TDS can be recorded first.
+      <div className="fr2">
+        <label>
+          TDS deducted (₹)
+          <input type="number" step="0.01" min="0" value={tdsAmount} onChange={(e) => setTdsAmount(e.target.value)} />
+        </label>
+        <label>
+          Note (optional)
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Internal note" />
+        </label>
       </div>
+      <div className="dim" style={{ fontSize: '.78rem' }}>
+        Outstanding on this invoice: {formatINR(amountDue * 100)}. This entry settles: {formatINR(settled * 100)}{' '}
+        (amount received + TDS).{invoiceTotal ? ` Invoice total: ${formatINR(invoiceTotal * 100)}.` : ''}
+      </div>
+      {overLimit ? (
+        <p className="error" style={{ margin: '.4rem 0 0' }}>
+          Total payments would exceed the invoice value. Reduce the amount or TDS.
+        </p>
+      ) : null}
       {formId ? null : (
-        <button type="submit" className="btn primary" disabled={disabled}>
-          Record payment
+        <button type="submit" className="btn primary" disabled={disabled || overLimit}>
+          {existing ? 'Save changes' : 'Record payment'}
         </button>
       )}
     </form>

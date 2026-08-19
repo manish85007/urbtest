@@ -2,6 +2,22 @@ import { useEffect, useState } from 'react';
 import { dataApi, type ClientSummary, type FactorySummary, type SiteSummary, type UserRow } from '../../api';
 import { Modal } from '../../components/Modal';
 
+const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | 'factory' | 'client'> }> = [
+  { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin'] },
+  { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin'] },
+  { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin'] },
+  { id: 'reports.heroes', label: 'Report: Recycle Heroes', roles: ['admin'] },
+  { id: 'reports.mrn', label: 'Report: MRN Register', roles: ['factory'] },
+  { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory'] },
+  { id: 'reports.cod', label: 'Report: Certificate Log', roles: ['factory'] },
+  { id: 'reports.category', label: 'Report: Category Recovery', roles: ['factory'] },
+  { id: 'reports.capacity', label: 'Report: Capacity Utilisation', roles: ['factory'] },
+  { id: 'compliance.email', label: 'Compliance: Send documents by email', roles: ['admin'] },
+  { id: 'portal.requests', label: 'Portal: View requests', roles: ['client'] },
+  { id: 'portal.invoices', label: 'Portal: View invoices', roles: ['client'] },
+  { id: 'portal.reports', label: 'Portal: View reports', roles: ['client'] },
+];
+
 interface UserFormModalProps {
   clients: ClientSummary[];
   factories: FactorySummary[];
@@ -28,6 +44,11 @@ export function UserFormModal({
   const [siteIds, setSiteIds] = useState<string[]>(user?.siteIds ?? []);
   const [factoryIds, setFactoryIds] = useState<string[]>(user?.factoryIds ?? []);
   const [active, setActive] = useState(user?.active !== false);
+  const [featureAccess, setFeatureAccess] = useState<Record<string, boolean> | null>(
+    user?.featureAccess ?? null,
+  );
+  const featuresForRole = FEATURE_FLAGS.filter((f) => f.roles.includes(role as 'admin' | 'factory' | 'client'));
+  const restrictFeatures = featureAccess !== null;
   const [sites, setSites] = useState<SiteSummary[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,6 +85,7 @@ export function UserFormModal({
           siteIds: role === 'client' ? siteIds : [],
           factoryIds: role === 'factory' ? factoryIds : [],
           active,
+          featureAccess,
         });
         onSaved('User updated.');
       } else {
@@ -79,6 +101,7 @@ export function UserFormModal({
           clientId: role === 'client' ? clientId : null,
           siteIds: role === 'client' ? siteIds : [],
           factoryIds: role === 'factory' ? factoryIds : [],
+          featureAccess,
         });
         onSaved(
           created.tempPassword
@@ -172,6 +195,50 @@ export function UserFormModal({
       {role === 'admin' ? (
         <p className="dim">Admins have full access to every client, site and factory.</p>
       ) : null}
+
+      {featuresForRole.length > 0 ? (
+        <div className="fg">
+          <label>
+            Feature Access{' '}
+            <span className="hint">
+              restrict which features this user can see; leave unrestricted for full default access
+            </span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.4rem' }}>
+            <input
+              type="checkbox"
+              checked={restrictFeatures}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  const init: Record<string, boolean> = {};
+                  featuresForRole.forEach((f) => { init[f.id] = true; });
+                  setFeatureAccess(init);
+                } else {
+                  setFeatureAccess(null);
+                }
+              }}
+            />
+            Enable custom restrictions for this user
+          </label>
+          {restrictFeatures ? (
+            <div className="check-list">
+              {featuresForRole.map((f) => (
+                <label key={f.id}>
+                  <input
+                    type="checkbox"
+                    checked={featureAccess?.[f.id] === true}
+                    onChange={(e) =>
+                      setFeatureAccess((prev) => ({ ...prev, [f.id]: e.target.checked }))
+                    }
+                  />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {user ? (
         <label>
           Status

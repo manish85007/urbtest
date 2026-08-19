@@ -11,6 +11,8 @@ import {
 import { addVehicle, deleteVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 import {
   addPayment,
+  updatePayment,
+  deletePayment,
   closeInvoice,
   createInvoice,
   createMrn,
@@ -251,20 +253,39 @@ export async function lifecycleRoutes(app: FastifyInstance) {
     }
   });
 
+  const paymentBodySchema = z.object({
+    utr: z.string().min(1),
+    amount: z.number().min(0),
+    tdsAmount: z.number().min(0).optional(),
+    paidAt: z.string().min(1),
+    mode: z.string().min(1),
+    note: z.string().optional(),
+  });
+
   app.post('/invoices/:id/payments', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
-      const body = z
-        .object({
-          utr: z.string().min(1),
-          amount: z.number().min(0),
-          tdsAmount: z.number().min(0).optional(),
-          paidAt: z.string().min(1),
-          mode: z.string().min(1),
-          note: z.string().optional(),
-        })
-        .parse(request.body);
+      const body = paymentBodySchema.parse(request.body);
       return await addPayment(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.patch('/payments/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = paymentBodySchema.parse(request.body);
+      return await updatePayment(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.delete('/payments/:id', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      return await deletePayment(request.user!, id);
     } catch (err) {
       return handleServiceError(err, reply);
     }
