@@ -28,10 +28,10 @@ WORKDIR /app
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=3001 \
-    WEB_DIST=/app/apps/web/dist \
-    UAT_SEED=true \
-    COOKIE_SECURE=false \
-    EMAIL_PROVIDER=console
+    WEB_DIST=/app/apps/web/dist
+# COOKIE_SECURE, UAT_SEED, EMAIL_PROVIDER, SESSION_SECRET and DATABASE_URL
+# must be supplied at runtime via environment injection (docker run -e / compose env_file / ECS secrets).
+# Do NOT set insecure defaults here.
 COPY --from=build /app /app
 RUN pnpm --filter @urb-tectrack/api exec prisma generate
 EXPOSE 3001

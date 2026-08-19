@@ -22,7 +22,7 @@ import {
   type ReportPeriod,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
-import { clientScopeFilter, factoryInScope, isStaff } from '../lib/auth-context.js';
+import { clientScopeFilter, factoryInScope, hasFeature, isStaff } from '../lib/auth-context.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
@@ -497,6 +497,7 @@ export async function getHeroesReport(
   filters?: { clientId?: string },
 ) {
   if (actor.role === 'factory') throw new AppError('Recycle Heroes report is not available for factory accounts.');
+  if (!hasFeature(actor, 'reports.heroes')) throw new AppError('You do not have access to this report.', 403);
   const resolved = period ?? parseReportPeriod({ period: 'fy' });
   const periodMeta = {
     fy: currentFY()?.label ?? '',
@@ -703,6 +704,10 @@ export async function getRegisterReport(
   const ADMIN_ONLY_REPORTS: RegisterType[] = ['summary', 'invoices', 'sustain', 'heroes'];
   if (actor.role === 'factory' && ADMIN_ONLY_REPORTS.includes(type)) {
     throw new AppError('This report is not available for factory accounts.');
+  }
+  // Per-user feature-access gate
+  if (!hasFeature(actor, `reports.${type}`)) {
+    throw new AppError('You do not have access to this report.', 403);
   }
 
   const resolved = period ?? parseReportPeriod({ period: 'fy' });

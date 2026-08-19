@@ -1,0 +1,93 @@
+## ─────────────────────────────────────────────────────────────────────────────
+## PRODUCTION DOCKER COMPOSE TEMPLATE
+## ─────────────────────────────────────────────────────────────────────────────
+## Usage:
+##   cp docker-compose.prod.yml docker-compose.prod.local.yml
+##   # Fill in every <PLACEHOLDER> in the new file
+##   docker compose -f docker-compose.prod.local.yml up -d
+##
+## NEVER commit docker-compose.prod.local.yml — it contains secrets.
+## ─────────────────────────────────────────────────────────────────────────────
+
+name: urb-tectrack-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: urb-tectrack-prod-db
+    environment:
+      POSTGRES_USER: tectrack
+      POSTGRES_PASSWORD: <STRONG_DB_PASSWORD>
+      POSTGRES_DB: tectrack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tectrack -d tectrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - prod-pg:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  app:
+    container_name: urb-tectrack-prod-app
+    image: urb-tectrack-app:latest   # build separately: docker build -t urb-tectrack-app:latest .
+    ports:
+      - "3001:3001"   # expose behind a reverse proxy (nginx/caddy) that handles TLS
+    environment:
+      # ── Required ──────────────────────────────────────────────────────────
+      DATABASE_URL: "postgresql://tectrack:<STRONG_DB_PASSWORD>@db:5432/tectrack?schema=public"
+      SESSION_SECRET: "<RUN: openssl rand -hex 32>"   # min 32 chars, unique per environment
+      CORS_ORIGIN: "https://<YOUR_DOMAIN>"
+      PORTAL_URL: "https://<YOUR_DOMAIN>"
+      # ── Security ──────────────────────────────────────────────────────────
+      COOKIE_SECURE: "true"
+      NODE_ENV: production
+      # ── Storage ───────────────────────────────────────────────────────────
+      # Choose one:
+      AWS_S3_BUCKET: "<BUCKET_NAME>"
+      # GCS_BUCKET: "<BUCKET_NAME>"
+      # ── Email ─────────────────────────────────────────────────────────────
+      EMAIL_PROVIDER: smtp    # configure SMTP credentials in Masters → Email & Templates
+      SMTP_FROM_EMAIL: "ops@<YOUR_DOMAIN>"
+      SMTP_FROM_NAME: "Urb TecTrack"
+      # ── Optional tuning ───────────────────────────────────────────────────
+      ENABLE_JOBS: "true"
+      EMAIL_POLL_MS: "30000"
+      REMINDER_CHECK_MS: "3600000"
+      SESSION_CLEANUP_MS: "3600000"
+      PAY_REMINDER_MAX: "12"
+      SLA_RECYCLE_DAYS: "30"
+      SLA_WARN_AT: "0.8"
+      # ── Sentry (optional) ─────────────────────────────────────────────────
+      SENTRY_DSN: "<YOUR_SENTRY_DSN>"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Automated nightly pg_dump — keeps 30 days of compressed backups.
+  db-backup:
+    image: postgres:16-alpine
+    container_name: urb-tectrack-prod-backup
+    environment:
+      PGPASSWORD: <STRONG_DB_PASSWORD>
+    volumes:
+      - ./backups/prod:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        while true; do
+          FILE=/backups/tectrack_$$(date +%Y%m%d_%H%M%S).sql.gz;
+          pg_dump -h db -U tectrack tectrack | gzip > $$FILE;
+          echo \"[backup] wrote $$FILE\";
+          find /backups -name '*.sql.gz' -mtime +30 -delete;
+          sleep 86400;
+        done
+      "
+    restart: unless-stopped
+
+volumes:
+  prod-pg:
+    name: urb-tectrack_prod-pg

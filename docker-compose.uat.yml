@@ -38,6 +38,30 @@ services:
       db:
         condition: service_healthy
 
+  # Automated daily pg_dump backup — dumps to ./backups/uat/ on the host.
+  # Keeps the last 7 days via find -mtime +7 -delete.
+  db-backup:
+    image: postgres:16-alpine
+    container_name: urb-tectrack-uat-backup
+    environment:
+      PGPASSWORD: tectrack_uat
+    volumes:
+      - ./backups/uat:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        while true; do
+          FILE=/backups/tectrack_$$(date +%Y%m%d_%H%M%S).sql.gz;
+          pg_dump -h db -U tectrack tectrack | gzip > $$FILE;
+          echo \"[backup] wrote $$FILE\";
+          find /backups -name '*.sql.gz' -mtime +7 -delete;
+          sleep 86400;
+        done
+      "
+    restart: unless-stopped
+
 volumes:
   uat-pg:
     name: urb-tectrack_uat-pg

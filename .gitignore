@@ -17,3 +17,5 @@ apps/api/prisma/migrations/**/migration_lock.toml
 infra/cdk.out/
 infra/cdk.context.json
 *.tsbuildinfo
+docker-compose.prod.local.yml
+backups/

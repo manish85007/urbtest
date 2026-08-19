@@ -1,4 +1,5 @@
 import type { SessionUser } from '../lib/auth-context.js';
+import { hasFeature } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { requireAdmin, loadSubmissionForActor } from '../lib/access.js';
 import { prisma } from '../lib/prisma.js';
@@ -13,6 +14,9 @@ export async function sendComplianceDocuments(
   input: { certificateIds?: string[]; form6InvoiceIds?: string[] },
 ) {
   requireAdmin(actor);
+  if (!hasFeature(actor, 'compliance.email')) {
+    throw new AppError('You do not have permission to send compliance documents by email.', 403);
+  }
   const sub = await loadSubmissionForActor(submissionId, actor);
   const certificateIds = [...new Set(input.certificateIds ?? [])];
   const form6InvoiceIds = [...new Set(input.form6InvoiceIds ?? [])];
