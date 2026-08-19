@@ -1292,12 +1292,24 @@ export const lifecycleApi = {
 
   uploadCertificate: (
     invoiceId: string,
-    body: { certNo: string; certDate: string; fileId: string; department?: string },
+    body: { certNo: string; certDate: string; fileId: string; department?: string; note?: string },
   ) =>
-    api<{ certNo: string }>(`/invoices/${invoiceId}/certificates`, {
+    api<{ certNo: string }>(`/invoices/${invoiceId}/certificate`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  sendComplianceDocuments: (
+    submissionId: string,
+    body: { certificateIds?: string[]; form6InvoiceIds?: string[] },
+  ) =>
+    api<{ sent: number; recipients: string[]; documents: number }>(
+      `/submissions/${submissionId}/compliance/email`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
   closeInvoice: (invoiceId: string, body?: { rating?: number; note?: string; forced?: boolean }) =>
     api<unknown>(`/invoices/${invoiceId}/close`, {

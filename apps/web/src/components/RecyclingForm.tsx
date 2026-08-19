@@ -23,7 +23,7 @@ type Recovery = { fe: number; nfe: number; pl: number; pcb: number };
 
 interface RecyclingFormProps {
   formId?: string;
-  defaultFactoryId: string;
+  lockedFactoryId: string;
   invoiceNo: string;
   billingWeight: number;
   invoiceQty?: number;
@@ -70,7 +70,7 @@ interface RecyclingFormProps {
 
 export function RecyclingForm({
   formId,
-  defaultFactoryId,
+  lockedFactoryId,
   invoiceNo,
   billingWeight,
   invoiceQty = 0,
@@ -83,7 +83,7 @@ export function RecyclingForm({
 }: RecyclingFormProps) {
   const today = new Date().toISOString().slice(0, 10);
   const target = round2(billingWeight);
-  const [factoryId, setFactoryId] = useState(initial?.factoryId || defaultFactoryId);
+  const [factoryName, setFactoryName] = useState(lockedFactoryId);
   const [processedAt, setProcessedAt] = useState(initial?.processedAt || today);
   const [dest, setDest] = useState(
     String(initial?.devicesDestroyed ?? (seedHints?.reduce((s, m) => s + (m.qty || 0), 0) || invoiceQty || 0)),
@@ -115,8 +115,8 @@ export function RecyclingForm({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!factoryId) return;
-    dataApi.categories(factoryId).then((cats) => {
+    if (!lockedFactoryId) return;
+    dataApi.categories(lockedFactoryId).then((cats) => {
       setCategories(cats);
       const first = cats[0]?.entryId ?? '';
       setRows((prev) => {
@@ -134,7 +134,11 @@ export function RecyclingForm({
         );
       });
     });
-  }, [factoryId, target]);
+    dataApi.factories().then((list) => {
+      const match = list.find((f) => f.id === lockedFactoryId);
+      setFactoryName(match?.name ?? lockedFactoryId);
+    });
+  }, [lockedFactoryId, target]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, CategorySummary[]>();
@@ -225,7 +229,7 @@ export function RecyclingForm({
         }
         onSubmit({
           processedAt,
-          factoryId,
+          factoryId: lockedFactoryId,
           devicesDestroyed: parseInt(dest, 10) || 0,
           photoIds: photoIds.length ? photoIds : undefined,
           reportIds: reportIds.length ? reportIds : undefined,
@@ -275,10 +279,12 @@ export function RecyclingForm({
         </div>
         <div className="fg">
           <label htmlFor="rc-fac">Facility</label>
-          <select id="rc-fac" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
-            <option value="URB-BLR">Urbeno Bengaluru Facility</option>
-            <option value="URB-KGF">Urbeno KGF Integrated Facility</option>
-          </select>
+          <div className="tile" style={{ marginTop: '.15rem' }}>
+            <div className="tile-v">{factoryName}</div>
+            <div className="dim mono" style={{ fontSize: '.72rem' }}>
+              {lockedFactoryId} · fixed from MRN
+            </div>
+          </div>
           <div className="dim" style={{ fontSize: '.71rem', marginTop: '.2rem' }}>
             Categories below are the lines authorised for this facility
           </div>

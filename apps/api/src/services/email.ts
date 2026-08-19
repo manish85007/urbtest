@@ -42,6 +42,19 @@ const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: 
       'Urbeno Private Limited\n' +
       'Recycling Heroes™',
   },
+  compliance_docs_share: {
+    name: 'Compliance documents share',
+    subject: 'Compliance documents for request {{request_id}}',
+    body:
+      'Dear {{contact_name}},\n\n' +
+      'The following compliance documents for {{client_name}} are ready to review:\n\n' +
+      '{{document_list}}\n\n' +
+      'Sign in to your Urb TecTrack portal to download them:\n' +
+      '{{portal_url}}\n\n' +
+      'Warm regards,\n' +
+      'Urbeno Private Limited\n' +
+      'Recycling Heroes™',
+  },
 };
 
 async function resolveRecipients(templateKey: string, to: string[]): Promise<string[]> {

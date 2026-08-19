@@ -224,7 +224,7 @@ export function MrnForm({
             value={factoryId}
             onChange={(e) => setFactoryId(e.target.value)}
             required
-            disabled={editing}
+            disabled={editing || factories.length <= 1}
           >
             {factories.map((f) => (
               <option key={f.id} value={f.id}>
@@ -232,6 +232,11 @@ export function MrnForm({
               </option>
             ))}
           </select>
+          {editing ? (
+            <div className="dim" style={{ fontSize: '.71rem', marginTop: '.2rem' }}>
+              Facility is fixed once the MRN is issued.
+            </div>
+          ) : null}
         </div>
         <div className="fg">
           <label htmlFor="mr-dt">Receiving Date</label>

@@ -393,8 +393,7 @@ export function InvoiceLifecyclePanel({
                   </div>
                 ) : (
                   <div className="dim" style={{ fontSize: '.83rem' }}>
-                    Form 6 {invoice.recycling.form6No} is on file. Upload the signed certificate PDF — the
-                    client is emailed automatically.
+                    Form 6 {invoice.recycling.form6No} is on file. Upload the signed certificate PDF when ready.
                   </div>
                 )}
               </div>
@@ -501,7 +500,7 @@ export function InvoiceLifecyclePanel({
         >
           <RecyclingForm
             formId="recy-form"
-            defaultFactoryId={invoice.recycling?.factoryId || invoice.mrn?.factoryId || 'URB-BLR'}
+            lockedFactoryId={invoice.mrn!.factoryId}
             invoiceNo={invoice.invoiceNo}
             billingWeight={Number(invoice.billingWeight)}
             invoiceQty={
@@ -558,13 +557,15 @@ export function InvoiceLifecyclePanel({
         <Modal
           title={`Upload Certificate of Destruction — ${invoice.invoiceNo}`}
           onClose={() => setPanel(null)}
-          okLabel="Upload & email certificate"
+          okLabel="Upload certificate"
           form="cod-form"
           busy={disabled}
           wide
         >
           <CertificateForm
             formId="cod-form"
+            invoiceNo={invoice.invoiceNo}
+            existingCerts={invoice.certificates}
             disabled={disabled}
             onSubmit={(body) =>
               run(() => lifecycleApi.uploadCertificate(invoice.id, body), 'Certificate uploaded.')
@@ -1052,15 +1053,28 @@ function RecyclingCard({
 
 function CertificateForm({
   formId,
+  invoiceNo,
+  existingCerts,
   disabled,
   onSubmit,
 }: {
   formId?: string;
+  invoiceNo: string;
+  existingCerts?: Array<{ certNo: string; department?: string | null }>;
   disabled: boolean;
-  onSubmit: (body: { certNo: string; certDate: string; fileId: string; department?: string }) => void;
+  onSubmit: (body: {
+    certNo: string;
+    certDate: string;
+    fileId: string;
+    department?: string;
+    note?: string;
+  }) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [certNo, setCertNo] = useState(`URB/COD/${Date.now().toString().slice(-6)}`);
+  const [certNo, setCertNo] = useState(`URB/COD/${new Date().getFullYear().toString().slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}/0001`);
+  const [certDate, setCertDate] = useState(today);
+  const [department, setDepartment] = useState('');
+  const [note, setNote] = useState('');
   const [fileId, setFileId] = useState('');
 
   return (
@@ -1070,17 +1084,84 @@ function CertificateForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!fileId) return;
-        onSubmit({ certNo, certDate: today, fileId: fileId, department: '' });
+        onSubmit({
+          certNo: certNo.trim(),
+          certDate,
+          fileId,
+          department: department.trim() || undefined,
+          note: note.trim() || undefined,
+        });
       }}
     >
-      <h3>Upload Certificate of Destruction</h3>
+      <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.8rem' }}>
+        The certificate is prepared outside the system. Upload the signed PDF here. Upload one certificate per
+        department if the client needs them split. Use Compliance Documents on the request to email certificates
+        to the client when ready.
+      </p>
+      {existingCerts?.length ? (
+        <div
+          style={{
+            background: 'var(--g3)',
+            padding: '.5rem .8rem',
+            borderRadius: 8,
+            fontSize: '.8rem',
+            marginBottom: '.8rem',
+          }}
+        >
+          Already on invoice {invoiceNo}:{' '}
+          {existingCerts.map((c, i) => (
+            <span key={c.certNo}>
+              {i ? ' · ' : ''}
+              <b className="mono">{c.certNo}</b>
+              {c.department ? ` (${c.department})` : ''}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="fr2">
+        <label>
+          Certificate Number *
+          <input
+            value={certNo}
+            onChange={(e) => setCertNo(e.target.value)}
+            placeholder="URB/COD/2627/0001"
+            className="mono"
+            required
+          />
+        </label>
+        <label>
+          Certificate Date *
+          <input type="date" value={certDate} max={today} onChange={(e) => setCertDate(e.target.value)} required />
+        </label>
+      </div>
       <label>
-        Certificate no.
-        <input value={certNo} onChange={(e) => setCertNo(e.target.value)} required />
+        Department / Scope{' '}
+        <span className="dim" style={{ fontWeight: 400 }}>
+          optional — use when splitting one pickup across departments
+        </span>
+        <input
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          placeholder="e.g. End-User Computing, or Finance Dept assets"
+        />
       </label>
+      <label>
+        Note{' '}
+        <span className="dim" style={{ fontWeight: 400 }}>
+          optional
+        </span>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="anything the client should know about this certificate"
+        />
+      </label>
+      <div className="section-hd" style={{ marginTop: '.3rem' }}>
+        Certificate PDF * <span className="hint" style={{ fontWeight: 400 }}>max 5 MB</span>
+      </div>
       <FileUpload
         kind="certificate"
-        label="Certificate PDF"
+        label="Attach Certificate PDF"
         hint="PDF only · max 5 MB"
         accept="application/pdf"
         required
@@ -1090,7 +1171,7 @@ function CertificateForm({
       />
       {formId ? null : (
         <button type="submit" className="btn primary" disabled={disabled || !fileId}>
-          Upload &amp; email certificate
+          Upload certificate
         </button>
       )}
     </form>

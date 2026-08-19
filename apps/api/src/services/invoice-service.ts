@@ -656,6 +656,15 @@ export async function updateMrn(actor: SessionUser, invoiceId: string, input: Mr
   return mrn;
 }
 
+function resolveRecyclingFactoryId(invoice: { mrn: { factoryId: string } | null }, inputFactoryId?: string) {
+  const locked = invoice.mrn?.factoryId;
+  if (!locked) throw new AppError('Create the MRN before recycling this invoice.');
+  if (inputFactoryId && inputFactoryId !== locked) {
+    throw new AppError('The receiving facility is fixed by the MRN and cannot be changed on Form 6.');
+  }
+  return locked;
+}
+
 export async function createRecycling(
   actor: SessionUser,
   invoiceId: string,
@@ -667,7 +676,7 @@ export async function createRecycling(
   if (!invoice.mrn) throw new AppError('Create the MRN before recycling this invoice.');
   if (invoice.recycling) throw new AppError('This invoice already has a recycling record.');
 
-  const factoryId = input.factoryId || invoice.mrn.factoryId;
+  const factoryId = resolveRecyclingFactoryId(invoice, input.factoryId);
   requireFactory(actor, factoryId);
 
   const target = roundKg(toKg(invoice.billingWeight));
@@ -841,8 +850,11 @@ export async function updateRecycling(
   const existing = invoice.recycling;
   if (!existing) throw new AppError('Issue Form 6 before editing it.');
 
-  const factoryId = input.factoryId || existing.factoryId || invoice.mrn.factoryId;
+  const factoryId = resolveRecyclingFactoryId(invoice, input.factoryId);
   requireFactory(actor, factoryId);
+  if (existing.factoryId !== factoryId) {
+    throw new AppError('The receiving facility is fixed by the MRN and cannot be changed on Form 6.');
+  }
 
   const target = roundKg(toKg(invoice.billingWeight));
   const split = round2(input.categories.reduce((sum, c) => sum + toKg(c.weightKg), 0));
@@ -1018,28 +1030,8 @@ export async function uploadCertificate(
       fileId: input.fileId,
       note: input.note?.trim() || null,
       uploadedBy: actor.email,
-      mailedAt: new Date(),
+      mailedAt: null,
     },
-  });
-
-  const recipients = [
-    ...new Set([
-      invoice.submission.createdBy,
-      ...(await prisma.user.findMany({
-        where: { clientId: invoice.submission.clientId, active: true },
-        select: { email: true },
-      })).map((u) => u.email),
-    ]),
-  ];
-
-  await sendTransactionalEmail('cod_delivery', recipients, {
-    request_id: invoice.submissionId,
-    invoice_no: invoice.invoiceNo,
-    cert_no: certificate.certNo,
-    cert_date: input.certDate,
-    department: certificate.department || 'All departments',
-    net_weight: Number(invoice.billingWeight),
-    client_name: invoice.submission.client.name,
   });
 
   await auditLog({
@@ -1052,7 +1044,6 @@ export async function uploadCertificate(
       submissionId: invoice.submissionId,
       invNo: invoice.invoiceNo,
       dept: certificate.department,
-      emailed: recipients,
     },
   });
 

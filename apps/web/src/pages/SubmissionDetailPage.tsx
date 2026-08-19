@@ -401,7 +401,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               />
             ))}
             <CertificatesCard sub={sub} />
-            <ComplianceCard sub={sub} isStaff={isStaff} />
+            <ComplianceCard sub={sub} isStaff={isStaff} isAdmin={isAdmin} onAction={act} />
           </WorkflowSection>
 
           <WorkflowSection
@@ -1185,15 +1185,43 @@ function CertificatesCard({ sub }: { sub: SubmissionDetail }) {
   );
 }
 
-function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: boolean }) {
-  const docs: Array<{ kind: string; no: string; inv: string; dt: string; note: string; href?: string; internal?: boolean }> =
-    [];
+function ComplianceCard({
+  sub,
+  isStaff,
+  isAdmin,
+  onAction,
+}: {
+  sub: SubmissionDetail;
+  isStaff: boolean;
+  isAdmin: boolean;
+  onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [emailBusy, setEmailBusy] = useState(false);
+
+  type DocRow = {
+    key: string;
+    kind: string;
+    no: string;
+    inv: string;
+    invId: string;
+    dt: string;
+    note: string;
+    href?: string;
+    internal?: boolean;
+    certId?: string;
+    emailed?: boolean;
+  };
+
+  const docs: DocRow[] = [];
   for (const inv of sub.invoices) {
     if (inv.mrn && isStaff) {
       docs.push({
+        key: `mrn:${inv.id}`,
         kind: 'MRN',
         no: inv.mrn.mrnNo,
         inv: inv.invoiceNo,
+        invId: inv.id,
         dt: inv.mrn.receivedAt ?? '',
         note: inv.mrn.factory?.name || inv.mrn.factoryId,
         href: filesApi.pdf(`/invoices/${inv.id}/mrn.pdf`),
@@ -1202,9 +1230,11 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
     }
     if (inv.recycling) {
       docs.push({
+        key: `form6:${inv.id}`,
         kind: 'Form 6',
         no: inv.recycling.form6No,
         inv: inv.invoiceNo,
+        invId: inv.id,
         dt: inv.recycling.processedAt ?? '',
         note: `E-way ${inv.ewayBillNo || '—'}`,
         href: filesApi.pdf(`/invoices/${inv.id}/form6.pdf`),
@@ -1212,12 +1242,16 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
     }
     for (const c of inv.certificates) {
       docs.push({
+        key: `cert:${c.id ?? c.certNo}`,
         kind: 'Certificate',
         no: c.certNo,
         inv: inv.invoiceNo,
+        invId: inv.id,
         dt: c.certDate ?? '',
         note: c.department || 'whole invoice',
         href: c.fileId ? filesApi.url(c.fileId) : undefined,
+        certId: c.id,
+        emailed: !!c.mailedAt,
       });
     }
   }
@@ -1226,6 +1260,16 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
   if (!hasCod) return null;
   const f6n = docs.filter((d) => d.kind === 'Form 6').length;
   const codn = docs.filter((d) => d.kind === 'Certificate').length;
+  const emailable = docs.filter((d) => !d.internal);
+
+  function toggle(key: string) {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function downloadAll(kind: 'Form 6' | 'Certificate') {
     docs
@@ -1235,12 +1279,39 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
       });
   }
 
+  async function sendSelected() {
+    const picked = docs.filter((d) => selected.has(d.key));
+    if (!picked.length) return;
+    setEmailBusy(true);
+    try {
+      const certificateIds = picked.filter((d) => d.certId).map((d) => d.certId!);
+      const form6InvoiceIds = picked.filter((d) => d.kind === 'Form 6').map((d) => d.invId);
+      const ok = await onAction(
+        () => lifecycleApi.sendComplianceDocuments(sub.id, { certificateIds, form6InvoiceIds }),
+        `Emailed ${picked.length} document${picked.length === 1 ? '' : 's'} to the client.`,
+      );
+      if (ok !== false) setSelected(new Set());
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-hd">
         <div className="card-ttl">📁 Compliance Documents</div>
         <span className="badge bg-gy">{docs.length}</span>
         <div className="spacer" />
+        {isAdmin ? (
+          <button
+            type="button"
+            className="btn bp bsm"
+            disabled={emailBusy || !selected.size}
+            onClick={() => void sendSelected()}
+          >
+            {emailBusy ? 'Sending…' : '✉ Send by email'}
+          </button>
+        ) : null}
         {codn > 1 ? (
           <button type="button" className="btn bs bsm" onClick={() => downloadAll('Certificate')}>
             ⬇ All certificates
@@ -1255,11 +1326,13 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
       <div className="dim" style={{ fontSize: '.78rem', marginBottom: '.5rem' }}>
         Every regulatory document raised against this request. Retained for a minimum of five years per
         Rule 12(4) of the E-Waste (Management) Rules, 2022; certificates for ten.
+        {isAdmin ? ' Select documents and use Send by email when the client should receive them.' : ''}
       </div>
       <div className="tw">
         <table>
           <thead>
             <tr>
+              {isAdmin ? <th></th> : null}
               <th>Document</th>
               <th>Number</th>
               <th>Invoice</th>
@@ -1270,12 +1343,31 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
           </thead>
           <tbody>
             {docs.map((dc) => (
-              <tr key={`${dc.kind}-${dc.no}`}>
+              <tr key={dc.key}>
+                {isAdmin ? (
+                  <td>
+                    {dc.internal ? (
+                      <span className="dim">—</span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(dc.key)}
+                        onChange={() => toggle(dc.key)}
+                        aria-label={`Select ${dc.kind} ${dc.no}`}
+                      />
+                    )}
+                  </td>
+                ) : null}
                 <td>
                   <span className={`badge ${dc.kind === 'Certificate' ? 'bg-g' : dc.kind === 'Form 6' ? 'bg-bl' : 'bg-gy'}`}>
                     {dc.kind}
                   </span>
                   {dc.internal ? <div className="dim" style={{ fontSize: '.68rem' }}>internal</div> : null}
+                  {dc.emailed ? (
+                    <div className="dim" style={{ fontSize: '.68rem' }}>
+                      ✉ sent
+                    </div>
+                  ) : null}
                 </td>
                 <td className="mono">
                   <b>{dc.no}</b>
@@ -1299,6 +1391,11 @@ function ComplianceCard({ sub, isStaff }: { sub: SubmissionDetail; isStaff: bool
           </tbody>
         </table>
       </div>
+      {isAdmin && emailable.length ? (
+        <div className="dim" style={{ fontSize: '.74rem', marginTop: '.45rem' }}>
+          MRN is internal only and is not emailed to clients. Form 6 and certificates can be shared from here.
+        </div>
+      ) : null}
     </div>
   );
 }
