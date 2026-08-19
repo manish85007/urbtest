@@ -360,16 +360,26 @@ export async function getImpactReport(
   const open = requests.filter((r) => r.stage < 9).length;
 
   const now = new Date();
+
+  // Build pending-pickup list: open submissions, vehicle assigned but not yet weighed,
+  // expectedAt is set (pickup scheduled). These are the only genuinely upcoming pickups.
+  const pendingPickups = allSubs
+    .filter((s) => !s.closedAt)
+    .flatMap((s) =>
+      s.vehicles
+        .filter((v) => !v.weighment && v.expectedAt && v.expectedAt > now)
+        .map((v) => ({
+          submissionId: s.id,
+          siteName: s.site.name,
+          siteId: s.siteId,
+          expectedAt: (v.expectedAt as Date).toISOString().slice(0, 10),
+          registration: v.registration,
+        })),
+    )
+    .sort((a, b) => a.expectedAt.localeCompare(b.expectedAt));
+
   const sites = (client?.sites ?? []).map((st) => {
     const ss = allSubs.filter((s) => s.siteId === st.id);
-    // Only consider vehicles from open submissions for "Next Pickup".
-    // Otherwise closed requests with stale future `expectedAt` values will
-    // incorrectly show up as upcoming pickups.
-    const next = ss
-      .filter((s) => !s.closedAt)
-      .flatMap((s) => s.vehicles.map((v) => v.expectedAt).filter((d): d is Date => !!d))
-      .filter((d) => d > now)
-      .sort((a, b) => a.getTime() - b.getTime())[0];
     return {
       id: st.id,
       name: st.name,
@@ -380,7 +390,6 @@ export async function getImpactReport(
         .filter((s) => fyLabel && inFiscalYear(s.requestDate, fyLabel))
         .reduce((sum, s) => sum + submissionNetKg(s), 0),
       total: ss.length,
-      nextPickup: next ? next.toISOString().slice(0, 10) : null,
     };
   });
 
@@ -392,6 +401,7 @@ export async function getImpactReport(
     treesEarnedAll: treesEarned(lifeImp.tonnes),
     lifetimeTonnes: lifeImp.tonnes,
     pendingClose: pending,
+    pendingPickups,
     clientName: client?.name ?? '',
     counts: { open, closed: requests.length - open, total: requests.length },
     sites,

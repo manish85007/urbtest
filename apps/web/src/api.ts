@@ -586,7 +586,13 @@ export interface ClientDashboardReport {
     open: number;
     fyKg: number;
     total: number;
-    nextPickup: string | null;
+  }>;
+  pendingPickups: Array<{
+    submissionId: string;
+    siteName: string;
+    siteId: string;
+    expectedAt: string;
+    registration: string;
   }>;
   requests: Array<{
     id: string;

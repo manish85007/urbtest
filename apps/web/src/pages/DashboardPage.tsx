@@ -748,20 +748,52 @@ function ClientDashboard({
             </div>
           ) : null}
 
-          {/* Next pickup callout if exists */}
-          {report.sites.some((s) => s.nextPickup) ? (
+          {/* Pending pickups — vehicles scheduled but not yet collected */}
+          {report.pendingPickups.length > 0 ? (
             <div className="card" style={{ marginBottom: '.6rem', borderColor: '#93c5fd', background: '#eff6ff' }}>
-              <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#1e40af', marginBottom: '.25rem' }}>
-                📅 Next Pickup
+              <div className="card-hd" style={{ marginBottom: '.4rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '.85rem', color: '#1e40af' }}>
+                  📅 Pending Pickups
+                </div>
+                <span className="badge" style={{ background: '#3b82f6', color: '#fff' }}>
+                  {report.pendingPickups.length}
+                </span>
               </div>
-              {report.sites
-                .filter((s) => s.nextPickup)
-                .slice(0, 3)
-                .map((s) => (
-                  <div key={s.id} style={{ fontSize: '.82rem', color: '#1e3a8a' }}>
-                    {s.name}: <b>{fmtDate(s.nextPickup!)}</b>
-                  </div>
-                ))}
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Request</th>
+                      <th>Site</th>
+                      <th>Vehicle</th>
+                      <th>Scheduled</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.pendingPickups.map((p) => (
+                      <tr key={`${p.submissionId}-${p.registration}`}>
+                        <td>
+                          <Link
+                            to={`/requests/${p.submissionId}`}
+                            style={{ fontWeight: 700, color: '#1e40af' }}
+                          >
+                            {p.submissionId}
+                          </Link>
+                        </td>
+                        <td className="dim" style={{ fontSize: '.8rem' }}>
+                          {p.siteName}
+                        </td>
+                        <td className="mono" style={{ fontSize: '.8rem' }}>
+                          {p.registration}
+                        </td>
+                        <td style={{ fontSize: '.82rem', fontWeight: 600, color: '#1e3a8a' }}>
+                          {fmtDate(p.expectedAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : null}
         </div>
