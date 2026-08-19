@@ -50,7 +50,7 @@ function StaffDashboard({
           </div>
           <div className="stat-t">awaiting acknowledgement</div>
         </Link>
-        <Link to="/requests" className="stat">
+        <Link to="/requests?status=open" className="stat">
           <div className="stat-l">Open Requests</div>
           <div className="stat-v">{report.stats.openRequests}</div>
           <div className="stat-t">of {report.stats.totalRequests} total</div>
@@ -596,7 +596,7 @@ function ClientDashboard({
 
       {/* Quick links to portal tabs */}
       <div className="client-quick-grid">
-        <Link to="/requests" className="client-quick-tile">
+        <Link to="/requests?status=open" className="client-quick-tile">
           <span className="client-quick-tile-ico">📋</span>
           <span className="client-quick-tile-l">My Requests</span>
           <span className="client-quick-tile-s">{report.counts.open} open · view all</span>
@@ -620,13 +620,13 @@ function ClientDashboard({
 
       {/* Hero metrics */}
       <div className="client-dash-hero">
-        <Link to="/requests" className="client-dash-metric">
+        <Link to="/requests?status=open" className="client-dash-metric">
           <div className="client-dash-metric-v" style={{ color: '#3b82f6' }}>
             {openCount}
           </div>
           <div className="client-dash-metric-l">Open Requests</div>
         </Link>
-        <Link to="/requests?stage=9" className="client-dash-metric">
+        <Link to="/requests?status=completed" className="client-dash-metric">
           <div className="client-dash-metric-v" style={{ color: '#22c55e' }}>
             {closedCount}
           </div>

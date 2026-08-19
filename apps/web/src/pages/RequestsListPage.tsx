@@ -19,6 +19,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
   const [q, setQ] = useState('');
   const stage = params.get('stage') ?? '';
   const phase = params.get('phase') ?? '';
+  const status = params.get('status') ?? '';
   const [clientId, setClientId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [fy, setFy] = useState('');
@@ -50,6 +51,8 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
+      if (status === 'open' && r.stage >= 9) return false;
+      if (status === 'completed' && r.stage < 9) return false;
       if (phase && String(viewPhaseForStage(r.stage)) !== phase) return false;
       if (stage && String(r.stage) !== stage) return false;
       if (clientId && r.clientId !== clientId) return false;
@@ -64,7 +67,10 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
       }
       return true;
     });
-  }, [rows, q, stage, phase, clientId, siteId, fy]);
+  }, [rows, q, stage, phase, status, clientId, siteId, fy]);
+
+  const statusLabel =
+    status === 'open' ? 'Open requests only' : status === 'completed' ? 'Completed requests only' : '';
 
   return (
     <div>
@@ -73,6 +79,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
           <h1 className="h1">{isStaff ? 'All Requests' : 'My Requests'}</h1>
           <div className="p-mu" style={{ margin: 0 }}>
             {filtered.length} of {rows.length} requests
+            {statusLabel ? ` · ${statusLabel}` : ''}
           </div>
         </div>
         <div className="spacer" />
@@ -88,6 +95,22 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
           <div className="fg">
             <label>Search</label>
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ID, PO, location…" />
+          </div>
+          <div className="fg">
+            <label>Status</label>
+            <select
+              value={status}
+              onChange={(e) => {
+                const next = new URLSearchParams(params);
+                if (e.target.value) next.set('status', e.target.value);
+                else next.delete('status');
+                setParams(next, { replace: true });
+              }}
+            >
+              <option value="">All requests</option>
+              <option value="open">Open only</option>
+              <option value="completed">Completed only</option>
+            </select>
           </div>
           <div className="fg">
             <label>Stage</label>
