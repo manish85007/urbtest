@@ -6,6 +6,7 @@ interface TreeCardProps {
   planting: HeroesPlanting;
   canEdit: boolean;
   showClientCsrProgress?: boolean;
+  clientVariant?: boolean;
   onAddProgress: (planting: HeroesPlanting) => void;
   onRemove?: (planting: HeroesPlanting) => void;
   onRemoveProgress?: (planting: HeroesPlanting, progressId: string) => void;
@@ -15,6 +16,7 @@ export function TreeCard({
   planting: t,
   canEdit,
   showClientCsrProgress,
+  clientVariant,
   onAddProgress,
   onRemove,
   onRemoveProgress,
@@ -26,7 +28,7 @@ export function TreeCard({
   const showProgressBtn = canEdit || (showClientCsrProgress && isClientSrc);
 
   return (
-    <div className="sub-card">
+    <div className={`sub-card${clientVariant ? ' heroes-tree-card' : ''}`}>
       <div className="sub-card-hd">
         <b style={{ fontSize: '.92rem' }}>
           {t.trees} tree{t.trees > 1 ? 's' : ''}
@@ -97,20 +99,25 @@ export function TreeCard({
           No growth photos yet — these build the audit trail for the CSR activity.
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '.5rem', overflowX: 'auto', paddingBottom: '.2rem' }}>
+        <div style={{ display: 'flex', gap: '.5rem', overflowX: 'auto', paddingBottom: '.2rem' }} className={clientVariant ? 'heroes-growth-row' : undefined}>
           {pg.map((p) => {
             const d = daysBetween(t.plantedAt, new Date(p.notedAt));
             return (
               <div
                 key={p.id}
-                style={{
-                  minWidth: 132,
-                  maxWidth: 132,
-                  border: '1px solid var(--bd)',
-                  borderRadius: 8,
-                  padding: '.35rem',
-                  background: '#fff',
-                }}
+                className={clientVariant ? 'heroes-growth-photo' : undefined}
+                style={
+                  clientVariant
+                    ? undefined
+                    : {
+                        minWidth: 132,
+                        maxWidth: 132,
+                        border: '1px solid var(--bd)',
+                        borderRadius: 8,
+                        padding: '.35rem',
+                        background: '#fff',
+                      }
+                }
               >
                 <div className="frow" style={{ marginBottom: '.2rem' }}>
                   {p.photoFileId ? (

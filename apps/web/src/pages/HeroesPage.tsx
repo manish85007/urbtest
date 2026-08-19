@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SUSTAINABILITY } from '@urb-tectrack/shared';
 import {
   dataApi,
@@ -11,6 +11,8 @@ import {
 } from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
 import { num } from '../lib/format';
+import { useAnimatedNumber } from '../lib/useAnimatedNumber';
+import { type ForestFilter, HeroesForest } from './heroes/HeroesForest';
 import { PlantModal } from './heroes/PlantModal';
 import { ProgressModal } from './heroes/ProgressModal';
 import { TreeCard } from './heroes/TreeCard';
@@ -31,6 +33,9 @@ function HeroesClient({ user }: { user: SessionUser }) {
   const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
   const [plantOpen, setPlantOpen] = useState(false);
   const [progressFor, setProgressFor] = useState<HeroesPlanting | null>(null);
+  const [forestFilter, setForestFilter] = useState<ForestFilter>('all');
+  const [selectedPlantingId, setSelectedPlantingId] = useState<string | null>(null);
+  const ledgerRef = useRef<HTMLDivElement>(null);
 
   function load() {
     dataApi
@@ -46,118 +51,153 @@ function HeroesClient({ user }: { user: SessionUser }) {
     load();
   }, [period.period, period.fy, period.year, period.from, period.to]);
 
+  useEffect(() => {
+    if (!selectedPlantingId || !ledgerRef.current) return;
+    const el = ledgerRef.current.querySelector(`[data-planting-id="${selectedPlantingId}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedPlantingId]);
+
+  const plantedAll = report?.metrics.plantedAll ?? 0;
+  const seqKg = report?.seq.kg ?? 0;
+  const seqPerDay = report?.seq.perDay ?? 0;
+  const plantedCount = useAnimatedNumber(plantedAll);
+  const co2Seq = useAnimatedNumber(Math.round(seqKg));
+  const perDayDisplay = useAnimatedNumber(Math.round(seqPerDay * 100)) / 100;
+
   if (!report && !error) return <p className="muted">Loading Recycle Heroes…</p>;
   if (!report) return <p className="error">{error}</p>;
 
   const h = report.metrics;
   const seq = report.seq;
-  const trees = '🌳'.repeat(Math.min(h.plantedAll, 120));
   const growthPhotos = report.plantings.reduce((a, t) => a + t.progress.length, 0);
 
+  const filteredPlantings = report.plantings.filter((p) => {
+    if (forestFilter === 'all') return true;
+    if (forestFilter === 'pending') return false;
+    if (forestFilter === 'client') return p.source === 'client';
+    return p.source !== 'client';
+  });
+
+  const forestFilters: Array<{ id: ForestFilter; label: string; count: number }> = [
+    { id: 'all', label: 'All trees', count: h.plantedAll + h.owed },
+    { id: 'urbeno', label: 'Urbeno', count: h.byUrbeno },
+    { id: 'client', label: 'Your CSR', count: h.byClient },
+    ...(h.owed > 0 ? [{ id: 'pending' as const, label: 'Scheduled', count: h.owed }] : []),
+  ];
+
   return (
-    <div>
-      <div className="f-row" style={{ marginBottom: '.9rem' }}>
+    <div className="heroes-client">
+      <div className="heroes-client-hd f-row">
         <div>
-          <div className="h1">Recycle Heroes</div>
+          <div className="h1">🌳 Recycle Heroes</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            Every tonne you recycle with Urbeno plants a tree — and every tree keeps working after it&apos;s planted
+            Every tonne you recycle plants a tree — click trees in your forest to explore each planting
           </div>
         </div>
         <div className="spacer" />
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
-          📄 How these numbers are built
+          📄 Methodology
         </a>
         <button type="button" className="btn bp" onClick={() => setPlantOpen(true)}>
-          + Log Our Own Planting
+          + Log CSR Planting
         </button>
       </div>
       {error ? <p className="error">{error}</p> : null}
       {msg ? <p className="ok-msg">{msg}</p> : null}
 
-      <div
-        className="card"
-        style={{
-          background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)',
-          borderColor: '#86efac',
-          textAlign: 'center',
-          padding: '1.4rem',
-        }}
-      >
-        <div style={{ fontSize: '3.4rem', fontWeight: 800, color: '#14532d', lineHeight: 1 }}>{h.plantedAll}</div>
-        <div style={{ fontSize: '1rem', fontWeight: 700, color: '#166534', marginBottom: '.2rem' }}>
-          trees standing for {report.clientName}
-        </div>
-        <div className="dim" style={{ fontSize: '.85rem' }}>
-          {h.byUrbeno} planted by Urbeno against your tonnage · {h.byClient} from your own CSR drives
-        </div>
-        {trees ? (
-          <div
-            className="tree-grid"
-            style={{ justifyContent: 'center', marginTop: '.8rem', maxWidth: 640, marginLeft: 'auto', marginRight: 'auto' }}
-          >
-            {trees}
+      <section className="heroes-hero-card">
+        <div className="heroes-hero-stats">
+          <div className="heroes-hero-count">
+            <span className="heroes-hero-count-v">{plantedCount}</span>
+            <span className="heroes-hero-count-l">trees standing for {report.clientName}</span>
+            <span className="heroes-hero-count-s">
+              {h.byUrbeno} by Urbeno · {h.byClient} from your CSR
+              {h.owed > 0 ? ` · ${h.owed} scheduled` : ''}
+            </span>
           </div>
-        ) : null}
-        {h.owed > 0 ? (
-          <div style={{ marginTop: '.7rem', fontSize: '.8rem', color: '#166534' }}>
-            {h.owed} more tree{h.owed > 1 ? 's' : ''} earned and scheduled for our next planting drive
+          <div className="heroes-filter-chips">
+            {forestFilters.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`heroes-filter-chip${forestFilter === f.id ? ' on' : ''}`}
+                onClick={() => {
+                  setForestFilter(f.id);
+                  setSelectedPlantingId(null);
+                }}
+              >
+                {f.label} <span className="heroes-filter-n">{f.count}</span>
+              </button>
+            ))}
           </div>
-        ) : null}
+        </div>
+        <HeroesForest
+          plantings={report.plantings}
+          byUrbeno={h.byUrbeno}
+          byClient={h.byClient}
+          owed={h.owed}
+          plantedAll={h.plantedAll}
+          filter={forestFilter}
+          selectedPlantingId={selectedPlantingId}
+          onSelectPlanting={setSelectedPlantingId}
+        />
+      </section>
+
+      <div className="heroes-metric-grid">
+        <button type="button" className="heroes-metric-card blue" onClick={() => ledgerRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+          <span className="heroes-metric-v">{num(co2Seq)}</span>
+          <span className="heroes-metric-l">CO₂ sequestered (kg)</span>
+          <span className="heroes-metric-s">Grows every day since planting</span>
+        </button>
+        <div className="heroes-metric-card">
+          <span className="heroes-metric-v">{perDayDisplay.toFixed(2)}</span>
+          <span className="heroes-metric-l">Absorbing now (kg/day)</span>
+          <span className="heroes-metric-s">Live from all standing trees</span>
+        </div>
+        <div className="heroes-metric-card">
+          <span className="heroes-metric-v">{num(seq.treeDays, 0)}</span>
+          <span className="heroes-metric-l">Tree-days banked</span>
+          <span className="heroes-metric-s">tree × days since planting</span>
+        </div>
+        <button
+          type="button"
+          className="heroes-metric-card"
+          onClick={() => {
+            setForestFilter('client');
+            ledgerRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
+          <span className="heroes-metric-v">{growthPhotos}</span>
+          <span className="heroes-metric-l">Growth photos</span>
+          <span className="heroes-metric-s">CSR audit trail — add more anytime</span>
+        </button>
       </div>
 
-      <div className="stats" style={{ marginBottom: '1rem' }}>
-        <div className="stat" style={{ background: 'linear-gradient(135deg,#dbeafe,#eff6ff)', borderColor: '#93c5fd' }}>
-          <div className="stat-l" style={{ color: '#1e40af' }}>
-            CO₂ Sequestered to Date
-          </div>
-          <div className="stat-v" style={{ color: '#1e3a8a' }}>
-            {num(seq.kg)}
-          </div>
-          <div className="stat-t">kg · accrues daily from each planting date</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">Absorbing Right Now</div>
-          <div className="stat-v">{seq.perDay.toFixed(2)}</div>
-          <div className="stat-t">kg CO₂ per day</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">Tree-Days Banked</div>
-          <div className="stat-v">{num(seq.treeDays)}</div>
-          <div className="stat-t">tree × days since planting</div>
-        </div>
-        <div className="stat">
-          <div className="stat-l">Growth Photos</div>
-          <div className="stat-v">{growthPhotos}</div>
-          <div className="stat-t">audit record</div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="section-hd">Milestones — a badge every {SUSTAINABILITY.heroMilestone} trees</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '.2rem' }}>
-          {h.badges.map((b) => (
-            <div key={b.n} className={`hero-badge ${b.unlocked ? '' : 'locked'}`} title={b.unlocked ? 'Unlocked' : 'Locked'}>
+      <div className="card heroes-milestones">
+        <div className="section-hd">Milestones — badge every {SUSTAINABILITY.heroMilestone} trees</div>
+        <div className="heroes-badge-row">
+          {h.badges.map((b, i) => (
+            <div
+              key={b.n}
+              className={`hero-badge heroes-badge-interactive ${b.unlocked ? 'unlocked' : 'locked'}`}
+              style={{ animationDelay: `${i * 0.06}s` }}
+              title={b.unlocked ? `${b.n} trees unlocked` : `Unlock at ${b.n} trees`}
+            >
               <div className="hero-badge-n">{b.n}</div>
               <div className="hero-badge-l">{b.unlocked ? 'trees' : 'locked'}</div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: '.8rem' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '.8rem',
-              fontWeight: 600,
-              color: 'var(--g2)',
-              marginBottom: '.25rem',
-            }}
-          >
+        <div className="heroes-progress-wrap">
+          <div className="heroes-progress-labels">
             <span>Progress to {h.nextBadge} trees</span>
             <span>{h.toNext} to go</span>
           </div>
-          <div className="bar">
-            <div className="bar-f" style={{ background: 'var(--g)', width: `${Math.min(100, h.pctToNext)}%` }} />
+          <div className="bar heroes-progress-bar">
+            <div
+              className="bar-f heroes-progress-fill"
+              style={{ width: `${Math.min(100, h.pctToNext)}%` }}
+            />
             <div className="bar-t" style={{ color: h.pctToNext > 45 ? '#fff' : 'var(--g2)' }}>
               {h.pctToNext.toFixed(1)}%
             </div>
@@ -166,50 +206,60 @@ function HeroesClient({ user }: { user: SessionUser }) {
       </div>
 
       <PeriodPicker variant="card" value={period} onChange={setPeriod} />
-      <div className="stats" style={{ marginBottom: '1rem' }}>
-        <div className="stat">
-          <div className="stat-l">Tonnes — {report.period.label || report.period.fy}</div>
-          <div className="stat-v">{h.tonnes.toFixed(2)}</div>
-          <div className="stat-t">completed</div>
+      <div className="heroes-period-grid">
+        <div className="heroes-period-stat">
+          <span className="heroes-period-v">{h.tonnes.toFixed(2)}</span>
+          <span className="heroes-period-l">Tonnes · {report.period.label || report.period.fy}</span>
         </div>
-        <div className="stat">
-          <div className="stat-l">Trees Earned</div>
-          <div className="stat-v">{h.earned}</div>
-          <div className="stat-t">1 per tonne</div>
+        <div className="heroes-period-stat">
+          <span className="heroes-period-v">{h.earned}</span>
+          <span className="heroes-period-l">Trees earned (1/tonne)</span>
         </div>
-        <div className="stat">
-          <div className="stat-l">Trees Planted</div>
-          <div className="stat-v">{h.planted}</div>
-          <div className="stat-t">in this period</div>
+        <div className="heroes-period-stat">
+          <span className="heroes-period-v">{h.planted}</span>
+          <span className="heroes-period-l">Planted this period</span>
         </div>
-        <div className="stat">
-          <div className="stat-l">Recycling CO₂e Avoided</div>
-          <div className="stat-v">{num(h.co2)}</div>
-          <div className="stat-t">kg · separate from tree capture</div>
+        <div className="heroes-period-stat">
+          <span className="heroes-period-v">{num(h.co2)}</span>
+          <span className="heroes-period-l">Recycling CO₂e avoided (kg)</span>
         </div>
       </div>
 
-      <div className="card">
+      <div className="card heroes-ledger" ref={ledgerRef}>
         <div className="card-hd">
-          <div className="card-ttl">Planting Record &amp; Growth Audit</div>
+          <div className="card-ttl">Planting record &amp; growth audit</div>
           <div className="spacer" />
           <span className="dim" style={{ fontSize: '.76rem' }}>
-            {report.plantings.length} planting{report.plantings.length !== 1 ? 's' : ''}
+            {filteredPlantings.length} of {report.plantings.length} planting
+            {report.plantings.length !== 1 ? 's' : ''}
+            {forestFilter !== 'all' ? ` · ${forestFilters.find((f) => f.id === forestFilter)?.label}` : ''}
           </span>
         </div>
         {!report.plantings.length ? (
           <div className="dim" style={{ fontSize: '.84rem', padding: '.5rem 0' }}>
             No plantings recorded yet. Trees are planted in batches at our partner sites.
           </div>
+        ) : !filteredPlantings.length ? (
+          <div className="dim" style={{ fontSize: '.84rem', padding: '.5rem 0' }}>
+            {forestFilter === 'pending'
+              ? 'Scheduled trees will appear here once the next Urbeno planting drive is recorded.'
+              : 'No plantings match this filter.'}
+          </div>
         ) : (
-          report.plantings.map((t) => (
-            <TreeCard
+          filteredPlantings.map((t) => (
+            <div
               key={t.id}
-              planting={t}
-              canEdit={false}
-              showClientCsrProgress
-              onAddProgress={setProgressFor}
-            />
+              data-planting-id={t.id}
+              className={`heroes-tree-card-wrap${selectedPlantingId === t.id ? ' highlighted' : ''}`}
+            >
+              <TreeCard
+                planting={t}
+                canEdit={false}
+                showClientCsrProgress
+                clientVariant
+                onAddProgress={setProgressFor}
+              />
+            </div>
           ))
         )}
       </div>
