@@ -30,11 +30,6 @@ function AdminOnly({ user, children }: { user: SessionUser; children: ReactNode 
   return children;
 }
 
-function ClientOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
-  if (user.role !== 'client') return <Navigate to="/" replace />;
-  return children;
-}
-
 export function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,14 +87,7 @@ export function App() {
         <Route path="/requests/:id" element={<SubmissionDetailPage user={user} />} />
         <Route path="/reports" element={<ReportsPage user={user} />} />
         <Route path="/heroes" element={<HeroesPage user={user} />} />
-        <Route
-          path="/impact"
-          element={
-            <ClientOnly user={user}>
-              <ImpactPage />
-            </ClientOnly>
-          }
-        />
+        <Route path="/impact" element={<ImpactPage user={user} />} />
         <Route
           path="/capacity"
           element={

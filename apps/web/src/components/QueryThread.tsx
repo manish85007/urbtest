@@ -48,9 +48,11 @@ export function QueryThread({
           Queries {openCount ? <span className="badge bg-rd">{openCount} open</span> : null}
         </div>
         <div className="spacer" />
-        <button type="button" className="btn bs bsm" onClick={() => setOpenCompose(true)}>
-          + Raise
-        </button>
+        {disabled ? null : (
+          <button type="button" className="btn bs bsm" onClick={() => setOpenCompose(true)}>
+            + Raise
+          </button>
+        )}
       </div>
       {!queries.length ? (
         <div className="dim" style={{ fontSize: '.82rem', textAlign: 'center', padding: '.6rem 0' }}>
@@ -59,6 +61,7 @@ export function QueryThread({
       ) : (
         queries.map((q) => {
           const canReply =
+            !disabled &&
             q.status === 'open' &&
             ((q.fromRole === 'client' && isStaff) || (q.fromRole === 'admin' && user.role === 'client'));
           return (

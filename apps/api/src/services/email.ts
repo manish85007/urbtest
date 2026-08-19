@@ -24,6 +24,24 @@ const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: 
       'Urbeno Private Limited\n' +
       'Recycling Heroes™',
   },
+  impact_share: {
+    name: 'Sustainability impact share',
+    subject: 'Sustainability impact report — {{client_name}} · {{period_label}}',
+    body:
+      'Dear {{contact_name}},\n\n' +
+      'Urbeno has prepared your organisation’s sustainability impact summary for {{period_label}}.\n\n' +
+      '  Weight recycled : {{kg}} kg\n' +
+      '  CO₂e avoided    : {{co2}} kg\n' +
+      '  Landfill diverted: {{landfill}} kg\n' +
+      '  Water saved     : {{water}} kL\n' +
+      '  Energy saved    : {{energy}} kWh\n' +
+      '  Closed invoices : {{invoices}}\n\n' +
+      'Review the full report and download the impact PDF from your Urb TecTrack portal:\n' +
+      '{{portal_url}}\n\n' +
+      'Warm regards,\n' +
+      'Urbeno Private Limited\n' +
+      'Recycling Heroes™',
+  },
 };
 
 async function resolveRecipients(templateKey: string, to: string[]): Promise<string[]> {

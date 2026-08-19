@@ -11,6 +11,7 @@ import { auditLog } from './audit.js';
 import { sendTransactionalEmail } from './email.js';
 import { assertFilesExist } from './file-service.js';
 import { notifyAdmins, notifyClientUsers, notifyUsers } from './notifications.js';
+import { isPastCalendarDate } from '@urb-tectrack/shared';
 
 const PLACEHOLDER_ITEM = 'Mixed e-waste (see attached BoM)';
 
@@ -92,6 +93,9 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
   const approxWeight = input.approxWeight ?? 0;
   if (!location || !input.requestDate || !approxQty || !approxWeight) {
     throw new AppError('Site, location, date, approximate quantity and weight are all required.');
+  }
+  if (isPastCalendarDate(input.requestDate)) {
+    throw new AppError('Pick-up request date cannot be in the past. Choose today or a future date.');
   }
   if (input.bomFileId || input.bomFileIds?.length) {
     await assertFilesExist(bomIdsFrom(input), ['bom']);
@@ -302,6 +306,12 @@ export async function updateSubmission(
   const nextItems = input.items ? namedLines(input.items) : null;
   if (nextItems && !nextItems.length) {
     throw new AppError('Keep at least one line item.');
+  }
+  if (input.requestDate) {
+    const previous = sub.requestDate.toISOString().slice(0, 10);
+    if (input.requestDate.slice(0, 10) !== previous && isPastCalendarDate(input.requestDate)) {
+      throw new AppError('Pick-up request date cannot be in the past. Choose today or a future date.');
+    }
   }
 
   const updated = await prisma.submission.update({

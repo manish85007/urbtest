@@ -185,7 +185,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                   <th>Stage</th>
                   <th>Invoices</th>
                   <th>Net kg</th>
-                  <th>Raised</th>
+                  <th>Pick-up date</th>
                 </tr>
               </thead>
               <tbody>

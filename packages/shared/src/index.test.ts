@@ -4,6 +4,7 @@ import { invStage, subStage, viewPhaseForStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
 import { formatE164, isValidNational10, national10 } from './phone.js';
+import { isPastCalendarDate, localYmd } from './calendar-date.js';
 
 describe('fiscal year', () => {
   it('uses April–March boundaries', () => {
@@ -74,5 +75,15 @@ describe('phone', () => {
     expect(isValidNational10('9900112233')).toBe(true);
     expect(formatE164('9900112233')).toBe('+919900112233');
     expect(isValidNational10('990011')).toBe(false);
+  });
+});
+
+describe('pick-up calendar date', () => {
+  it('treats earlier calendar days as past and today as allowed', () => {
+    const now = new Date(2026, 7, 19, 15, 0, 0);
+    expect(localYmd(now)).toBe('2026-08-19');
+    expect(isPastCalendarDate('2026-08-18', now)).toBe(true);
+    expect(isPastCalendarDate('2026-08-19', now)).toBe(false);
+    expect(isPastCalendarDate('2026-08-20', now)).toBe(false);
   });
 });

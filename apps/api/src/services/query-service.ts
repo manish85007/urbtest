@@ -12,6 +12,9 @@ export async function raiseQuery(actor: SessionUser, submissionId: string, text:
   if (!body) throw new AppError('Type your query first.');
 
   const sub = await loadSubmissionForActor(submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is closed. Edits are no longer available.');
+  }
   const fromRole = isStaff(actor) ? 'admin' : 'client';
 
   const query = await prisma.requestQuery.create({
@@ -56,6 +59,9 @@ export async function replyToQuery(actor: SessionUser, queryId: string, text: st
   if (!query) throw new AppError('Query not found.', 404);
 
   const sub = await loadSubmissionForActor(query.submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is closed. Edits are no longer available.');
+  }
   const actorSide = isStaff(actor) ? 'admin' : 'client';
   if (query.fromRole === actorSide && query.status === 'open') {
     throw new AppError('Wait for the other party to reply before sending another note on this thread.');

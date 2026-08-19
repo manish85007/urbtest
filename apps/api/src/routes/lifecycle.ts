@@ -18,6 +18,7 @@ import {
   deleteInvoice,
   updateInvoice,
   updateMrn,
+  updateRecycling,
   uploadCertificate,
 } from '../services/invoice-service.js';
 import { raiseQuery, replyToQuery } from '../services/query-service.js';
@@ -255,8 +256,9 @@ export async function lifecycleRoutes(app: FastifyInstance) {
       const body = z
         .object({
           utr: z.string().min(1),
-          amount: z.number().positive(),
-          paidAt: z.string(),
+          amount: z.number().min(0),
+          tdsAmount: z.number().min(0).optional(),
+          paidAt: z.string().min(1),
           mode: z.string().min(1),
           note: z.string().optional(),
         })
@@ -345,7 +347,55 @@ export async function lifecycleRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/invoices/:id/certificates', { preHandler: requireAuth }, async (request, reply) => {
+  app.patch('/invoices/:id/recycling', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z
+        .object({
+          processedAt: z.string(),
+          factoryId: z.string().optional(),
+          divertedPct: z.number().optional(),
+          devicesDestroyed: z.number().optional(),
+          categories: z
+            .array(
+              z.object({
+                entryId: z.string(),
+                groupCode: z.string(),
+                weightKg: z.number().positive(),
+                recoveryFe: z.number().optional(),
+                recoveryNfe: z.number().optional(),
+                recoveryPl: z.number().optional(),
+                recoveryPcb: z.number().optional(),
+                overrideReason: z.string().optional(),
+              }),
+            )
+            .min(1),
+          photoIds: z.array(z.string()).optional(),
+          reportIds: z.array(z.string()).optional(),
+          serialFileId: z.string().optional(),
+          vehicleIds: z.array(z.string()).optional(),
+        })
+        .parse(request.body);
+      return await updateRecycling(request.user!, id, {
+        ...body,
+        categories: body.categories.map((c) => ({
+          ...c,
+          groupCode: c.groupCode as
+            | 'ITEW'
+            | 'CEEW'
+            | 'LSEEW'
+            | 'EETW'
+            | 'TLSEW'
+            | 'MDW'
+            | 'LIW',
+        })),
+      });
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/invoices/:id/certificate', { preHandler: requireAuth }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
       const body = z

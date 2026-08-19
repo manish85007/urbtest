@@ -311,6 +311,7 @@ model Payment {
   invoiceId   String   @map("invoice_id")
   utr         String
   amountPaise BigInt   @map("amount_paise")
+  tdsPaise    BigInt   @default(0) @map("tds_paise")
   paidAt      DateTime @map("paid_at") @db.Date
   mode        String
   note        String?

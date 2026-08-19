@@ -7,6 +7,7 @@ import {
   getHeroesReport,
   getRegisterReport,
   getReportsForActor,
+  shareImpactReport,
   REGISTER_KINDS,
   type RegisterType,
 } from '../services/reporting-service.js';
@@ -184,14 +185,35 @@ export async function reportsRoutes(app: FastifyInstance) {
 
   app.get('/reports/impact.pdf', { preHandler: requireAuth }, async (request, reply) => {
     try {
+      const q = request.query as Record<string, unknown>;
+      const clientId = typeof q.clientId === 'string' && q.clientId ? q.clientId : undefined;
       const { filename, buffer } = await impactPdf(
         request.user!,
-        periodFromQuery(request.query as Record<string, unknown>),
+        periodFromQuery(q),
+        clientId,
       );
       return reply
         .header('Content-Type', 'application/pdf')
         .header('Content-Disposition', `attachment; filename="${filename}"`)
         .send(buffer);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.post('/reports/impact/share', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const body = z
+        .object({
+          clientId: z.string().min(1),
+          period: z.string().optional(),
+          fy: z.string().optional(),
+          year: z.string().optional(),
+          from: z.string().optional(),
+          to: z.string().optional(),
+        })
+        .parse(request.body);
+      return await shareImpactReport(request.user!, body.clientId, parseReportPeriod(body));
     } catch (err) {
       return handleErr(err, reply);
     }

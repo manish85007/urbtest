@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL } from '@urb-tectrack/shared';
+import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL, settledPaise } from '@urb-tectrack/shared';
 import {
   dataApi,
   filesApi,
@@ -21,7 +21,7 @@ import { PhoneField } from '../components/PhoneField';
 import { Modal } from '../components/Modal';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
-import { fmtDate, fmtTS, num } from '../lib/format';
+import { fmtDate, fmtTS, num, todayIso } from '../lib/format';
 
 type StepModal =
   | { kind: 'ack' }
@@ -300,13 +300,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                       </thead>
                       <tbody>
                         {sub.invoices.map((inv) => {
-                          const paid = inv.payments.reduce((s, p) => {
-                            try {
-                              return s + BigInt(p.amountPaise);
-                            } catch {
-                              return s;
-                            }
-                          }, 0n);
+                          const paid = settledPaise(inv.payments);
                           const pay = getPayStatus(BigInt(inv.totalPaise), paid);
                           return (
                             <tr
@@ -346,7 +340,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                     lineItems={sub.items ?? []}
                     payTermsDays={sub.client.payTermsDays ?? 30}
                     user={user}
-                    disabled={busy}
+                    disabled={busy || !!sub.closedAt}
                     onAction={act}
                     onEditInvoice={
                       isAdmin && invoiceEditable(inv, sub.closedAt)
@@ -402,7 +396,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 lineItems={sub.items ?? []}
                 payTermsDays={sub.client.payTermsDays ?? 30}
                 user={user}
-                disabled={busy}
+                disabled={busy || !!sub.closedAt}
                 onAction={act}
               />
             ))}
@@ -426,7 +420,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 lineItems={sub.items ?? []}
                 payTermsDays={sub.client.payTermsDays ?? 30}
                 user={user}
-                disabled={busy}
+                disabled={busy || !!sub.closedAt}
                 onAction={act}
               />
             ))}
@@ -440,7 +434,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             submissionId={sub.id}
             queries={sub.queries ?? []}
             user={user}
-            disabled={busy}
+            disabled={busy || !!sub.closedAt}
             onAction={act}
           />
         </div>
@@ -673,7 +667,7 @@ function RequestCard({
           <div className="tile-v">{sub.location || '—'}</div>
         </div>
         <div className="tile">
-          <div className="tile-l">Request Date</div>
+          <div className="tile-l">Pick Up Request Date</div>
           <div className="tile-v">{fmtDate(sub.requestDate)}</div>
         </div>
         <div className="tile">
@@ -1031,7 +1025,7 @@ function DetailsCard({ sub }: { sub: SubmissionDetail }) {
         </div>
       </div>
       <div className="tile" style={{ marginBottom: '.4rem' }}>
-        <div className="tile-l">Request Date</div>
+        <div className="tile-l">Pick Up Request Date</div>
         <div className="tile-v">{fmtDate(sub.requestDate)}</div>
       </div>
       <div className="tile" style={{ marginBottom: '.4rem' }}>
@@ -1333,7 +1327,8 @@ function EditRequestForm({
 }) {
   const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [siteId, setSiteId] = useState(sub.siteId);
-  const [requestDate, setRequestDate] = useState(sub.requestDate.slice(0, 10));
+  const originalPickup = sub.requestDate.slice(0, 10);
+  const [requestDate, setRequestDate] = useState(originalPickup);
   const [location, setLocation] = useState(sub.location ?? '');
   const [approxQty, setApproxQty] = useState(String(sub.approxQty));
   const [approxWeight, setApproxWeight] = useState(String(sub.approxWeight));
@@ -1398,8 +1393,14 @@ function EditRequestForm({
           <input id="er-ref" value={ref} onChange={(e) => setRef(e.target.value)} />
         </div>
         <div className="fg">
-          <label htmlFor="er-date">Request Date</label>
-          <input id="er-date" type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} />
+          <label htmlFor="er-date">Pick Up Request Date</label>
+          <input
+            id="er-date"
+            type="date"
+            value={requestDate}
+            min={originalPickup < todayIso() ? originalPickup : todayIso()}
+            onChange={(e) => setRequestDate(e.target.value)}
+          />
         </div>
         <div className="fg">
           <label htmlFor="er-qty">Approx. Quantity</label>

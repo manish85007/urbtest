@@ -4,6 +4,7 @@ import { dataApi, lifecycleApi, type SessionUser } from '../api';
 import { FileUpload } from '../components/FileUpload';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { Modal } from '../components/Modal';
+import { todayIso } from '../lib/format';
 
 const BOM_MAX_MB = 10;
 
@@ -13,7 +14,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [clientId, setClientId] = useState(user.clientId ?? '');
   const [siteId, setSiteId] = useState('');
-  const [requestDate, setRequestDate] = useState(new Date().toISOString().slice(0, 10));
+  const [requestDate, setRequestDate] = useState(todayIso());
   const [location, setLocation] = useState('');
   const [ref, setRef] = useState('');
   const [approxWeight, setApproxWeight] = useState('');
@@ -60,6 +61,10 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
     const named = namedDraftLines(items);
     if (!siteId || !location.trim() || !requestDate || !Number(approxQty) || !Number(approxWeight)) {
       setError('Site, location, date, approximate quantity and weight are all required.');
+      return;
+    }
+    if (requestDate < todayIso()) {
+      setError('Pick-up request date cannot be in the past. Choose today or a future date.');
       return;
     }
     if (!named.length && !bomIds.length) {
@@ -148,11 +153,12 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
             <input id="ns-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="PO-1234" />
           </div>
           <div className="fg">
-            <label htmlFor="ns-date">Request Date *</label>
+            <label htmlFor="ns-date">Pick Up Request Date *</label>
             <input
               id="ns-date"
               type="date"
               value={requestDate}
+              min={todayIso()}
               onChange={(e) => setRequestDate(e.target.value)}
               required
             />

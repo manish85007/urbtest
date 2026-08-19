@@ -4,6 +4,7 @@ import {
   currentFY,
   dateInPeriod,
   getPayStatus,
+  settledPaise,
   heroProgress,
   inFiscalYear,
   invStage,
@@ -26,6 +27,8 @@ import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
 import { AppError } from '../lib/errors.js';
+import { requireAdmin } from '../lib/access.js';
+import { sendTransactionalEmail } from './email.js';
 
 const SLA_RECYCLE_DAYS = Number(process.env.SLA_RECYCLE_DAYS ?? 30);
 const SLA_WARN_AT = Number(process.env.SLA_WARN_AT ?? 0.8);
@@ -156,7 +159,7 @@ export async function getStaffDashboard(actor: SessionUser) {
   }> = [];
 
   for (const inv of openInvoices) {
-    const paidPaise = sumPaise(inv.payments.map((p) => p.amountPaise));
+    const paidPaise = settledPaise(inv.payments);
     const pay = getPayStatus(inv.totalPaise, paidPaise);
     if (pay.key === 'paid') continue;
 
@@ -231,7 +234,7 @@ export async function getStaffDashboard(actor: SessionUser) {
   };
 
   const pendingPayments = openInvoices.filter((inv) => {
-    const paid = sumPaise(inv.payments.map((p) => p.amountPaise));
+    const paid = settledPaise(inv.payments);
     return getPayStatus(inv.totalPaise, paid).key !== 'paid';
   }).length;
 
@@ -260,8 +263,15 @@ export async function getStaffDashboard(actor: SessionUser) {
   };
 }
 
-export async function getImpactReport(actor: SessionUser, siteId?: string, period?: ReportPeriod) {
-  const scope = clientScopeFilter(actor);
+export async function getImpactReport(
+  actor: SessionUser,
+  siteId?: string,
+  period?: ReportPeriod,
+  clientId?: string,
+) {
+  const scopedClientId = actor.role === 'client' ? actor.clientId : clientId;
+  const baseScope = scopedClientId ? { clientId: scopedClientId } : clientScopeFilter(actor);
+  const scope = siteId ? { ...baseScope, siteId } : baseScope;
   const resolved = period ?? parseReportPeriod({ period: 'fy' });
   const fy = currentFY();
   const fyLabel = fy?.label ?? '';
@@ -270,9 +280,6 @@ export async function getImpactReport(actor: SessionUser, siteId?: string, perio
     closedAt: { not: null },
     submission: scope,
   };
-  if (siteId) {
-    where.submission = { ...scope, siteId };
-  }
 
   const closedInvoices = await prisma.invoice.findMany({
     where,
@@ -293,7 +300,7 @@ export async function getImpactReport(actor: SessionUser, siteId?: string, perio
   const pendingClose = await prisma.invoice.findMany({
     where: {
       closedAt: null,
-      submission: siteId ? { ...scope, siteId } : scope,
+      submission: scope,
       certificates: { some: {} },
     },
     include: {
@@ -313,11 +320,11 @@ export async function getImpactReport(actor: SessionUser, siteId?: string, perio
       issuedAt: inv.certificates[0]?.uploadedAt.toISOString().slice(0, 10) ?? null,
     }));
 
-  const clientId = actor.clientId;
+  const reportClientId = scopedClientId ?? actor.clientId;
   const [client, allSubs, lifeImp, planted] = await Promise.all([
-    clientId
+    reportClientId
       ? prisma.client.findUnique({
-          where: { id: clientId },
+          where: { id: reportClientId },
           include: { sites: { where: { active: true }, orderBy: { name: 'asc' } } },
         })
       : Promise.resolve(null),
@@ -326,9 +333,9 @@ export async function getImpactReport(actor: SessionUser, siteId?: string, perio
       include: submissionInclude,
       orderBy: { createdAt: 'desc' },
     }),
-    clientId ? impactForClient(clientId, null) : Promise.resolve(computeImpact(0, 0, 0)),
-    clientId
-      ? prisma.treePlanting.aggregate({ where: { clientId }, _sum: { trees: true } })
+    reportClientId ? impactForClient(reportClientId, null) : Promise.resolve(computeImpact(0, 0, 0)),
+    reportClientId
+      ? prisma.treePlanting.aggregate({ where: { clientId: reportClientId }, _sum: { trees: true } })
       : Promise.resolve({ _sum: { trees: 0 } }),
   ]);
 
@@ -754,7 +761,7 @@ export async function getRegisterReport(
       take: 2000,
     });
     rows = invoices.filter((inv) => inP(inv.invoiceDate)).map((inv) => {
-      const paid = sumPaise(inv.payments.map((p) => p.amountPaise));
+      const paid = settledPaise(inv.payments);
       const pay = getPayStatus(inv.totalPaise, paid);
       const tot = rupees(inv.totalPaise);
       const paidR = rupees(paid);
@@ -892,7 +899,7 @@ export async function getRegisterReport(
       ];
     });
   } else if (type === 'sustain') {
-    head = ['Client', 'Site', 'Closed Invoices', 'Net kg', 'Tonnes', 'CO2e avoided kg', 'Landfill diverted kg', 'Tree equivalent', 'Water kL', 'Energy kWh'];
+    head = ['Client ID', 'Client', 'Site', 'Closed Invoices', 'Net kg', 'Tonnes', 'CO2e avoided kg', 'Landfill diverted kg', 'Tree equivalent', 'Water kL', 'Energy kWh'];
     const clients = clientId
       ? await prisma.client.findMany({ where: { id: clientId } })
       : actor.role === 'client' && actor.clientId
@@ -902,6 +909,7 @@ export async function getRegisterReport(
       const imp = await impactForClient(c.id, resolved, siteId);
       if (!imp.invoices) continue;
       rows.push([
+        c.id,
         c.name,
         siteName || 'All sites',
         imp.invoices,
@@ -961,4 +969,37 @@ export async function getRegisterReport(
     rows,
     total: rows.length,
   };
+}
+
+export async function shareImpactReport(actor: SessionUser, clientId: string, period?: ReportPeriod) {
+  requireAdmin(actor);
+  const client = await prisma.client.findUnique({ where: { id: clientId, active: true } });
+  if (!client) throw new AppError('Client not found.');
+  const report = await getImpactReport(actor, undefined, period, clientId);
+  if (!report.impact.invoices) {
+    throw new AppError('No closed requests in this period for this client — nothing to share yet.');
+  }
+  const users = await prisma.user.findMany({
+    where: { clientId, active: true, role: 'client' },
+    select: { email: true },
+  });
+  if (!users.length) throw new AppError('This client has no active portal users to share with.');
+  const portal = process.env.PORTAL_URL ?? 'http://localhost:8080';
+  await sendTransactionalEmail(
+    'impact_share',
+    users.map((u) => u.email),
+    {
+      client_name: client.name,
+      contact_name: client.contact || client.name,
+      period_label: report.period.label,
+      kg: Number(report.impact.kg.toFixed(1)),
+      co2: Number(report.impact.co2.toFixed(0)),
+      landfill: Number(report.impact.landfill.toFixed(0)),
+      water: Number(report.impact.water.toFixed(1)),
+      energy: Number(report.impact.energy.toFixed(1)),
+      invoices: report.impact.invoices,
+      portal_url: `${portal}/impact`,
+    },
+  );
+  return { sent: users.length, recipients: users.map((u) => u.email), clientName: client.name };
 }

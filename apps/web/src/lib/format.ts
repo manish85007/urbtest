@@ -1,3 +1,5 @@
+import { localYmd } from '@urb-tectrack/shared';
+
 export function num(n: number, digits = 2): string {
   return Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: digits });
 }
@@ -29,5 +31,5 @@ export function daysBetween(from: string, to = new Date()): number {
 }
 
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localYmd();
 }

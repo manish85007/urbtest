@@ -1,7 +1,7 @@
 import '../lib/load-env.js';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { FileKind } from '@prisma/client';
-import { invStage } from '@urb-tectrack/shared';
+import { invStage, localYmd } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { toSessionUser } from '../lib/auth-context.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
@@ -15,6 +15,7 @@ import {
   createMrn,
   createRecycling,
   updateMrn,
+  updateRecycling,
   uploadCertificate,
 } from '../services/invoice-service.js';
 
@@ -60,13 +61,27 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     const admin = await actor('admin@urbeno.in');
     const factory = await actor('blr@urbeno.in');
 
+    const today = localYmd();
     const site = await prisma.site.findFirst({ where: { clientId: 'TCPL', code: 'BLR' } });
     expect(site).toBeTruthy();
+
+    await expect(
+      createSubmission(client, {
+        clientId: 'TCPL',
+        siteId: site!.id,
+        requestDate: '2020-01-15',
+        location: 'Past date should fail',
+        approxQty: 10,
+        approxWeight: 50,
+        notes: 'Automated lifecycle test',
+        items: [{ name: 'Mixed e-waste', qty: 10, weightKg: 50, hsn: '854890' }],
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/past/i) });
 
     const sub = await createSubmission(client, {
       clientId: 'TCPL',
       siteId: site!.id,
-      requestDate: '2026-08-16',
+      requestDate: today,
       location: 'Integration test bay',
       approxQty: 10,
       approxWeight: 50,
@@ -206,16 +221,24 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     ).rejects.toMatchObject({ message: expect.stringMatching(/Form 6/i) });
 
     await createRecycling(factory, invoiceId, {
-      processedAt: '2026-08-16',
+      processedAt: today,
       factoryId: 'URB-BLR',
       devicesDestroyed: 10,
       categories: [{ entryId: 'REC-ITEW2', groupCode: 'ITEW', weightKg: 50 }],
     });
 
+    const edited = await updateRecycling(factory, invoiceId, {
+      processedAt: today,
+      factoryId: 'URB-BLR',
+      devicesDestroyed: 11,
+      categories: [{ entryId: 'REC-ITEW2', groupCode: 'ITEW', weightKg: 50 }],
+    });
+    expect(edited.devicesDestroyed).toBe(11);
+
     const certFile = await seedFile('certificate', admin.email);
     await uploadCertificate(admin, invoiceId, {
       certNo: `URB/INT/${Date.now()}`,
-      certDate: '2026-08-16',
+      certDate: today,
       fileId: certFile.id,
     });
 
@@ -224,14 +247,34 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       include: { payments: true },
     });
 
+    const rupees = Number(invoice.totalPaise) / 100;
     await addPayment(admin, invoiceId, {
       utr: `UTR-INT-${Date.now()}`,
-      amount: Number(invoice.totalPaise) / 100,
-      paidAt: '2026-08-16',
+      amount: rupees - 118,
+      tdsAmount: 118,
+      paidAt: today,
       mode: 'PM1',
     });
 
     await closeInvoice(client, invoiceId, { rating: 5, note: 'Integration test close' });
+
+    await expect(
+      updateRecycling(factory, invoiceId, {
+        processedAt: today,
+        factoryId: 'URB-BLR',
+        devicesDestroyed: 12,
+        categories: [{ entryId: 'REC-ITEW2', groupCode: 'ITEW', weightKg: 50 }],
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/closed/i) });
+
+    await expect(
+      addPayment(admin, invoiceId, {
+        utr: `UTR-CLOSED-${Date.now()}`,
+        amount: 1,
+        paidAt: today,
+        mode: 'PM1',
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/closed/i) });
 
     const final = await prisma.submission.findUniqueOrThrow({
       where: { id: submissionId },

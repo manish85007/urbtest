@@ -3,6 +3,7 @@ import {
   deriveTax,
   deriveTotal,
   getPayStatus,
+  settledPaise,
   matTotal,
   recoveryFor,
   rupeesToPaise,
@@ -123,6 +124,7 @@ export interface PaymentInput {
   paidAt: string;
   mode: string;
   note?: string;
+  tdsAmount?: number;
 }
 
 export interface MrnInput {
@@ -235,6 +237,12 @@ function assertInvoiceEditable(invoice: { closedAt: Date | null }) {
   }
 }
 
+function assertLifecycleOpen(invoice: { closedAt: Date | null; submission: { closedAt: Date | null } }) {
+  if (invoice.closedAt || invoice.submission.closedAt) {
+    throw new AppError('This request is closed. Edits are no longer available.');
+  }
+}
+
 function assertInvoiceDeletable(invoice: {
   closedAt: Date | null;
   mrn: unknown;
@@ -260,6 +268,9 @@ export async function createInvoice(
 ) {
   requireStaff(actor);
   const sub = await loadSubmissionForActor(submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is closed. Edits are no longer available.');
+  }
 
   const duplicate = sub.invoices.some((i) => i.invoiceNo === input.invoiceNo.trim());
   if (duplicate) {
@@ -338,7 +349,7 @@ export async function createInvoice(
 export async function updateInvoice(actor: SessionUser, invoiceId: string, input: CreateInvoiceInput) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
-  assertInvoiceEditable(invoice);
+  assertLifecycleOpen(invoice);
   const sub = await loadSubmissionForActor(invoice.submissionId, actor);
 
   const nextNo = input.invoiceNo.trim();
@@ -430,12 +441,21 @@ export async function deleteInvoice(actor: SessionUser, invoiceId: string) {
 export async function addPayment(actor: SessionUser, invoiceId: string, input: PaymentInput) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertLifecycleOpen(invoice);
+  assertNotFutureDate(input.paidAt, 'Payment date');
+
+  const tdsAmount = Number(input.tdsAmount ?? 0);
+  if (tdsAmount < 0) throw new AppError('TDS cannot be negative.');
+  if (!(Number(input.amount) > 0) && !(tdsAmount > 0)) {
+    throw new AppError('Enter the amount received, TDS deducted, or both.');
+  }
 
   const payment = await prisma.payment.create({
     data: {
       invoiceId,
       utr: input.utr.trim(),
-      amountPaise: BigInt(rupeesToPaise(input.amount)),
+      amountPaise: BigInt(rupeesToPaise(input.amount || 0)),
+      tdsPaise: BigInt(rupeesToPaise(tdsAmount)),
       paidAt: new Date(input.paidAt),
       mode: input.mode,
       note: input.note?.trim() || null,
@@ -448,7 +468,13 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
     action: 'inv.payment',
     entity: 'invoice',
     entityId: invoice.invoiceNo,
-    details: { submissionId: invoice.submissionId, utr: payment.utr, amount: input.amount },
+    details: {
+      submissionId: invoice.submissionId,
+      utr: payment.utr,
+      amount: input.amount,
+      tds: tdsAmount,
+      paidAt: input.paidAt,
+    },
   });
 
   return payment;
@@ -526,6 +552,7 @@ function assertInvoiceVehiclesWeighed(invoice: Awaited<ReturnType<typeof loadInv
 export async function createMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   requireFactory(actor, input.factoryId);
+  assertLifecycleOpen(invoice);
   const beforeStage = deriveSubmissionStage(invoice.submission);
 
   if (invoice.mrn) throw new AppError('This invoice already has an MRN. Each invoice takes one MRN.');
@@ -589,7 +616,7 @@ export async function updateMrn(actor: SessionUser, invoiceId: string, input: Mr
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const existing = invoice.mrn;
   if (!existing) throw new AppError('Create the MRN before editing it.');
-  if (invoice.closedAt) throw new AppError('This invoice is closed; the MRN cannot be changed.');
+  assertLifecycleOpen(invoice);
   if (input.factoryId && input.factoryId !== existing.factoryId) {
     throw new AppError('The receiving factory cannot be changed after the MRN is issued.');
   }
@@ -636,6 +663,7 @@ export async function createRecycling(
 ) {
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const beforeStage = deriveSubmissionStage(invoice.submission);
+  assertLifecycleOpen(invoice);
   if (!invoice.mrn) throw new AppError('Create the MRN before recycling this invoice.');
   if (invoice.recycling) throw new AppError('This invoice already has a recycling record.');
 
@@ -802,6 +830,161 @@ export async function createRecycling(
   return recycling;
 }
 
+export async function updateRecycling(
+  actor: SessionUser,
+  invoiceId: string,
+  input: RecyclingInput,
+) {
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertLifecycleOpen(invoice);
+  if (!invoice.mrn) throw new AppError('Create the MRN before recycling this invoice.');
+  const existing = invoice.recycling;
+  if (!existing) throw new AppError('Issue Form 6 before editing it.');
+
+  const factoryId = input.factoryId || existing.factoryId || invoice.mrn.factoryId;
+  requireFactory(actor, factoryId);
+
+  const target = roundKg(toKg(invoice.billingWeight));
+  const split = round2(input.categories.reduce((sum, c) => sum + toKg(c.weightKg), 0));
+  if (Math.abs(split - target) >= 0.01) {
+    throw new AppError(
+      `The category split totals ${split} kg but this invoice covers ${target} kg. Every kilogram received has to land in an authorised category — adjust the split by ${Math.abs(round2(target - split))} kg.`,
+    );
+  }
+
+  const categoryRows: Array<{
+    categoryId: number;
+    entryId: string;
+    groupCode: string;
+    weightKg: number;
+    recoveryFe: number;
+    recoveryNfe: number;
+    recoveryPl: number;
+    recoveryPcb: number;
+    overrideReason: string | null;
+  }> = [];
+  let totalFe = 0;
+  let totalNfe = 0;
+  let totalPl = 0;
+  let totalPcb = 0;
+
+  for (const cat of input.categories) {
+    const kg = toKg(cat.weightKg);
+    const mat =
+      cat.recoveryFe !== undefined
+        ? {
+            fe: cat.recoveryFe,
+            nfe: cat.recoveryNfe ?? 0,
+            pl: cat.recoveryPl ?? 0,
+            pcb: cat.recoveryPcb ?? 0,
+          }
+        : recoveryFor(cat.groupCode, kg);
+
+    const mt = round2(matTotal(mat));
+    if (Math.abs(mt - kg) >= 0.05) {
+      throw new AppError(
+        `Recovery for ${cat.entryId} totals ${mt} kg against ${kg} kg received in that category. The fractions must account for the whole weight.`,
+      );
+    }
+
+    const master = await prisma.categoryMaster.findUnique({
+      where: { factoryId_entryId: { factoryId, entryId: cat.entryId } },
+    });
+    if (!master) throw new AppError(`Category ${cat.entryId} is not authorised at ${factoryId}.`);
+
+    const capacityCheck = await assertCategoryCapacityOrOverride({
+      factoryId,
+      entryId: cat.entryId,
+      addKg: kg,
+      capacityTpa: Number(master.capacityTpa),
+      processedAt: new Date(input.processedAt),
+      overrideReason: cat.overrideReason,
+      excludeRecyclingId: existing.id,
+    });
+
+    if (capacityCheck.exceeds && cat.overrideReason?.trim()) {
+      await auditLog({
+        actorEmail: actor.email,
+        actorId: actor.id,
+        action: 'capacity.override',
+        entity: 'invoice',
+        entityId: invoice.invoiceNo,
+        details: {
+          submissionId: invoice.submissionId,
+          entryId: cat.entryId,
+          projectedKg: capacityCheck.projectedKg,
+          capKg: capacityCheck.capKg,
+          reason: cat.overrideReason.trim(),
+        },
+      });
+    }
+
+    categoryRows.push({
+      categoryId: master.id,
+      entryId: cat.entryId,
+      groupCode: cat.groupCode,
+      weightKg: kg,
+      recoveryFe: mat.fe,
+      recoveryNfe: mat.nfe,
+      recoveryPl: mat.pl,
+      recoveryPcb: mat.pcb,
+      overrideReason: cat.overrideReason ?? null,
+    });
+
+    totalFe += mat.fe;
+    totalNfe += mat.nfe;
+    totalPl += mat.pl;
+    totalPcb += mat.pcb;
+  }
+
+  if (input.photoIds?.length) await assertFilesExist(input.photoIds, ['processing']);
+  if (input.reportIds?.length) await assertFilesExist(input.reportIds, ['report']);
+  if (input.serialFileId) await assertFilesExist([input.serialFileId], ['serials']);
+
+  const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
+  const processedAt = new Date(input.processedAt);
+  const photoIds = input.photoIds?.length ? input.photoIds : existing.photoIds;
+  const reportIds = input.reportIds?.length ? input.reportIds : existing.reportIds;
+
+  const recycling = await prisma.$transaction(async (tx) => {
+    await tx.recyclingCategory.deleteMany({ where: { recyclingId: existing.id } });
+    return tx.recycling.update({
+      where: { id: existing.id },
+      data: {
+        processedAt,
+        factoryId,
+        divertedPct: input.divertedPct ?? existing.divertedPct,
+        devicesDestroyed: Math.max(0, Math.floor(Number(input.devicesDestroyed) || 0)),
+        recoveryFe: roundKg(totalFe),
+        recoveryNfe: roundKg(totalNfe),
+        recoveryPl: roundKg(totalPl),
+        recoveryPcb: roundKg(totalPcb),
+        photoIds,
+        reportIds,
+        serialFileId: input.serialFileId ?? existing.serialFileId,
+        vehicleIds,
+        categories: { create: categoryRows },
+      },
+      include: { categories: true },
+    });
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'recy.update',
+    entity: 'recycling',
+    entityId: recycling.form6No,
+    details: {
+      submissionId: invoice.submissionId,
+      invNo: invoice.invoiceNo,
+      cats: input.categories.map((c) => c.entryId),
+    },
+  });
+
+  return recycling;
+}
+
 export async function uploadCertificate(
   actor: SessionUser,
   invoiceId: string,
@@ -809,6 +992,7 @@ export async function uploadCertificate(
 ) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertLifecycleOpen(invoice);
   const beforeStage = deriveSubmissionStage(invoice.submission);
   if (!invoice.recycling) {
     throw new AppError('Issue Form 6 before uploading the Certificate of Destruction.');
@@ -906,7 +1090,7 @@ export async function closeInvoice(
     throw new AppError('Upload a certificate before closing this invoice.');
   }
 
-  const paid = invoice.payments.reduce((sum, p) => sum + p.amountPaise, 0n);
+  const paid = settledPaise(invoice.payments);
   const status = getPayStatus(invoice.totalPaise, paid);
   if (status.key !== 'paid') {
     throw new AppError(unpaidCloseMessage(invoice.invoiceNo, status.duePaise, invoice.totalPaise));

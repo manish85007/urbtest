@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { seedLookups } from '../src/services/lookups.js';
 import { backfillAuditHashes } from '../src/services/audit.js';
+import { seedLifecycleSamples } from './seed-lifecycle.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 for (const envPath of [resolve(here, '../.env'), resolve(here, '../../../.env')]) {
@@ -456,8 +457,14 @@ async function main() {
 
   await prisma.idSequence.upsert({
     where: { key: 'sub' },
-    update: { nextValue: 49 },
+    update: {},
     create: { key: 'sub', prefix: 'REQ-', pad: 5, nextValue: 49 },
+  });
+
+  await seedLifecycleSamples(prisma, {
+    TCPL: site.id,
+    INFR: infrSite.id,
+    BHRT: bhrtSite.id,
   });
 
   await seedLookups();
@@ -587,7 +594,7 @@ async function main() {
   await backfillAuditHashes();
 
   console.log(
-    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, demo requests, lookups, v6.4 compliance registers`,
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, demo requests, 25 closed lifecycle samples, lookups, v6.4 compliance registers`,
   );
 }
 

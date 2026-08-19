@@ -84,6 +84,9 @@ export async function importSerials(
 ) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  if (invoice.closedAt || invoice.submission.closedAt) {
+    throw new AppError('This request is closed. Edits are no longer available.');
+  }
   if (!invoice.recycling) {
     throw new AppError('Record recycling before importing serials.');
   }
@@ -129,6 +132,9 @@ export async function destroySerials(
 ) {
   requireStaff(actor);
   const invoice = await loadInvoiceForActor(invoiceId, actor);
+  if (invoice.closedAt || invoice.submission.closedAt) {
+    throw new AppError('This request is closed. Edits are no longer available.');
+  }
   if (!invoice.recycling?.serials.length) throw new AppError('No serials on this invoice');
 
   const pending = invoice.recycling.serials.filter((s) => !s.dcodNo);

@@ -1,4 +1,4 @@
-import type { FiscalYear } from '@urb-tectrack/shared';
+import type { FiscalYear } from './fiscal-year.js';
 
 export interface CategoryCapacityCheck {
   entryId: string;

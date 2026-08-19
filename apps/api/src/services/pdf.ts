@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SUSTAINABILITY, getFY, type ReportPeriod } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
-import { canSeeMrn, isStaff } from '../lib/auth-context.js';
+import { canSeeMrn } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { loadInvoiceForActor } from '../lib/access.js';
 import { buildTextPdf, type PdfLetterhead } from '../lib/simple-pdf.js';
@@ -279,19 +279,20 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
 export async function impactPdf(
   actor: SessionUser,
   period?: ReportPeriod,
+  clientId?: string,
 ): Promise<{ filename: string; buffer: Buffer }> {
-  if (isStaff(actor) && !actor.clientId) {
-    throw new AppError('Impact certificates are issued per client organisation.');
+  if (actor.role === 'client' && clientId && clientId !== actor.clientId) {
+    throw new AppError('You can only download your organisation’s impact certificate.');
   }
-  const report = await getImpactReport(actor, undefined, period);
+  const report = await getImpactReport(actor, undefined, period, clientId);
   if (!report.impact.invoices) {
     throw new AppError('No completed submissions in this period — nothing to certify yet.');
   }
 
-  const clientName =
-    actor.role === 'client'
-      ? (await prisma.client.findUnique({ where: { id: actor.clientId ?? '' } }))?.name ?? 'Client'
-      : 'Urbeno portfolio';
+  const scopedId = actor.role === 'client' ? actor.clientId : clientId;
+  const clientName = scopedId
+    ? (await prisma.client.findUnique({ where: { id: scopedId } }))?.name ?? 'Client'
+    : report.clientName || 'Urbeno portfolio';
   const co = await getCompanyProfile();
 
   const buffer = buildTextPdf(
@@ -327,10 +328,10 @@ export async function impactPdf(
     actorId: actor.id,
     action: 'pdf.impact',
     entity: 'report',
-    entityId: actor.clientId ?? 'staff',
+    entityId: scopedId ?? 'portfolio',
   });
 
-  return { filename: `sustainability-${actor.clientId ?? 'portfolio'}.pdf`, buffer };
+  return { filename: `sustainability-${scopedId ?? 'portfolio'}.pdf`, buffer };
 }
 
 export async function methodologyPdf(actor?: SessionUser): Promise<{ filename: string; buffer: Buffer }> {

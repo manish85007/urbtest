@@ -2,6 +2,7 @@ import {
   SLA_LABEL,
   formatINR,
   getPayStatus,
+  settledPaise,
   invoiceDue,
   paymentTermsLabel,
   recyclingSla,
@@ -71,7 +72,7 @@ export async function runReminders() {
 
   for (const inv of invoices) {
     const sub = inv.submission;
-    const paidPaise = sumPaise(inv.payments.map((p) => p.amountPaise));
+    const paidPaise = settledPaise(inv.payments);
     const pay = getPayStatus(inv.totalPaise, paidPaise);
 
     if (pay.key !== 'paid') {

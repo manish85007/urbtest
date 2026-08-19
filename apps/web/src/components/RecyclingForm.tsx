@@ -30,6 +30,23 @@ interface RecyclingFormProps {
   ewayBillNo?: string;
   vehicles: VehicleDetail[];
   seedHints?: Array<{ name: string; qty: number; weightKg: number }>;
+  initial?: {
+    processedAt?: string;
+    factoryId?: string;
+    devicesDestroyed?: number;
+    vehicleIds?: string[];
+    photoIds?: string[];
+    reportIds?: string[];
+    categories?: Array<{
+      entryId: string;
+      groupCode: string;
+      weightKg: number;
+      recoveryFe?: number;
+      recoveryNfe?: number;
+      recoveryPl?: number;
+      recoveryPcb?: number;
+    }>;
+  };
   disabled: boolean;
   onSubmit: (body: {
     processedAt: string;
@@ -60,21 +77,41 @@ export function RecyclingForm({
   ewayBillNo,
   vehicles,
   seedHints,
+  initial,
   disabled,
   onSubmit,
 }: RecyclingFormProps) {
   const today = new Date().toISOString().slice(0, 10);
   const target = round2(billingWeight);
-  const [factoryId, setFactoryId] = useState(defaultFactoryId);
-  const [processedAt, setProcessedAt] = useState(today);
-  const [dest, setDest] = useState(String(seedHints?.reduce((s, m) => s + (m.qty || 0), 0) || invoiceQty || 0));
-  const [vehicleIds, setVehicleIds] = useState<string[]>(() => vehicles.map((v) => v.id));
+  const [factoryId, setFactoryId] = useState(initial?.factoryId || defaultFactoryId);
+  const [processedAt, setProcessedAt] = useState(initial?.processedAt || today);
+  const [dest, setDest] = useState(
+    String(initial?.devicesDestroyed ?? (seedHints?.reduce((s, m) => s + (m.qty || 0), 0) || invoiceQty || 0)),
+  );
+  const [vehicleIds, setVehicleIds] = useState<string[]>(() =>
+    initial?.vehicleIds?.length ? initial.vehicleIds : vehicles.map((v) => v.id),
+  );
   const [categories, setCategories] = useState<CategorySummary[]>([]);
-  const [rows, setRows] = useState<SplitRow[]>([{ entryId: '', kg: String(target || ''), hint: seedHints?.[0]?.name }]);
-  const [recovery, setRecovery] = useState<Record<string, Recovery>>({});
+  const [rows, setRows] = useState<SplitRow[]>(() =>
+    initial?.categories?.length
+      ? initial.categories.map((c) => ({ entryId: c.entryId, kg: String(c.weightKg) }))
+      : [{ entryId: '', kg: String(target || ''), hint: seedHints?.[0]?.name }],
+  );
+  const [recovery, setRecovery] = useState<Record<string, Recovery>>(() => {
+    const out: Record<string, Recovery> = {};
+    for (const c of initial?.categories ?? []) {
+      out[c.entryId] = {
+        fe: c.recoveryFe ?? 0,
+        nfe: c.recoveryNfe ?? 0,
+        pl: c.recoveryPl ?? 0,
+        pcb: c.recoveryPcb ?? 0,
+      };
+    }
+    return out;
+  });
   const [overrideReason, setOverrideReason] = useState('');
-  const [photoIds, setPhotoIds] = useState<string[]>([]);
-  const [reportIds, setReportIds] = useState<string[]>([]);
+  const [photoIds, setPhotoIds] = useState<string[]>(initial?.photoIds ?? []);
+  const [reportIds, setReportIds] = useState<string[]>(initial?.reportIds ?? []);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -84,6 +121,11 @@ export function RecyclingForm({
       const first = cats[0]?.entryId ?? '';
       setRows((prev) => {
         if (!first) return prev;
+        if (prev.some((r) => r.entryId)) {
+          return prev.map((r) =>
+            r.entryId && cats.some((c) => c.entryId === r.entryId) ? r : { ...r, entryId: first },
+          );
+        }
         if (prev.length === 1 && !prev[0].entryId) {
           return [{ ...prev[0], entryId: first, kg: prev[0].kg || String(target || '') }];
         }

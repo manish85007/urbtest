@@ -4,6 +4,7 @@ import {
   getPayStatus,
   invoiceDue,
   paymentTermsLabel,
+  settledPaise,
   type PayStatusKey,
 } from '@urb-tectrack/shared';
 import {
@@ -79,7 +80,7 @@ export function InvoiceLifecyclePanel({
     if (ok !== false) setPanel(null);
   }
 
-  const paidPaise = invoice.payments.reduce((s, p) => s + asPaise(p.amountPaise), 0n);
+  const paidPaise = settledPaise(invoice.payments);
   const totalPaise = asPaise(invoice.totalPaise);
   const taxablePaise = asPaise(invoice.taxablePaise);
   const taxPaise = asPaise(invoice.taxPaise);
@@ -97,6 +98,7 @@ export function InvoiceLifecyclePanel({
   const vehicleNet = Number(invoice.vehicleNetKg ?? 0);
   const canCreateMrn = isFactory && !invoice.mrn && !invoice.closedAt;
   const canCreateForm6 = isFactory && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
+  const canEditForm6 = isFactory && !!invoice.recycling && !invoice.closedAt;
   const canUploadCod = isAdmin && !!invoice.recycling && !invoice.closedAt;
   const panelId =
     section === 'recycling' ? `inv-${invoice.id}-recy` : section === 'close' ? `inv-${invoice.id}-close` : `inv-${invoice.id}`;
@@ -313,18 +315,20 @@ export function InvoiceLifecyclePanel({
             <div className="tw">
               <table>
                 <thead>
-                  <tr>
-                    <th>UTR / Ref</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Mode</th>
-                  </tr>
+                <tr>
+                  <th>UTR / Ref</th>
+                  <th>Amount</th>
+                  <th>TDS</th>
+                  <th>Date</th>
+                  <th>Mode</th>
+                </tr>
                 </thead>
                 <tbody>
                   {invoice.payments.map((p, i) => (
                     <tr key={p.id ?? `${p.utr}-${i}`}>
                       <td className="mono">{p.utr || '—'}</td>
                       <td className="mono">{formatINR(Number(asPaise(p.amountPaise)))}</td>
+                      <td className="mono">{Number(asPaise(p.tdsPaise)) ? formatINR(Number(asPaise(p.tdsPaise))) : '—'}</td>
                       <td className="dim">{fmtDate(p.paidAt)}</td>
                       <td>{lookupLabel(paymentModes, p.mode)}</td>
                     </tr>
@@ -350,8 +354,10 @@ export function InvoiceLifecyclePanel({
             <RecyclingCard
               invoice={invoice}
               canCreate={canCreateForm6}
+              canEdit={canEditForm6}
               isStaff={isStaff}
               onCreateClick={() => setPanel('recy')}
+              onEditClick={() => setPanel('recy')}
             />
             {invoice.recycling ? (
               <div className="card" style={{ marginBottom: '.6rem' }}>
@@ -401,7 +407,7 @@ export function InvoiceLifecyclePanel({
               </div>
             )}
             {isStaff && invoice.recycling ? (
-              <SerialPanel invoice={invoice} disabled={disabled} onAction={onAction} />
+              <SerialPanel invoice={invoice} disabled={disabled || !!invoice.closedAt} onAction={onAction} />
             ) : null}
           </>
         )
@@ -486,16 +492,16 @@ export function InvoiceLifecyclePanel({
 
       {panel === 'recy' ? (
         <Modal
-          title={`Process Invoice — ${invoice.invoiceNo}`}
+          title={`${invoice.recycling ? 'Edit Form 6' : 'Process Invoice'} — ${invoice.invoiceNo}`}
           onClose={() => setPanel(null)}
-          okLabel="Issue Form 6"
+          okLabel={invoice.recycling ? 'Save Form 6' : 'Issue Form 6'}
           form="recy-form"
           busy={disabled}
           wide
         >
           <RecyclingForm
             formId="recy-form"
-            defaultFactoryId={invoice.mrn?.factoryId ?? 'URB-BLR'}
+            defaultFactoryId={invoice.recycling?.factoryId || invoice.mrn?.factoryId || 'URB-BLR'}
             invoiceNo={invoice.invoiceNo}
             billingWeight={Number(invoice.billingWeight)}
             invoiceQty={
@@ -504,6 +510,27 @@ export function InvoiceLifecyclePanel({
             }
             ewayBillNo={invoice.ewayBillNo}
             vehicles={covered}
+            initial={
+              invoice.recycling
+                ? {
+                    processedAt: invoice.recycling.processedAt?.slice(0, 10),
+                    factoryId: invoice.recycling.factoryId,
+                    devicesDestroyed: invoice.recycling.devicesDestroyed,
+                    vehicleIds: invoice.recycling.vehicleIds,
+                    photoIds: invoice.recycling.photoIds,
+                    reportIds: invoice.recycling.reportIds,
+                    categories: (invoice.recycling.categories ?? []).map((c) => ({
+                      entryId: c.entryId,
+                      groupCode: c.groupCode,
+                      weightKg: Number(c.weightKg),
+                      recoveryFe: Number(c.recoveryFe ?? 0),
+                      recoveryNfe: Number(c.recoveryNfe ?? 0),
+                      recoveryPl: Number(c.recoveryPl ?? 0),
+                      recoveryPcb: Number(c.recoveryPcb ?? 0),
+                    })),
+                  }
+                : undefined
+            }
             seedHints={
               invoice.mrn?.materials?.length
                 ? invoice.mrn.materials.map((m) => ({
@@ -518,7 +545,11 @@ export function InvoiceLifecyclePanel({
                   }))
             }
             disabled={disabled}
-            onSubmit={(body) => run(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')}
+            onSubmit={(body) =>
+              invoice.recycling
+                ? run(() => lifecycleApi.updateRecycling(invoice.id, body), 'Form 6 updated.')
+                : run(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')
+            }
           />
         </Modal>
       ) : null}
@@ -794,13 +825,17 @@ function MrnCard({
 function RecyclingCard({
   invoice,
   canCreate,
+  canEdit,
   isStaff,
   onCreateClick,
+  onEditClick,
 }: {
   invoice: InvoiceDetail;
   canCreate: boolean;
+  canEdit?: boolean;
   isStaff: boolean;
   onCreateClick: () => void;
+  onEditClick?: () => void;
 }) {
   const r = invoice.recycling;
   const cats = r?.categories ?? [];
@@ -829,9 +864,16 @@ function RecyclingCard({
       }
       actions={
         r ? (
-          <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
-            ⬇ Form 6
-          </a>
+          <>
+            {canEdit ? (
+              <button type="button" className="btn bs bsm" onClick={onEditClick}>
+                Edit Form 6
+              </button>
+            ) : null}
+            <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
+              ⬇ Form 6
+            </a>
+          </>
         ) : null
       }
     >
@@ -1064,13 +1106,20 @@ function PaymentForm({
   formId?: string;
   amountDue: number;
   disabled: boolean;
-  onSubmit: (body: { utr: string; amount: number; paidAt: string; mode: string }) => void;
+  onSubmit: (body: { utr: string; amount: number; tdsAmount: number; paidAt: string; mode: string }) => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const todayYmd = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   const paymentModes = useLookups('paymentMode');
   const [utr, setUtr] = useState('');
   const [amount, setAmount] = useState(String(amountDue));
+  const [tdsAmount, setTdsAmount] = useState('0');
+  const [paidAt, setPaidAt] = useState(todayYmd);
   const [mode, setMode] = useState('PM1');
+  const received = Number(amount) || 0;
+  const tds = Number(tdsAmount) || 0;
+  const settled = received + tds;
 
   return (
     <form
@@ -1078,30 +1127,44 @@ function PaymentForm({
       className="sub-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ utr, amount: Number(amount), paidAt: today, mode });
+        onSubmit({ utr, amount: received, tdsAmount: tds, paidAt, mode });
       }}
     >
       <h3>Record payment</h3>
+      <div className="fr2">
+        <label>
+          Payment date
+          <input type="date" value={paidAt} max={todayYmd} onChange={(e) => setPaidAt(e.target.value)} required />
+        </label>
+        <label>
+          Payment mode
+          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+            {paymentModes.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       <div className="fr2">
         <label>
           UTR / reference
           <input value={utr} onChange={(e) => setUtr(e.target.value)} required />
         </label>
         <label>
-          Amount (₹)
+          Amount received (₹)
           <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </label>
       </div>
       <label>
-        Payment mode
-        <select value={mode} onChange={(e) => setMode(e.target.value)}>
-          {paymentModes.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        TDS deducted (₹)
+        <input type="number" step="0.01" min="0" value={tdsAmount} onChange={(e) => setTdsAmount(e.target.value)} />
       </label>
+      <div className="dim" style={{ fontSize: '.78rem' }}>
+        Outstanding on this invoice: {formatINR(amountDue * 100)}. Settled this entry: {formatINR(settled * 100)}{' '}
+        (amount received + TDS). Payment or TDS can be recorded first.
+      </div>
       {formId ? null : (
         <button type="submit" className="btn primary" disabled={disabled}>
           Record payment

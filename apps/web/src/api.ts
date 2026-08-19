@@ -437,6 +437,7 @@ export interface InvoiceDetail {
   payments: Array<{
     id?: string;
     amountPaise: string;
+    tdsPaise?: string;
     utr?: string;
     paidAt?: string;
     mode?: string;
@@ -743,6 +744,11 @@ export const dataApi = {
     api<RegisterReport>(
       `/reports/register/${type}${qs({ ...(period ?? {}), clientId: scope?.clientId, siteId: scope?.siteId })}`,
     ),
+  shareImpact: (body: { clientId: string } & PeriodQuery) =>
+    api<{ sent: number; recipients: string[]; clientName: string }>('/reports/impact/share', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   lookups: (category: string, includeInactive = false) =>
     api<LookupRow[]>(
       `/lookups/${category}${includeInactive ? '?includeInactive=1' : ''}`,
@@ -1183,7 +1189,10 @@ export const lifecycleApi = {
   deleteInvoice: (invoiceId: string) =>
     api<{ submission: SubmissionDetail }>(`/invoices/${invoiceId}`, { method: 'DELETE' }),
 
-  addPayment: (invoiceId: string, body: { utr: string; amount: number; paidAt: string; mode: string }) =>
+  addPayment: (
+    invoiceId: string,
+    body: { utr: string; amount: number; tdsAmount?: number; paidAt: string; mode: string },
+  ) =>
     api<unknown>(`/invoices/${invoiceId}/payments`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -1252,6 +1261,32 @@ export const lifecycleApi = {
   ) =>
     api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {
       method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateRecycling: (
+    invoiceId: string,
+    body: {
+      processedAt: string;
+      factoryId?: string;
+      devicesDestroyed?: number;
+      categories: Array<{
+        entryId: string;
+        groupCode: string;
+        weightKg: number;
+        recoveryFe?: number;
+        recoveryNfe?: number;
+        recoveryPl?: number;
+        recoveryPcb?: number;
+        overrideReason?: string;
+      }>;
+      photoIds?: string[];
+      reportIds?: string[];
+      vehicleIds?: string[];
+    },
+  ) =>
+    api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     }),
 

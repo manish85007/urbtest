@@ -15,6 +15,7 @@ test.describe('full lifecycle', () => {
     await login(page, 'ramesh@techcorp.in');
     await page.getByRole('link', { name: /New request/i }).click();
     await expect(page.getByRole('heading', { name: 'New Collection Request' })).toBeVisible();
+    await expect(page.getByLabel('Pick Up Request Date')).toBeVisible();
     await page.getByLabel('Pickup Location').fill(`E2E bay ${uniq}`);
     await page.getByLabel('Approx. Weight (kg)').fill('75');
     await page.getByLabel('Approx. Quantity (units)').fill('12');
@@ -87,6 +88,7 @@ test.describe('full lifecycle', () => {
     await expect(page.locator('#recy-form select.rc-c')).not.toHaveValue('', { timeout: 15_000 });
     await page.locator('.modal').getByRole('button', { name: 'Issue Form 6' }).click();
     await expect(page.getByText('Recycling recorded.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Edit Form 6' })).toBeVisible();
 
     await logout(page);
 
@@ -102,6 +104,8 @@ test.describe('full lifecycle', () => {
     await expect(page.getByText('Certificate uploaded.')).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole('button', { name: '+ Record Payment' }).click();
+    await expect(page.getByLabel('Payment date')).toBeVisible();
+    await expect(page.getByLabel('TDS deducted (₹)')).toBeVisible();
     await page.getByLabel('UTR / reference').fill(`UTR-E2E-${uniq}`);
     await page.locator('.modal').getByRole('button', { name: 'Record payment' }).click();
     await expect(page.getByText('Payment recorded.')).toBeVisible({ timeout: 10_000 });
@@ -115,6 +119,11 @@ test.describe('full lifecycle', () => {
     await page.locator('.modal').getByRole('button', { name: 'Acknowledge closure' }).click();
     await expect(page.getByText('Invoice closed.')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.ok-msg.sm')).toContainText('Closed');
+
+    await logout(page);
+    await login(page, 'blr@urbeno.in');
+    await page.goto(`/requests/${submissionId}`);
+    await expect(page.getByRole('button', { name: 'Edit Form 6' })).toHaveCount(0);
   });
 
   test('reject and client resubmit loop', async ({ page }) => {

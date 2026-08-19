@@ -1,14 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SUSTAINABILITY } from '@urb-tectrack/shared';
-import { dataApi, filesApi, type ClientDashboardReport, type PeriodQuery, type RegisterReport } from '../api';
+import {
+  dataApi,
+  filesApi,
+  type ClientDashboardReport,
+  type PeriodQuery,
+  type RegisterReport,
+  type SessionUser,
+} from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
 
-export function ImpactPage() {
+function periodQs(period: PeriodQuery) {
+  return `period=${encodeURIComponent(period.period ?? 'fy')}&fy=${encodeURIComponent(period.fy ?? '')}&year=${encodeURIComponent(period.year ?? '')}&from=${encodeURIComponent(period.from ?? '')}&to=${encodeURIComponent(period.to ?? '')}`;
+}
+
+export function ImpactPage({ user }: { user?: SessionUser }) {
   const [report, setReport] = useState<ClientDashboardReport | null>(null);
   const [staffReport, setStaffReport] = useState<RegisterReport | null>(null);
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busyId, setBusyId] = useState('');
   const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     setError('');
@@ -18,8 +32,7 @@ export function ImpactPage() {
         if (r.kind === 'client') {
           setReport(r);
           setStaffReport(null);
-        }
-        else {
+        } else {
           setReport(null);
           setStaffReport(await dataApi.register('sustain', period));
         }
@@ -27,33 +40,105 @@ export function ImpactPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
   }, [period.period, period.fy, period.year, period.from, period.to]);
 
-  if (error) return <p className="error">{error}</p>;
+  const totals = useMemo(() => {
+    if (!staffReport?.rows.length) return null;
+    const kgIdx = staffReport.head.findIndex((h) => /net kg/i.test(h));
+    const co2Idx = staffReport.head.findIndex((h) => /co2/i.test(h));
+    const invIdx = staffReport.head.findIndex((h) => /invoice/i.test(h));
+    const sum = (idx: number) =>
+      idx < 0 ? 0 : staffReport.rows.reduce((s, row) => s + (Number(row[idx]) || 0), 0);
+    return {
+      kg: sum(kgIdx),
+      co2: sum(co2Idx),
+      invoices: sum(invIdx),
+      clients: staffReport.rows.length,
+    };
+  }, [staffReport]);
+
+  async function share(clientName: string, clientId?: string) {
+    if (!clientId) return;
+    setBusyId(clientId);
+    setError('');
+    setMsg('');
+    try {
+      const res = await dataApi.shareImpact({ clientId, ...period });
+      setMsg(`Shared ${res.clientName} impact with ${res.sent} recipient${res.sent === 1 ? '' : 's'}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Could not share ${clientName}`);
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  if (error && !staffReport && !report) return <p className="error">{error}</p>;
   if (!report && !staffReport) return <p className="muted">Loading sustainability impact…</p>;
 
   if (staffReport) {
+    const qs = periodQs(period);
+    const idIdx = staffReport.head.findIndex((h) => h === 'Client ID');
+    const nameIdx = staffReport.head.findIndex((h) => h === 'Client');
     return (
       <div>
         <div className="f-row" style={{ marginBottom: '.9rem' }}>
           <div>
             <div className="h1">Sustainability</div>
             <div className="p-mu" style={{ margin: 0 }}>
-              {staffReport.periodLabel} · portfolio sustainability summary for Urbeno operations
+              {staffReport.periodLabel} · overall and client-wise closed-lifecycle impact
             </div>
           </div>
           <div className="spacer" />
           <PeriodPicker value={period} onChange={setPeriod} />
           <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
-            📄 How these numbers are built
+            📄 Methodology
+          </a>
+          <a className="btn bs" href={filesApi.pdf(`/reports/impact.pdf?${qs}`)} target="_blank" rel="noreferrer">
+            Portfolio PDF
           </a>
           <Link to="/heroes" className="btn bp">
             Recycle Heroes →
           </Link>
         </div>
+        {msg ? <p className="ok-msg">{msg}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
+
+        {totals ? (
+          <div className="stats">
+            <div className="stat">
+              <div className="stat-l">Clients with closed work</div>
+              <div className="stat-v">{totals.clients}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-l">Weight recycled</div>
+              <div className="stat-v">{totals.kg.toLocaleString()}</div>
+              <div className="stat-t">kg billed and closed</div>
+            </div>
+            <div className="stat" style={{ background: 'linear-gradient(135deg,#dbeafe,#eff6ff)', borderColor: '#93c5fd' }}>
+              <div className="stat-l" style={{ color: '#1e40af' }}>
+                CO₂e avoided
+              </div>
+              <div className="stat-v" style={{ color: '#1e3a8a' }}>
+                {totals.co2.toFixed(0)}
+              </div>
+              <div className="stat-t">kg</div>
+            </div>
+            <div className="stat">
+              <div className="stat-l">Closed invoices</div>
+              <div className="stat-v">{totals.invoices}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="card">
+            <p className="dim" style={{ margin: 0 }}>
+              No closed requests in this period yet. Sustainability figures only count requests the client has
+              acknowledged closed.
+            </p>
+          </div>
+        )}
 
         <div className="card">
-          <div className="section-hd">{staffReport.description}</div>
+          <div className="section-hd">Client-wise review</div>
           <p className="dim" style={{ fontSize: '.82rem' }}>
-            Scope: {staffReport.scopeLabel}
+            Scope: {staffReport.scopeLabel}. Generate a client PDF or email it to that organisation’s portal users.
           </p>
           <div className="tw" style={{ marginTop: '.6rem' }}>
             <table>
@@ -62,16 +147,43 @@ export function ImpactPage() {
                   {staffReport.head.map((head) => (
                     <th key={head}>{head}</th>
                   ))}
+                  {isAdmin ? <th></th> : null}
                 </tr>
               </thead>
               <tbody>
-                {staffReport.rows.map((row, idx) => (
-                  <tr key={idx}>
-                    {row.map((cell, cellIdx) => (
-                      <td key={cellIdx}>{cell}</td>
-                    ))}
-                  </tr>
-                ))}
+                {staffReport.rows.map((row, idx) => {
+                  const clientId = String(row[idIdx] ?? '');
+                  const name = String(row[nameIdx] ?? clientId);
+                  return (
+                    <tr key={idx}>
+                      {row.map((cell, cellIdx) => (
+                        <td key={cellIdx}>{cell}</td>
+                      ))}
+                      {isAdmin ? (
+                        <td>
+                          <div className="frow" style={{ flexWrap: 'nowrap' }}>
+                            <a
+                              className="btn bs bsm"
+                              href={filesApi.pdf(`/reports/impact.pdf?${qs}&clientId=${encodeURIComponent(clientId)}`)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              PDF
+                            </a>
+                            <button
+                              type="button"
+                              className="btn bp bsm"
+                              disabled={!!busyId}
+                              onClick={() => void share(name, clientId)}
+                            >
+                              {busyId === clientId ? 'Sharing…' : 'Share'}
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -82,6 +194,7 @@ export function ImpactPage() {
 
   if (!report) return <p className="muted">Loading sustainability impact…</p>;
   const { impact } = report;
+  const qs = periodQs(period);
 
   return (
     <div>
@@ -97,14 +210,7 @@ export function ImpactPage() {
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
           📄 How these numbers are built
         </a>
-        <a
-          className="btn bs"
-          href={filesApi.pdf(
-            `/reports/impact.pdf?period=${encodeURIComponent(period.period ?? 'fy')}&fy=${encodeURIComponent(period.fy ?? '')}&year=${encodeURIComponent(period.year ?? '')}&from=${encodeURIComponent(period.from ?? '')}&to=${encodeURIComponent(period.to ?? '')}`,
-          )}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a className="btn bs" href={filesApi.pdf(`/reports/impact.pdf?${qs}`)} target="_blank" rel="noreferrer">
           Impact PDF
         </a>
         <Link to="/heroes" className="btn bp">

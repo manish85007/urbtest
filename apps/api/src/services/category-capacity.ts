@@ -34,8 +34,14 @@ export async function assertCategoryCapacityOrOverride(input: {
   capacityTpa: number;
   processedAt: Date;
   overrideReason?: string | null;
+  excludeRecyclingId?: string;
 }) {
-  const usedKg = await getCategoryUsedKg(input.factoryId, input.entryId, input.processedAt);
+  const usedKg = await getCategoryUsedKg(
+    input.factoryId,
+    input.entryId,
+    input.processedAt,
+    input.excludeRecyclingId,
+  );
   const check = {
     ...checkCategoryCapacity(usedKg, input.addKg, Number(input.capacityTpa)),
     entryId: input.entryId,
