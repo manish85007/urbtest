@@ -26,19 +26,27 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
 
   useEffect(() => {
     setError('');
+    const isStaff = user?.role === 'admin' || user?.role === 'factory';
+    if (isStaff) {
+      dataApi
+        .register('sustain', period)
+        .then((r) => {
+          setReport(null);
+          setStaffReport(r);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
+      return;
+    }
     dataApi
       .reportsDashboard(undefined, period)
-      .then(async (r) => {
+      .then((r) => {
         if (r.kind === 'client') {
           setReport(r);
           setStaffReport(null);
-        } else {
-          setReport(null);
-          setStaffReport(await dataApi.register('sustain', period));
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
-  }, [period.period, period.fy, period.year, period.from, period.to]);
+  }, [period.period, period.fy, period.year, period.from, period.to, user?.role]);
 
   const totals = useMemo(() => {
     if (!staffReport?.rows.length) return null;

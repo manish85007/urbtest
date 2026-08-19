@@ -6,6 +6,7 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -55,6 +56,16 @@ export class UrbTecTrackUatStack extends cdk.Stack {
       deleteAutomatedBackups: true,
     });
 
+    const sessionSecret = new secretsmanager.Secret(this, 'SessionSecret', {
+      description: 'Urb TecTrack UAT session signing key',
+      generateSecretString: {
+        secretStringTemplate: '{}',
+        generateStringKey: 'secret',
+        passwordLength: 64,
+        excludePunctuation: true,
+      },
+    });
+
     const cluster = new ecs.Cluster(this, 'Cluster', { vpc, containerInsights: false });
 
     const service = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'App', {
@@ -81,7 +92,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
           logRetention: logs.RetentionDays.TWO_WEEKS,
         }),
         environment: {
-          NODE_ENV: 'production',
+          NODE_ENV: 'uat',
           API_HOST: '0.0.0.0',
           API_PORT: '3001',
           WEB_DIST: '/app/apps/web/dist',
@@ -96,6 +107,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
         },
         secrets: {
           DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(db.secret!, 'password'),
+          SESSION_SECRET: ecs.Secret.fromSecretsManager(sessionSecret, 'secret'),
         },
       },
     });

@@ -4,19 +4,22 @@ await initSentry(); // must run before buildApp so Fastify integrations are capt
 import { buildApp } from './app.js';
 import { disconnectDb } from './lib/prisma.js';
 
-// ── Production safety guards ──────────────────────────────────────────────────
-const isProd = process.env.NODE_ENV === 'production';
+// ── Production / UAT safety guards ───────────────────────────────────────────
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+const isProd = nodeEnv === 'production';
+const isUat = nodeEnv === 'uat';
+const requiresSessionSecret = isProd || isUat;
 
 const SESSION_SECRET = process.env.SESSION_SECRET ?? '';
-if (isProd && SESSION_SECRET.length < 32) {
+if (requiresSessionSecret && SESSION_SECRET.length < 32) {
   console.error(
     '[FATAL] SESSION_SECRET is missing or too short (need ≥ 32 chars). ' +
-      'Set it via environment injection before starting in production.',
+      'Set it via environment injection before starting in production/UAT.',
   );
   process.exit(1);
 }
 
-if (isProd && SESSION_SECRET === 'change-me-in-production-use-32-chars-min') {
+if (requiresSessionSecret && SESSION_SECRET === 'change-me-in-production-use-32-chars-min') {
   console.error(
     '[FATAL] SESSION_SECRET is still set to the default placeholder. ' +
       'Generate a secure random value (e.g. openssl rand -hex 32) and inject it at runtime.',
@@ -31,10 +34,11 @@ if (isProd && !process.env.CORS_ORIGIN) {
   );
 }
 
+// UAT seeding is allowed only outside strict production.
 if (isProd && process.env.UAT_SEED === 'true') {
   console.error(
     '[FATAL] UAT_SEED=true is set in a production environment. ' +
-      'This would overwrite production data. Remove UAT_SEED or set it to false.',
+      'This would overwrite production data. Remove UAT_SEED or set NODE_ENV=uat.',
   );
   process.exit(1);
 }
