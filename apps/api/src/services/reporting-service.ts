@@ -362,7 +362,11 @@ export async function getImpactReport(
   const now = new Date();
   const sites = (client?.sites ?? []).map((st) => {
     const ss = allSubs.filter((s) => s.siteId === st.id);
+    // Only consider vehicles from open submissions for "Next Pickup".
+    // Otherwise closed requests with stale future `expectedAt` values will
+    // incorrectly show up as upcoming pickups.
     const next = ss
+      .filter((s) => !s.closedAt)
       .flatMap((s) => s.vehicles.map((v) => v.expectedAt).filter((d): d is Date => !!d))
       .filter((d) => d > now)
       .sort((a, b) => a.getTime() - b.getTime())[0];
