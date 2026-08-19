@@ -21,7 +21,19 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary] Uncaught render error:', error, info.componentStack);
-    // If Sentry is configured it will be captured automatically via the global handler.
+    // Explicitly forward to Sentry if installed — React render errors don't always
+    // reach window.onerror so the global handler may miss them.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const Sentry = (window as any).__SENTRY__;
+      if (Sentry?.getCurrentHub) {
+        import('@sentry/react' as any)
+          .then((S: any) => S.captureException(error, { extra: { componentStack: info.componentStack } }))
+          .catch(() => {});
+      }
+    } catch {
+      // Never let error reporting crash the boundary itself
+    }
   }
 
   render() {

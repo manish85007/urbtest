@@ -28,6 +28,7 @@ services:
       DATABASE_USER: tectrack
       DATABASE_PASSWORD: tectrack_uat
       DATABASE_NAME: tectrack
+      SESSION_SECRET: "urb-tectrack-uat-session-secret-change-for-staging"
       UAT_SEED: "true"
       COOKIE_SECURE: "false"
       EMAIL_PROVIDER: console

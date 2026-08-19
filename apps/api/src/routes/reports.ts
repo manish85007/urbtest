@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseReportPeriod } from '@urb-tectrack/shared';
 import { attachSession, requireAuth } from '../middleware/session.js';
+import { hasFeature } from '../lib/auth-context.js';
 import {
   getCapacityReport,
   getHeroesReport,
@@ -158,6 +159,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   });
 
   app.get('/invoices/:id/mrn.pdf', { preHandler: requireAuth }, async (request, reply) => {
+    if (!hasFeature(request.user!, 'reports.mrn')) return reply.forbidden('You do not have access to MRN PDFs.');
     try {
       const { id } = request.params as { id: string };
       const { filename, buffer } = await mrnPdf(request.user!, id);
@@ -171,6 +173,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   });
 
   app.get('/invoices/:id/form6.pdf', { preHandler: requireAuth }, async (request, reply) => {
+    if (!hasFeature(request.user!, 'reports.form6')) return reply.forbidden('You do not have access to Form 6 PDFs.');
     try {
       const { id } = request.params as { id: string };
       const { filename, buffer } = await form6Pdf(request.user!, id);
@@ -184,6 +187,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   });
 
   app.get('/reports/impact.pdf', { preHandler: requireAuth }, async (request, reply) => {
+    if (!hasFeature(request.user!, 'reports.sustain')) return reply.forbidden('You do not have access to the impact report.');
     try {
       const q = request.query as Record<string, unknown>;
       const clientId = typeof q.clientId === 'string' && q.clientId ? q.clientId : undefined;
