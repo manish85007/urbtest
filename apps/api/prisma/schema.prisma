@@ -182,6 +182,7 @@ model Submission {
   bomFileIds   String[]  @default([]) @map("bom_file_ids")
   notes        String?
   createdBy    String    @map("created_by")
+  onBehalfOf   String?   @map("on_behalf_of")
   createdAt    DateTime  @default(now()) @map("created_at")
   acknowledgedAt DateTime? @map("acknowledged_at")
   acknowledgedBy String? @map("acknowledged_by")

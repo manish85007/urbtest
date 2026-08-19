@@ -74,6 +74,7 @@ const createSubmissionSchema = z.object({
   bomFileIds: z.array(z.string()).optional(),
   notes: z.string().optional(),
   items: z.array(lineItemSchema).optional(),
+  onBehalfOf: z.string().email().optional(),
 });
 
 const vehicleSchema = z.object({

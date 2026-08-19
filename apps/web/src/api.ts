@@ -462,6 +462,7 @@ export interface SubmissionDetail {
   rejectNote?: string | null;
   rejectAt?: string | null;
   createdBy: string;
+  onBehalfOf?: string | null;
   createdAt?: string;
   acknowledgedAt: string | null;
   acknowledgedBy?: string | null;
@@ -1055,6 +1056,7 @@ export const lifecycleApi = {
     bomFileId?: string;
     bomFileIds?: string[];
     items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
+    onBehalfOf?: string;
   }) => api<SubmissionDetail>('/submissions', { method: 'POST', body: JSON.stringify(body) }),
 
   acknowledge: (id: string) =>

@@ -472,7 +472,18 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               </div>
               <div className="tile">
                 <div className="tile-l">Requestor</div>
-                <div className="tile-v">{sub.createdBy}</div>
+                <div className="tile-v">
+                  {sub.onBehalfOf ? (
+                    <>
+                      <span>{sub.onBehalfOf}</span>
+                      <div style={{ fontSize: '.72rem', color: 'var(--g2)', marginTop: '.1rem' }}>
+                        via {sub.createdBy}
+                      </div>
+                    </>
+                  ) : (
+                    sub.createdBy
+                  )}
+                </div>
               </div>
             </div>
             {sub.notes ? (
@@ -674,7 +685,18 @@ function RequestCard({
         </div>
         <div className="tile">
           <div className="tile-l">Raised By</div>
-          <div className="tile-v">{sub.createdBy}</div>
+          <div className="tile-v">
+            {sub.onBehalfOf ? (
+              <>
+                <span>{sub.onBehalfOf}</span>
+                <div style={{ fontSize: '.72rem', color: 'var(--g2)', marginTop: '.1rem' }}>
+                  via {sub.createdBy}
+                </div>
+              </>
+            ) : (
+              sub.createdBy
+            )}
+          </div>
         </div>
       </div>
       {sub.notes ? (

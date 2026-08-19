@@ -22,6 +22,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   const [qtyTouched, setQtyTouched] = useState(false);
   const [wtTouched, setWtTouched] = useState(false);
   const [notes, setNotes] = useState('');
+  const [onBehalfOf, setOnBehalfOf] = useState('');
   const [bomIds, setBomIds] = useState<string[]>([]);
   const [items, setItems] = useState<DraftLine[]>([{ ...EMPTY_LINE }]);
   const [error, setError] = useState('');
@@ -86,6 +87,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
         bomFileId: bomIds[0],
         bomFileIds: bomIds,
         items: named,
+        onBehalfOf: onBehalfOf.trim() || undefined,
       });
       nav(`/requests/${sub.id}`);
     } catch (err) {
@@ -111,16 +113,31 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
       </p>
       <form id="new-request-form" className="sub-form" onSubmit={submit}>
         {user.role !== 'client' ? (
-          <div className="fg">
-            <label htmlFor="ns-cid">Client *</label>
-            <select id="ns-cid" value={clientId} onChange={(e) => setClientId(e.target.value)} required>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.id})
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="fg">
+              <label htmlFor="ns-cid">Client *</label>
+              <select id="ns-cid" value={clientId} onChange={(e) => setClientId(e.target.value)} required>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="fg">
+              <label htmlFor="ns-behalf">
+                On Behalf Of{' '}
+                <span className="hint">client contact email — they become the requestor for this request</span>
+              </label>
+              <input
+                id="ns-behalf"
+                type="email"
+                value={onBehalfOf}
+                onChange={(e) => setOnBehalfOf(e.target.value)}
+                placeholder="ramesh@techcorp.in"
+              />
+            </div>
+          </>
         ) : null}
 
         <div className="fr2">

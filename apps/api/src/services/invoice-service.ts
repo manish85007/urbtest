@@ -1193,11 +1193,34 @@ export async function closeInvoice(
     if (actor.clientId !== invoice.submission.clientId) {
       throw new AppError('You do not have permission to close this invoice.', 403);
     }
-    const isCreator = actor.email === invoice.submission.createdBy;
-    if (!isCreator && daysSinceCert < 30) {
-      throw new AppError(
-        'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
-      );
+    // Determine the effective requestor:
+    // - If onBehalfOf is set, that email is the designated requestor (admin raised on their behalf).
+    // - Otherwise check if createdBy is actually a client-role user.
+    // When admin raised the request (no client creator), any client user of that client may close immediately.
+    const effectiveRequestor = invoice.submission.onBehalfOf ?? null;
+    if (effectiveRequestor) {
+      // onBehalfOf designates the requestor — they may close any time; others must wait 30 days
+      const isCreator = actor.email === effectiveRequestor;
+      if (!isCreator && daysSinceCert < 30) {
+        throw new AppError(
+          'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
+        );
+      }
+    } else {
+      const creatorUser = await prisma.user.findUnique({
+        where: { email: invoice.submission.createdBy },
+        select: { role: true },
+      });
+      const raisedByClient = creatorUser?.role === 'client';
+      if (raisedByClient) {
+        const isCreator = actor.email === invoice.submission.createdBy;
+        if (!isCreator && daysSinceCert < 30) {
+          throw new AppError(
+            'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
+          );
+        }
+      }
+      // If raised by admin with no onBehalfOf, any client user of that client may close immediately.
     }
   } else {
     throw new AppError('Only the client requestor may close this invoice.', 403);

@@ -34,6 +34,7 @@ export interface CreateSubmissionInput {
   bomFileIds?: string[];
   notes?: string;
   items?: SubmissionLineInput[];
+  onBehalfOf?: string;
 }
 
 function bomIdsFrom(input: { bomFileId?: string | null; bomFileIds?: string[] | null }) {
@@ -118,6 +119,9 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
       bomFileIds: bomIds,
       notes: input.notes?.trim() || null,
       createdBy: actor.email,
+      onBehalfOf: actor.role !== 'client' && input.onBehalfOf?.trim()
+        ? input.onBehalfOf.trim().toLowerCase()
+        : null,
       items: {
         create: lines.map((line, i) => ({
           name: line.name,
