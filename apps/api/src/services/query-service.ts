@@ -2,12 +2,15 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { isStaff } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
-import { loadSubmissionForActor } from '../lib/access.js';
+import { loadSubmissionForActor, requirePermission } from '../lib/access.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
 
 export async function raiseQuery(actor: SessionUser, submissionId: string, text: string) {
+  if (isStaff(actor)) {
+    requirePermission(actor, 'manageQueries');
+  }
   const body = text.trim();
   if (!body) throw new AppError('Type your query first.');
 
@@ -49,6 +52,9 @@ export async function raiseQuery(actor: SessionUser, submissionId: string, text:
 }
 
 export async function replyToQuery(actor: SessionUser, queryId: string, text: string) {
+  if (isStaff(actor)) {
+    requirePermission(actor, 'manageQueries');
+  }
   const body = text.trim();
   if (!body) throw new AppError('Type your reply first.');
 

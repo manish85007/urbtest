@@ -1,4 +1,5 @@
 import type { User, UserRole } from '@prisma/client';
+import { hasPermission, isStaffRole } from '@urb-tectrack/shared';
 
 export interface SessionUser {
   id: string;
@@ -26,18 +27,18 @@ export function toSessionUser(user: User): SessionUser {
 
 /** Returns true if the user has a given feature flag explicitly enabled, or if no restrictions are set (null). */
 export function hasFeature(user: SessionUser, feature: string): boolean {
-  if (user.role === 'admin') return true;
+  if (user.role === 'admin' || user.role === 'operations') return true;
   if (!user.featureAccess) return true;
   return user.featureAccess[feature] === true;
 }
 
 export function isStaff(user: SessionUser): boolean {
-  return user.role === 'admin' || user.role === 'factory';
+  return isStaffRole(user.role);
 }
 
 /** Empty factoryIds means every facility (kit: leave all unchecked). */
 export function factoryInScope(user: SessionUser, factoryId: string): boolean {
-  if (user.role === 'admin') return true;
+  if (user.role === 'admin' || user.role === 'operations') return true;
   if (user.role !== 'factory') return false;
   if (!user.factoryIds.length) return true;
   return user.factoryIds.includes(factoryId);
@@ -48,11 +49,15 @@ export function canSeeMrn(user: SessionUser): boolean {
 }
 
 export function clientScopeFilter(user: SessionUser): Record<string, unknown> {
-  if (user.role === 'admin' || user.role === 'factory') return {};
+  if (user.role === 'admin' || user.role === 'factory' || user.role === 'operations') return {};
   return {
     clientId: user.clientId ?? '__none__',
     ...(user.siteIds.length
       ? { siteId: { in: user.siteIds } }
       : {}),
   };
+}
+
+export function can(user: SessionUser, permission: Parameters<typeof hasPermission>[1]): boolean {
+  return hasPermission(user.role, permission);
 }

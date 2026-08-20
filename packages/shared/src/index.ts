@@ -15,6 +15,7 @@ export * from './category-capacity.js';
 export * from './phone.js';
 export * from './password-policy.js';
 export * from './classification.js';
+export * from './permissions.js';
 
 export const STAGES = [
   { n: 1, k: 'req', l: 'Request', ic: '📝', by: 'Client', d: 'Pickup request raised' },

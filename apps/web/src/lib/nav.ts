@@ -20,6 +20,16 @@ export function navItems(role: SessionUser['role']): NavItem[] {
       { to: '/compliance', label: 'Compliance' },
     ];
   }
+  if (role === 'operations') {
+    return [
+      { to: '/', label: 'Dashboard', match: (p) => p === '/' },
+      { to: '/requests', label: 'Requests', match: (p) => p.startsWith('/requests') },
+      { to: '/heroes', label: 'Recycle Heroes' },
+      { to: '/impact', label: 'Sustainability' },
+      { to: '/capacity', label: 'Capacity' },
+      { to: '/reports', label: 'Reports' },
+    ];
+  }
   if (role === 'factory') {
     return [
       { to: '/', label: 'Dashboard', match: (p) => p === '/' },

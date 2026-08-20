@@ -5,6 +5,8 @@ export function roleLabel(role: SessionUser['role'] | string): string {
   switch (role) {
     case 'admin':
       return 'Super Admin';
+    case 'operations':
+      return 'Operations Manager';
     case 'factory':
       return 'Factory Manager';
     case 'client':
@@ -16,6 +18,7 @@ export function roleLabel(role: SessionUser['role'] | string): string {
 
 export function portalSubtitle(role: SessionUser['role'], factoryIds: string[] = []): string {
   if (role === 'client') return 'Client portal';
+  if (role === 'operations') return 'Urbeno · Operations';
   if (role === 'factory') {
     return factoryIds.length ? `Urbeno · ${factoryIds.join(', ')}` : 'Urbeno · All facilities';
   }
@@ -23,6 +26,7 @@ export function portalSubtitle(role: SessionUser['role'], factoryIds: string[] =
 }
 
 export function dashboardTitle(role: SessionUser['role']): string {
+  if (role === 'operations') return 'Operations Dashboard';
   if (role === 'factory') return 'Factory Dashboard';
   if (role === 'admin') return 'Super Admin Dashboard';
   return 'Your Dashboard';

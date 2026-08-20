@@ -28,7 +28,7 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
 }
 
 export async function requireStaff(request: FastifyRequest, reply: FastifyReply) {
-  if (!request.user || (request.user.role !== 'admin' && request.user.role !== 'factory')) {
+  if (!request.user || (request.user.role !== 'admin' && request.user.role !== 'factory' && request.user.role !== 'operations')) {
     return reply.forbidden('Staff access required.');
   }
 }

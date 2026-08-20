@@ -11,6 +11,7 @@ import {
   type SiteSummary,
 } from '../api';
 import { downloadCsvGrid } from '../lib/csv';
+import { isStaffUser } from '../lib/permissions';
 import { PeriodPicker } from '../components/PeriodPicker';
 
 const KINDS: Array<{
@@ -39,7 +40,7 @@ interface ReportsPageProps {
 }
 
 export function ReportsPage({ user }: ReportsPageProps) {
-  const isStaff = user.role === 'admin' || user.role === 'factory';
+  const isStaff = isStaffUser(user);
   const isClient = user.role === 'client';
   const available = KINDS.filter((k) => {
     if (isClient && k.clientHidden) return false;

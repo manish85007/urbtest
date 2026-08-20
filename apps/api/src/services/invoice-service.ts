@@ -23,7 +23,7 @@ import {
   loadSubmissionForActor,
   requireAdmin,
   requireFactory,
-  requireStaff,
+  requirePermission,
   syncSubmissionClosure,
 } from '../lib/access.js';
 import { deriveInvoiceStage, deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
@@ -266,7 +266,7 @@ export async function createInvoice(
   submissionId: string,
   input: CreateInvoiceInput,
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageInvoices');
   const sub = await loadSubmissionForActor(submissionId, actor);
   if (sub.closedAt) {
     throw new AppError('This request is closed. Edits are no longer available.');
@@ -347,7 +347,7 @@ export async function createInvoice(
 }
 
 export async function updateInvoice(actor: SessionUser, invoiceId: string, input: CreateInvoiceInput) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageInvoices');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertLifecycleOpen(invoice);
   const sub = await loadSubmissionForActor(invoice.submissionId, actor);
@@ -419,7 +419,7 @@ export async function updateInvoice(actor: SessionUser, invoiceId: string, input
 }
 
 export async function deleteInvoice(actor: SessionUser, invoiceId: string) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageInvoices');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertInvoiceDeletable(invoice);
   const sub = await loadSubmissionForActor(invoice.submissionId, actor);
@@ -458,7 +458,7 @@ function assertPaymentWithinTotal(
 }
 
 export async function addPayment(actor: SessionUser, invoiceId: string, input: PaymentInput) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageInvoices');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertLifecycleOpen(invoice);
   assertNotFutureDate(input.paidAt, 'Payment date');
@@ -504,7 +504,7 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
 }
 
 export async function updatePayment(actor: SessionUser, paymentId: string, input: PaymentInput) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageInvoices');
   const existing = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: { invoice: { include: { submission: { include: { client: true, site: true, invoices: true } }, payments: true } } },
@@ -549,7 +549,7 @@ export async function updatePayment(actor: SessionUser, paymentId: string, input
 }
 
 export async function deletePayment(actor: SessionUser, paymentId: string) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageInvoices');
   const existing = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: { invoice: { include: { submission: { include: { client: true, site: true, invoices: true } }, payments: true } } },
@@ -640,6 +640,7 @@ function assertInvoiceVehiclesWeighed(invoice: Awaited<ReturnType<typeof loadInv
 }
 
 export async function createMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
+  requirePermission(actor, 'createMrn');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   requireFactory(actor, input.factoryId);
   assertLifecycleOpen(invoice);
@@ -702,7 +703,7 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
 }
 
 export async function updateMrn(actor: SessionUser, invoiceId: string, input: MrnInput) {
-  requireAdmin(actor);
+  requirePermission(actor, 'editMrn');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const existing = invoice.mrn;
   if (!existing) throw new AppError('Create the MRN before editing it.');
@@ -760,6 +761,7 @@ export async function createRecycling(
   invoiceId: string,
   input: RecyclingInput,
 ) {
+  requirePermission(actor, 'manageRecycling');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const beforeStage = deriveSubmissionStage(invoice.submission);
   assertLifecycleOpen(invoice);
@@ -934,6 +936,7 @@ export async function updateRecycling(
   invoiceId: string,
   input: RecyclingInput,
 ) {
+  requirePermission(actor, 'manageRecycling');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertLifecycleOpen(invoice);
   if (!invoice.mrn) throw new AppError('Create the MRN before recycling this invoice.');
@@ -1092,7 +1095,7 @@ export async function uploadCertificate(
   invoiceId: string,
   input: CertificateInput,
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'uploadCertificate');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertLifecycleOpen(invoice);
   const beforeStage = deriveSubmissionStage(invoice.submission);

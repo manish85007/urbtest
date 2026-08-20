@@ -22,6 +22,7 @@ import { RecyclingForm } from './RecyclingForm';
 import { CollapsibleCard } from './CollapsibleCard';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
+import { isStaffUser, userCan } from '../lib/permissions';
 
 export type InvoicePanelSection = 'invoice-mrn' | 'recycling' | 'close';
 
@@ -67,9 +68,15 @@ export function InvoiceLifecyclePanel({
   canDeleteInvoice = true,
   section = 'invoice-mrn',
 }: InvoiceLifecyclePanelProps) {
-  const isStaff = user.role === 'admin' || user.role === 'factory';
-  const isFactory = user.role === 'factory' || user.role === 'admin';
+  const isStaff = isStaffUser(user);
   const isAdmin = user.role === 'admin';
+  const perms = {
+    createMrn: userCan(user, 'createMrn'),
+    editMrn: userCan(user, 'editMrn'),
+    manageRecycling: userCan(user, 'manageRecycling'),
+    manageInvoices: userCan(user, 'manageInvoices'),
+    uploadCertificate: userCan(user, 'uploadCertificate'),
+  };
   const isClient = user.role === 'client';
   const paymentModes = useLookups('paymentMode');
   const taxRates = useLookups('taxRate');
@@ -97,10 +104,10 @@ export function InvoiceLifecyclePanel({
       : vehicles;
   const billingKg = Number(invoice.billingWeight || 0);
   const vehicleNet = Number(invoice.vehicleNetKg ?? 0);
-  const canCreateMrn = isFactory && !invoice.mrn && !invoice.closedAt;
-  const canCreateForm6 = isFactory && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
-  const canEditForm6 = isFactory && !!invoice.recycling && !invoice.closedAt;
-  const canUploadCod = isAdmin && !!invoice.recycling && !invoice.closedAt;
+  const canCreateMrn = perms.createMrn && !invoice.mrn && !invoice.closedAt;
+  const canCreateForm6 = perms.manageRecycling && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
+  const canEditForm6 = perms.manageRecycling && !!invoice.recycling && !invoice.closedAt;
+  const canUploadCod = perms.uploadCertificate && !!invoice.recycling && !invoice.closedAt;
   const panelId =
     section === 'recycling' ? `inv-${invoice.id}-recy` : section === 'close' ? `inv-${invoice.id}-close` : `inv-${invoice.id}`;
 
@@ -282,7 +289,7 @@ export function InvoiceLifecyclePanel({
             invoice={invoice}
             vehicles={covered}
             canCreate={canCreateMrn}
-            canEdit={isAdmin && !!invoice.mrn && !invoice.closedAt}
+            canEdit={perms.editMrn && !!invoice.mrn && !invoice.closedAt}
             onCreateClick={() => setPanel('mrn')}
             onEditClick={() => setPanel('mrn')}
           />
@@ -301,7 +308,7 @@ export function InvoiceLifecyclePanel({
               )
             ) : null}
             <div className="spacer" />
-            {isStaff && !invoice.closedAt ? (
+            {perms.manageInvoices && !invoice.closedAt ? (
               <button type="button" className="btn bs bsm" onClick={() => setPanel('pay')}>
                 + Record Payment
               </button>
@@ -322,7 +329,7 @@ export function InvoiceLifecyclePanel({
                   <th>TDS</th>
                   <th>Date</th>
                   <th>Mode</th>
-                  {isStaff && !invoice.closedAt ? <th></th> : null}
+                  {perms.manageInvoices && !invoice.closedAt ? <th></th> : null}
                 </tr>
                 </thead>
                 <tbody>
@@ -333,7 +340,7 @@ export function InvoiceLifecyclePanel({
                       <td className="mono">{Number(asPaise(p.tdsPaise)) ? formatINR(Number(asPaise(p.tdsPaise))) : '—'}</td>
                       <td className="dim">{fmtDate(p.paidAt)}</td>
                       <td>{lookupLabel(paymentModes, p.mode)}</td>
-                      {isStaff && !invoice.closedAt ? (
+                      {perms.manageInvoices && !invoice.closedAt ? (
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <button
                             type="button"

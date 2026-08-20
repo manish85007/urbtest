@@ -12,6 +12,7 @@ interface UsersTabProps {
 
 function scopeLabel(u: UserRow, clients: ClientSummary[], factories: FactorySummary[]) {
   if (u.role === 'admin') return 'full access';
+  if (u.role === 'operations') return 'ack · vehicles · reports';
   if (u.role === 'factory') {
     if (!u.factoryIds.length) return 'all factories';
     return u.factoryIds.map((id) => factories.find((f) => f.id === id)?.name ?? id).join(', ');
@@ -55,7 +56,7 @@ export function UsersTab({ users, clients, factories, onChanged }: UsersTabProps
                   <td className="dim">{u.email}</td>
                   <td>
                     <span
-                      className={`badge ${u.role === 'admin' ? 'bg-g' : u.role === 'factory' ? 'bg-pu' : 'bg-bl'}`}
+                      className={`badge ${u.role === 'admin' ? 'bg-g' : u.role === 'operations' ? 'bg-te' : u.role === 'factory' ? 'bg-pu' : 'bg-bl'}`}
                     >
                       {roleLabel(u.role)}
                     </span>

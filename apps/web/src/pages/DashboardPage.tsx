@@ -313,7 +313,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
         <AdminDashboard
           user={user}
           report={report}
-          variant={user.role === 'admin' ? 'admin' : 'factory'}
+          variant={user.role === 'factory' ? 'factory' : 'admin'}
         />
       ) : (
         <ClientDashboard user={user} report={report} siteId={siteId} onSite={setSiteId} />

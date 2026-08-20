@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { lifecycleApi, type QueryThread as QueryThreadType, type SessionUser } from '../api';
 import { fmtDate } from '../lib/format';
+import { isStaffUser, userCan } from '../lib/permissions';
 import { Modal } from './Modal';
 
 export function QueryThread({
@@ -20,7 +21,8 @@ export function QueryThread({
   const [openCompose, setOpenCompose] = useState(false);
   const [replyFor, setReplyFor] = useState<string | null>(null);
   const [reply, setReply] = useState('');
-  const isStaff = user.role === 'admin' || user.role === 'factory';
+  const isStaff = isStaffUser(user);
+  const canManageQueries = userCan(user, 'manageQueries');
   const openCount = queries.filter((q) => q.status === 'open').length;
   const replyTarget = queries.find((q) => q.id === replyFor);
 
@@ -48,7 +50,7 @@ export function QueryThread({
           Queries {openCount ? <span className="badge bg-rd">{openCount} open</span> : null}
         </div>
         <div className="spacer" />
-        {disabled ? null : (
+        {disabled || !canManageQueries ? null : (
           <button type="button" className="btn bs bsm" onClick={() => setOpenCompose(true)}>
             + Raise
           </button>
@@ -63,7 +65,8 @@ export function QueryThread({
           const canReply =
             !disabled &&
             q.status === 'open' &&
-            ((q.fromRole === 'client' && isStaff) || (q.fromRole === 'admin' && user.role === 'client'));
+            ((q.fromRole === 'client' && isStaff && canManageQueries) ||
+              (q.fromRole === 'admin' && user.role === 'client'));
           return (
             <div
               key={q.id}

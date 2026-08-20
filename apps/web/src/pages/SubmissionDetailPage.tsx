@@ -22,6 +22,7 @@ import { Modal } from '../components/Modal';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, fmtTS, num, todayIso } from '../lib/format';
+import { isStaffUser, userCan } from '../lib/permissions';
 
 type StepModal =
   | { kind: 'ack' }
@@ -124,8 +125,12 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
     );
   }
 
-  const isStaff = user.role === 'admin' || user.role === 'factory';
-  const isAdmin = user.role === 'admin';
+  const isStaff = isStaffUser(user);
+  const canAck = userCan(user, 'acknowledgeRequest');
+  const canReject = userCan(user, 'rejectRequest');
+  const canManageVehicles = userCan(user, 'manageVehicles');
+  const canManageInvoices = userCan(user, 'manageInvoices');
+  const canComplianceAdmin = userCan(user, 'uploadCertificate');
   const stage = sub.derivedStage;
   const phase = viewPhaseForStage(stage);
   const unweighed = sub.vehicles.filter((v) => !v.weighment);
@@ -168,17 +173,17 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         <Link to="/requests" className="btn bs">
           ← Back
         </Link>
-        {isAdmin && phase === 1 && stage === 1 ? (
+        {canAck && phase === 1 && stage === 1 ? (
           <button type="button" className="btn bp" disabled={busy} onClick={() => setStep({ kind: 'ack' })}>
             ✅ Acknowledge Request
           </button>
         ) : null}
-        {isStaff && phase === 2 && !sub.vehicles.length ? (
+        {canManageVehicles && phase === 2 && !sub.vehicles.length ? (
           <button type="button" className="btn bp" onClick={() => setStep({ kind: 'vehicle' })}>
             🚚 Assign Vehicle
           </button>
         ) : null}
-        {isAdmin && phase === 2 && unweighed.length ? (
+        {canManageVehicles && phase === 2 && unweighed.length ? (
           <button
             type="button"
             className="btn bp"
@@ -187,7 +192,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             ⚖️ Weigh ({unweighed.length} pending)
           </button>
         ) : null}
-        {isAdmin && phase === 3 && allWeighed ? (
+        {canManageInvoices && phase === 3 && allWeighed ? (
           <button type="button" className="btn bp" onClick={() => setStep({ kind: 'invoice' })}>
             {sub.invoices.length ? '🧾 Add Invoice' : '🧾 Raise Invoice'}
           </button>
@@ -239,16 +244,18 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               }
             />
 
-            {isAdmin && stage === 1 ? (
+            {(canAck || canReject) && stage === 1 ? (
               <div className="card">
                 <div className="card-ttl">Acknowledge request</div>
                 <p className="p-mu">
                   Accepting this request moves it to Vehicles & Weighment and sends an acknowledgement
                   email to the requestor.
                 </p>
-                <button type="button" className="btn ghost" disabled={busy} onClick={() => setStep({ kind: 'reject' })}>
-                  Request changes
-                </button>
+                {canReject ? (
+                  <button type="button" className="btn ghost" disabled={busy} onClick={() => setStep({ kind: 'reject' })}>
+                    Request changes
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </WorkflowSection>
@@ -345,12 +352,12 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                     disabled={busy || !!sub.closedAt}
                     onAction={act}
                     onEditInvoice={
-                      isAdmin && invoiceEditable(inv, sub.closedAt)
+                      canManageInvoices && invoiceEditable(inv, sub.closedAt)
                         ? () => setStep({ kind: 'invoice', invoiceId: inv.id })
                         : undefined
                     }
                     onDeleteInvoice={
-                      isAdmin && invoiceEditable(inv, sub.closedAt)
+                      canManageInvoices && invoiceEditable(inv, sub.closedAt)
                         ? () => {
                             if (!invoiceDeletable(inv, sub.closedAt)) {
                               setError(
@@ -403,7 +410,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               />
             ))}
             <CertificatesCard sub={sub} />
-            <ComplianceCard sub={sub} isStaff={isStaff} isAdmin={isAdmin} onAction={act} />
+            <ComplianceCard sub={sub} isStaff={isStaff} isAdmin={canComplianceAdmin} onAction={act} />
           </WorkflowSection>
 
           <WorkflowSection
@@ -639,9 +646,8 @@ function RequestCard({
   onBom: (bomFileIds: string[]) => void;
 }) {
   const isClient = user.role === 'client';
-  const isAdmin = user.role === 'admin';
   const closed = !!sub.closedAt;
-  const canEdit = !closed && (isAdmin || (isClient && sub.derivedStage === 1));
+  const canEdit = !closed && (userCan(user, 'editRequestAsStaff') || (isClient && sub.derivedStage === 1));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
   const bomIds = bomFilesOf(sub);
 
@@ -805,8 +811,7 @@ function VehicleCard({
   onWeighVehicle: (vehicleId: string) => void;
   onDeleteVehicle: (vehicleId: string, registration: string) => void;
 }) {
-  const isStaff = user.role === 'admin' || user.role === 'factory';
-  const isAdmin = user.role === 'admin';
+  const canManageVehicles = userCan(user, 'manageVehicles');
   const stage = sub.derivedStage;
   const vehicleTypes = useLookups('vehicleType');
   const logistics = useLookups('logistics');
@@ -814,8 +819,8 @@ function VehicleCard({
 
   if (!sub.vehicles.length && stage < 3) return null;
 
-  const canAdd = isStaff && stage >= 3 && stage <= 5;
-  const canEditVehicle = isStaff && !sub.closedAt;
+  const canAdd = canManageVehicles && stage >= 3 && stage <= 5;
+  const canEditVehicle = canManageVehicles && !sub.closedAt;
   const billedVehicleIds = new Set(sub.invoices.flatMap((inv) => inv.vehicleIds ?? []));
 
   return (
@@ -863,17 +868,17 @@ function VehicleCard({
                     Edit vehicle
                   </button>
                 ) : null}
-                {isAdmin && canEditVehicle && !billedVehicleIds.has(v.id) ? (
+                {canManageVehicles && canEditVehicle && !billedVehicleIds.has(v.id) ? (
                   <button type="button" className="btn brd bsm" onClick={() => onDeleteVehicle(v.id, v.registration)}>
                     Delete
                   </button>
                 ) : null}
-                {isAdmin && !w && stage >= 4 && stage <= 5 ? (
+                {canManageVehicles && !w && stage >= 4 && stage <= 5 ? (
                   <button type="button" className="btn bp bsm" onClick={() => onWeighVehicle(v.id)}>
                     Record Weighment
                   </button>
                 ) : null}
-                {isAdmin && w && stage >= 4 && stage <= 5 ? (
+                {canManageVehicles && w && stage >= 4 && stage <= 5 ? (
                   <button type="button" className="btn bs bsm" onClick={() => onWeighVehicle(v.id)}>
                     Edit weighment
                   </button>

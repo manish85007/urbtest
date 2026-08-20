@@ -5,6 +5,7 @@ import { nextSequence, submissionInclude } from '../lib/db-helpers.js';
 import {
   loadSubmissionForActor,
   requireAdmin,
+  requirePermission,
 } from '../lib/access.js';
 import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
@@ -79,6 +80,8 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
     if (actor.siteIds.length && !actor.siteIds.includes(input.siteId)) {
       throw new AppError('You do not have access to this site.');
     }
+  } else {
+    requirePermission(actor, 'createRequestAsStaff');
   }
 
   const site = await prisma.site.findFirst({
@@ -189,7 +192,7 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
 }
 
 export async function acknowledgeSubmission(actor: SessionUser, submissionId: string) {
-  requireAdmin(actor);
+  requirePermission(actor, 'acknowledgeRequest');
   const sub = await loadSubmissionForActor(submissionId, actor);
   if (deriveSubmissionStage(sub) !== 1) {
     throw new AppError('Only a new request can be acknowledged.');
@@ -237,7 +240,7 @@ export async function acknowledgeSubmission(actor: SessionUser, submissionId: st
 }
 
 export async function rejectSubmission(actor: SessionUser, submissionId: string, reason: string) {
-  requireAdmin(actor);
+  requirePermission(actor, 'rejectRequest');
   const sub = await loadSubmissionForActor(submissionId, actor);
   if (!reason?.trim()) throw new AppError('A rejection reason is required.');
 
@@ -302,7 +305,7 @@ export async function updateSubmission(
     throw new AppError('A closed request cannot be edited.');
   }
   if (actor.role === 'admin') {
-    requireAdmin(actor);
+    requirePermission(actor, 'editRequestAsStaff');
   } else if (actor.role === 'client') {
     if (stage !== 1) {
       throw new AppError('Only a new request can be edited.');

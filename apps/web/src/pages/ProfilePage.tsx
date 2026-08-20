@@ -11,6 +11,7 @@ interface ProfilePageProps {
 
 const ROLE_LABEL: Record<SessionUser['role'], string> = {
   admin: roleLabel('admin'),
+  operations: roleLabel('operations'),
   factory: roleLabel('factory'),
   client: roleLabel('client'),
 };

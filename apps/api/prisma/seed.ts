@@ -133,7 +133,7 @@ async function main() {
 
   const users = [
     { email: 'admin@urbeno.in', name: 'Manish Jain', role: UserRole.admin },
-    { email: 'ops@urbeno.in', name: 'Deepa Rao', role: UserRole.admin },
+    { email: 'ops@urbeno.in', name: 'Deepa Rao', role: UserRole.operations },
     { email: 'blr@urbeno.in', name: 'Suresh Babu', role: UserRole.factory, factoryIds: ['URB-BLR'] },
     { email: 'kgf@urbeno.in', name: 'Ravi Shankar', role: UserRole.factory, factoryIds: ['URB-KGF'] },
     {

@@ -2,7 +2,7 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { nextSequence } from '../lib/db-helpers.js';
-import { loadInvoiceForActor, requireStaff } from '../lib/access.js';
+import { loadInvoiceForActor, requirePermission } from '../lib/access.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
 
@@ -82,7 +82,7 @@ export async function importSerials(
   rows: SerialRowInput[],
   serialFileId?: string,
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageRecycling');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   if (invoice.closedAt || invoice.submission.closedAt) {
     throw new AppError('This request is closed. Edits are no longer available.');
@@ -130,7 +130,7 @@ export async function destroySerials(
   invoiceId: string,
   input: { serialNos?: string[] | 'all'; std: string; method?: string },
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageRecycling');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   if (invoice.closedAt || invoice.submission.closedAt) {
     throw new AppError('This request is closed. Edits are no longer available.');

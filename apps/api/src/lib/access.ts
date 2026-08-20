@@ -1,5 +1,6 @@
 import type { SessionUser } from './auth-context.js';
-import { clientScopeFilter, factoryInScope, isStaff } from './auth-context.js';
+import { can, clientScopeFilter, factoryInScope, isStaff } from './auth-context.js';
+import type { RolePermissionKey } from '@urb-tectrack/shared';
 import { AppError } from './errors.js';
 import { prisma } from './prisma.js';
 import { submissionInclude, type SubmissionFull } from './db-helpers.js';
@@ -70,6 +71,12 @@ export function requireAdmin(actor: SessionUser) {
 
 export function requireStaff(actor: SessionUser) {
   if (!isStaff(actor)) throw new AppError('Staff access required.', 403);
+}
+
+export function requirePermission(actor: SessionUser, permission: RolePermissionKey) {
+  if (!can(actor, permission)) {
+    throw new AppError('You do not have permission for this action.', 403);
+  }
 }
 
 export function requireFactory(actor: SessionUser, factoryId: string) {

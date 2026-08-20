@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { dataApi, type ClientSummary, type FactorySummary, type SiteSummary, type UserRow } from '../../api';
 import { Modal } from '../../components/Modal';
 
-const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | 'factory' | 'client'> }> = [
-  { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin'] },
-  { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin'] },
-  { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin'] },
-  { id: 'reports.heroes', label: 'Report: Recycle Heroes', roles: ['admin'] },
+const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | 'operations' | 'factory' | 'client'> }> = [
+  { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin', 'operations'] },
+  { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin', 'operations'] },
+  { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin', 'operations'] },
+  { id: 'reports.heroes', label: 'Report: Recycle Heroes', roles: ['admin', 'operations'] },
   { id: 'reports.mrn', label: 'Report: MRN Register', roles: ['factory'] },
   { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory', 'client'] },
   { id: 'reports.cod', label: 'Report: Certificate Log', roles: ['factory', 'client'] },
@@ -37,8 +37,8 @@ export function UserFormModal({
 }: UserFormModalProps) {
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
-  const [role, setRole] = useState<'admin' | 'factory' | 'client'>(
-    (user?.role as 'admin' | 'factory' | 'client') || 'client',
+  const [role, setRole] = useState<'admin' | 'operations' | 'factory' | 'client'>(
+    (user?.role as 'admin' | 'operations' | 'factory' | 'client') || 'client',
   );
   const [clientId, setClientId] = useState(user?.clientId || presetClientId || clients[0]?.id || '');
   const [siteIds, setSiteIds] = useState<string[]>(user?.siteIds ?? []);
@@ -47,7 +47,7 @@ export function UserFormModal({
   const [featureAccess, setFeatureAccess] = useState<Record<string, boolean> | null>(
     user?.featureAccess ?? null,
   );
-  const featuresForRole = FEATURE_FLAGS.filter((f) => f.roles.includes(role as 'admin' | 'factory' | 'client'));
+  const featuresForRole = FEATURE_FLAGS.filter((f) => f.roles.includes(role as 'admin' | 'operations' | 'factory' | 'client'));
   const restrictFeatures = featureAccess !== null;
   const [sites, setSites] = useState<SiteSummary[]>([]);
   const [error, setError] = useState('');
@@ -139,6 +139,7 @@ export function UserFormModal({
         <select value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
           <option value="client">Client user</option>
           <option value="admin">Super Admin</option>
+          <option value="operations">Operations Manager</option>
           <option value="factory">Factory manager</option>
         </select>
       </label>
@@ -194,6 +195,12 @@ export function UserFormModal({
       ) : null}
       {role === 'admin' ? (
         <p className="dim">Super Admins have full access to every client, site and factory.</p>
+      ) : null}
+      {role === 'operations' ? (
+        <p className="dim">
+          Operations Managers can acknowledge requests, manage vehicles &amp; weighments, and run reports. Other areas are
+          read-only.
+        </p>
       ) : null}
 
       {featuresForRole.length > 0 ? (

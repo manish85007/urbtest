@@ -7,6 +7,7 @@ import { StageBadge } from '../../components/StageProgress';
 import { fmtDate, num } from '../../lib/format';
 import { useAnimatedNumber } from '../../lib/useAnimatedNumber';
 import { dashboardTitle } from '../../lib/roles';
+import { userCan } from '../../lib/permissions';
 
 type ActionPanel = 'ack' | 'overdue' | 'sla' | 'queues' | 'active';
 
@@ -17,7 +18,9 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboardProps) {
-  const isAdmin = variant === 'admin';
+  const isAdminVariant = variant === 'admin';
+  const canCreateRequest = userCan(user, 'createRequestAsStaff');
+  const isSuperAdmin = user.role === 'admin';
   const nav = useNavigate();
   const [panel, setPanel] = useState<ActionPanel>(() => {
     if (report.newRequests.length) return 'ack';
@@ -46,7 +49,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
   const queueBars = [
     { label: 'Awaiting MRN', value: report.queues.awaitingMrn.length, color: '#f59e0b' },
     { label: 'Awaiting Recycling', value: report.queues.awaitingRecycling.length, color: '#3b82f6' },
-    ...(isAdmin
+    ...(isAdminVariant
       ? [
           { label: 'Awaiting CoD', value: report.queues.awaitingCod.length, color: '#a855f7' },
           { label: 'Awaiting Client Close', value: report.queues.awaitingClose.length, color: '#22c55e' },
@@ -65,7 +68,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
       count:
         report.queues.awaitingMrn.length +
         report.queues.awaitingRecycling.length +
-        (isAdmin ? report.queues.awaitingCod.length + report.queues.awaitingClose.length : 0),
+        (isAdminVariant ? report.queues.awaitingCod.length + report.queues.awaitingClose.length : 0),
     },
     { id: 'active', label: 'Active requests', count: report.activeRequests.length },
   ];
@@ -77,14 +80,16 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
           <div className="h1">{dashboardTitle(user.role)}</div>
           <div className="p-mu" style={{ margin: 0 }}>
             {fy} · {user.name}
-            {!isAdmin && (user.factoryIds ?? []).length ? ` · ${(user.factoryIds ?? []).join(', ')}` : ''}
-            {isAdmin ? ' · operations overview' : ''}
+            {!isAdminVariant && (user.factoryIds ?? []).length ? ` · ${(user.factoryIds ?? []).join(', ')}` : ''}
+            {isAdminVariant ? ' · operations overview' : ''}
           </div>
         </div>
         <div className="spacer" />
-        <Link to="/requests/new" className="btn bp">
-          + New Request
-        </Link>
+        {canCreateRequest ? (
+          <Link to="/requests/new" className="btn bp">
+            + New Request
+          </Link>
+        ) : null}
       </div>
 
       <div className="admin-quick-grid">
@@ -113,7 +118,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
           <span className="admin-quick-l">Capacity</span>
           <span className="admin-quick-s">{cap.pct.toFixed(1)}% of {num(cap.capTpa)} TPA</span>
         </Link>
-        {isAdmin ? (
+        {isSuperAdmin ? (
           <Link to="/masters" className="admin-quick-tile">
             <span className="admin-quick-ico">⚙️</span>
             <span className="admin-quick-l">Masters</span>
@@ -223,7 +228,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                   <span className="mono">{r.approxWeight} kg</span>,
                   <span className="dim">{fmtDate(r.requestDate)}</span>,
                   <Link to={`/requests/${r.id}`} className="btn bp bsm" onClick={(e) => e.stopPropagation()}>
-                    {isAdmin ? 'Acknowledge' : 'Open'}
+                    {userCan(user, 'acknowledgeRequest') ? 'Acknowledge' : 'Open'}
                   </Link>,
                 ],
               }))}
@@ -290,7 +295,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
           <div className="admin-queue-grid">
             <AdminQueueCard title="📋 Awaiting MRN" items={report.queues.awaitingMrn} act="Receive" cls="bg-am" />
             <AdminQueueCard title="♻️ Awaiting Recycling" items={report.queues.awaitingRecycling} act="Process" cls="bg-bl" />
-            {isAdmin ? (
+            {isAdminVariant ? (
               <>
                 <AdminQueueCard title="🏅 Awaiting CoD" items={report.queues.awaitingCod} act="Upload" cls="bg-pu" />
                 <AdminQueueCard title="🎉 Awaiting Client Close" items={report.queues.awaitingClose} act="With client" cls="bg-g" />

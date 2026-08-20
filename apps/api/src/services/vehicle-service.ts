@@ -4,7 +4,7 @@ import { AppError } from '../lib/errors.js';
 import { roundKg, toKg } from '../lib/decimal.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude } from '../lib/db-helpers.js';
-import { loadSubmissionForActor, requireAdmin, requireStaff } from '../lib/access.js';
+import { loadSubmissionForActor, requirePermission } from '../lib/access.js';
 import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
@@ -62,7 +62,7 @@ export async function addVehicle(
   submissionId: string,
   input: AddVehicleInput,
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageVehicles');
   const sub = await loadSubmissionForActor(submissionId, actor);
   const beforeStage = deriveSubmissionStage(sub);
   if (!sub.acknowledgedAt) {
@@ -133,7 +133,7 @@ export async function recordWeighment(
   vehicleId: string,
   input: WeighmentInput,
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageVehicles');
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
@@ -237,7 +237,7 @@ export async function updateVehicle(
   vehicleId: string,
   input: AddVehicleInput,
 ) {
-  requireStaff(actor);
+  requirePermission(actor, 'manageVehicles');
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
@@ -312,7 +312,7 @@ export async function updateVehicle(
 }
 
 export async function deleteVehicle(actor: SessionUser, vehicleId: string) {
-  requireAdmin(actor);
+  requirePermission(actor, 'manageVehicles');
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
