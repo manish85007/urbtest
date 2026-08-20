@@ -256,6 +256,22 @@ export async function listClientsForMasters(includeInactive = false) {
   }));
 }
 
+/** Active client portal users who can access a given site (empty siteIds = all sites). */
+export async function listClientPortalUsersForSite(clientId: string, siteId: string) {
+  const site = await prisma.site.findFirst({ where: { id: siteId, clientId, active: true } });
+  if (!site) throw new AppError('Site not found for this client.', 404);
+
+  const users = await prisma.user.findMany({
+    where: { clientId, role: 'client', active: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, email: true, name: true, siteIds: true },
+  });
+
+  return users
+    .filter((u) => !u.siteIds.length || u.siteIds.includes(siteId))
+    .map(({ id, email, name }) => ({ id, email, name }));
+}
+
 export async function getClientDetail(clientId: string) {
   const client = await prisma.client.findUnique({
     where: { id: clientId },

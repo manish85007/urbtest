@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
+import { attachSession, requireAdmin, requireAuth, requireStaff } from '../middleware/session.js';
 import { factoryInScope, isStaff } from '../lib/auth-context.js';
 import { isAppError } from '../lib/errors.js';
 import { listAllLookups, listLookups, upsertLookup } from '../services/lookups.js';
@@ -11,6 +11,7 @@ import {
   createSite,
   createUser,
   getClientDetail,
+  listClientPortalUsersForSite,
   listClientsForMasters,
   listFactoriesForMasters,
   listUsers,
@@ -110,6 +111,19 @@ export async function mastersRoutes(app: FastifyInstance) {
       return sites.filter((s) => actor.siteIds.includes(s.id));
     }
     return sites;
+  });
+
+  app.get('/clients/:clientId/portal-users', { preHandler: requireStaff }, async (request, reply) => {
+    try {
+      const { clientId } = request.params as { clientId: string };
+      const { siteId } = request.query as { siteId?: string };
+      if (!siteId?.trim()) {
+        return reply.badRequest('siteId query parameter is required.');
+      }
+      return await listClientPortalUsersForSite(clientId, siteId.trim());
+    } catch (err) {
+      return handleErr(err, reply);
+    }
   });
 
   app.post('/clients/:clientId/sites', { preHandler: requireAdmin }, async (request, reply) => {

@@ -710,6 +710,10 @@ export const dataApi = {
     api<SiteSummary[]>(
       `/clients/${clientId}/sites${includeInactive ? '?includeInactive=1' : ''}`,
     ),
+  portalUsers: (clientId: string, siteId: string) =>
+    api<Array<{ id: string; email: string; name: string }>>(
+      `/clients/${clientId}/portal-users?siteId=${encodeURIComponent(siteId)}`,
+    ),
   factories: (includeInactive = false) =>
     api<FactorySummary[]>(`/factories${includeInactive ? '?includeInactive=1' : ''}`),
   categories: (factoryId: string, includeInactive = false) =>

@@ -104,6 +104,27 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
   const bomIds = bomIdsFrom(input);
   const lines = linesForCreate(input.items, bomIds[0], approxQty, approxWeight);
 
+  let onBehalfOf: string | null = null;
+  if (actor.role !== 'client' && input.onBehalfOf?.trim()) {
+    const email = input.onBehalfOf.trim().toLowerCase();
+    const requestor = await prisma.user.findFirst({
+      where: {
+        email,
+        clientId,
+        role: 'client',
+        active: true,
+      },
+      select: { email: true, siteIds: true },
+    });
+    if (!requestor) {
+      throw new AppError('Selected requestor is not an active user for this client.');
+    }
+    if (requestor.siteIds.length && !requestor.siteIds.includes(site.id)) {
+      throw new AppError('Selected requestor does not have access to this site.');
+    }
+    onBehalfOf = email;
+  }
+
   const id = await nextSequence('sub');
   const sub = await prisma.submission.create({
     data: {
@@ -119,9 +140,7 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
       bomFileIds: bomIds,
       notes: input.notes?.trim() || null,
       createdBy: actor.email,
-      onBehalfOf: actor.role !== 'client' && input.onBehalfOf?.trim()
-        ? input.onBehalfOf.trim().toLowerCase()
-        : null,
+      onBehalfOf,
       items: {
         create: lines.map((line, i) => ({
           name: line.name,

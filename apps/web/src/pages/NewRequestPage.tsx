@@ -23,6 +23,8 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   const [wtTouched, setWtTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [onBehalfOf, setOnBehalfOf] = useState('');
+  const [portalUsers, setPortalUsers] = useState<Array<{ id: string; email: string; name: string }>>([]);
+  const [portalUsersLoading, setPortalUsersLoading] = useState(false);
   const [bomIds, setBomIds] = useState<string[]>([]);
   const [items, setItems] = useState<DraftLine[]>([{ ...EMPTY_LINE }]);
   const [error, setError] = useState('');
@@ -43,8 +45,24 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
     dataApi.sites(clientId).then((s) => {
       setSites(s);
       setSiteId(s[0]?.id ?? '');
+      setOnBehalfOf('');
     });
   }, [clientId]);
+
+  useEffect(() => {
+    if (user.role === 'client' || !clientId || !siteId) {
+      setPortalUsers([]);
+      setOnBehalfOf('');
+      return;
+    }
+    setPortalUsersLoading(true);
+    setOnBehalfOf('');
+    dataApi
+      .portalUsers(clientId, siteId)
+      .then(setPortalUsers)
+      .catch(() => setPortalUsers([]))
+      .finally(() => setPortalUsersLoading(false));
+  }, [clientId, siteId, user.role]);
 
   useEffect(() => {
     if (user.clientId) setClientId(user.clientId);
@@ -116,7 +134,15 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
           <>
             <div className="fg">
               <label htmlFor="ns-cid">Client *</label>
-              <select id="ns-cid" value={clientId} onChange={(e) => setClientId(e.target.value)} required>
+              <select
+                id="ns-cid"
+                value={clientId}
+                onChange={(e) => {
+                  setClientId(e.target.value);
+                  setOnBehalfOf('');
+                }}
+                required
+              >
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} ({c.id})
@@ -124,26 +150,18 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
                 ))}
               </select>
             </div>
-            <div className="fg">
-              <label htmlFor="ns-behalf">
-                On Behalf Of{' '}
-                <span className="hint">client contact email — they become the requestor for this request</span>
-              </label>
-              <input
-                id="ns-behalf"
-                type="email"
-                value={onBehalfOf}
-                onChange={(e) => setOnBehalfOf(e.target.value)}
-                placeholder="ramesh@techcorp.in"
-              />
-            </div>
           </>
         ) : null}
 
         <div className="fr2">
           <div className="fg">
             <label htmlFor="ns-site">Site *</label>
-            <select id="ns-site" value={siteId} onChange={(e) => setSiteId(e.target.value)} required>
+            <select
+              id="ns-site"
+              value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}
+              required
+            >
               {sites.length ? (
                 sites.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -155,6 +173,35 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
               )}
             </select>
           </div>
+          {user.role !== 'client' ? (
+            <div className="fg">
+              <label htmlFor="ns-behalf">
+                On Behalf Of{' '}
+                <span className="hint">client user with access to the selected site</span>
+              </label>
+              <select
+                id="ns-behalf"
+                value={onBehalfOf}
+                onChange={(e) => setOnBehalfOf(e.target.value)}
+                disabled={!siteId || portalUsersLoading}
+              >
+                <option value="">
+                  {!siteId
+                    ? 'Select a site first'
+                    : portalUsersLoading
+                      ? 'Loading users…'
+                      : portalUsers.length
+                        ? '— Optional: select requestor —'
+                        : 'No portal users for this site'}
+                </option>
+                {portalUsers.map((u) => (
+                  <option key={u.id} value={u.email}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="fg">
             <label htmlFor="ns-loc">Pickup Location *</label>
             <input
