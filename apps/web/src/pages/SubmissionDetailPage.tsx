@@ -37,6 +37,13 @@ function bomFilesOf(sub: SubmissionDetail): string[] {
   return sub.bomFileId ? [sub.bomFileId] : [];
 }
 
+/** Client portal user who receives lifecycle emails (matches API submission-notify). */
+function clientEmailRecipient(sub: Pick<SubmissionDetail, 'onBehalfOf' | 'createdBy'>): string {
+  const onBehalf = sub.onBehalfOf?.trim();
+  if (onBehalf) return onBehalf;
+  return sub.createdBy;
+}
+
 function formatPickupConfirm(value: string) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
@@ -555,7 +562,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               color: 'var(--bl)',
             }}
           >
-            📧 Email will be sent to <b>{sub.createdBy}</b> using the Request Acknowledgement template.
+            📧 Email will be sent to <b>{clientEmailRecipient(sub)}</b> using the Request Acknowledgement template.
           </div>
         </Modal>
       ) : null}
@@ -571,6 +578,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           <RejectForm
             formId="reject-form"
             disabled={busy}
+            clientEmail={clientEmailRecipient(sub)}
             onReject={(reason) => act(() => lifecycleApi.reject(sub.id, reason), 'Changes requested from client.')}
           />
         </Modal>
@@ -1605,9 +1613,11 @@ function RejectForm({
   disabled,
   onReject,
   formId,
+  clientEmail,
 }: {
   disabled: boolean;
   formId?: string;
+  clientEmail?: string;
   onReject: (reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
@@ -1622,6 +1632,20 @@ function RejectForm({
         setReason('');
       }}
     >
+      {clientEmail ? (
+        <div
+          style={{
+            background: 'var(--bl2)',
+            padding: '.55rem .8rem',
+            borderRadius: 8,
+            fontSize: '.78rem',
+            color: 'var(--bl)',
+            marginBottom: '.7rem',
+          }}
+        >
+          📧 Email will be sent to <b>{clientEmail}</b> using the Changes Requested template.
+        </div>
+      ) : null}
       <div className="fg">
         <label htmlFor="ak-rej">Note to client</label>
         <textarea
