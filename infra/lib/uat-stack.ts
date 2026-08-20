@@ -99,6 +99,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
           UAT_SEED: 'true',
           COOKIE_SECURE: 'false',
           EMAIL_PROVIDER: 'console',
+          EMAIL_REDIRECT_TO: 'uat.urbeno@gmail.com',
           ENABLE_JOBS: 'true',
           AWS_S3_BUCKET: uploads.bucketName,
           DATABASE_USER: 'tectrack',
