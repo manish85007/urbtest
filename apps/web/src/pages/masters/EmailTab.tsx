@@ -502,7 +502,17 @@ function SmtpSettingsForm({ onChanged }: { onChanged: (msg: string) => void }) {
         </div>
         <div className="fg">
           <label>Port</label>
-          <input type="number" value={port} onChange={(e) => setPort(e.target.value)} />
+          <input
+            type="number"
+            value={port}
+            onChange={(e) => {
+              const next = e.target.value;
+              setPort(next);
+              const n = Number(next);
+              if (n === 587 || n === 25) setSecure(false);
+              if (n === 465) setSecure(true);
+            }}
+          />
         </div>
         <div className="fg">
           <label>Username</label>
@@ -523,7 +533,7 @@ function SmtpSettingsForm({ onChanged }: { onChanged: (msg: string) => void }) {
       </div>
       <label style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.8rem' }}>
         <input type="checkbox" checked={secure} onChange={(e) => setSecure(e.target.checked)} />
-        Implicit TLS (port 465). Leave off for STARTTLS on 587.
+        Implicit TLS (port 465 only). For Gmail on port 587, leave this <b>off</b> — STARTTLS is used automatically.
       </label>
       <button type="submit" className="btn bp" disabled={busy}>
         Save outgoing mail

@@ -85,38 +85,52 @@ function encodeSubject(subject: string) {
   return `=?UTF-8?B?${b64(subject)}?=`;
 }
 
+/** Port 587/25 use STARTTLS; port 465 uses implicit TLS. Mismatch causes OpenSSL "wrong version number". */
+export function normalizeSmtpTls(config: SmtpConfig): SmtpConfig {
+  const port = Number(config.port) || (config.secure ? 465 : 587);
+  if (port === 465) {
+    return { ...config, port: 465, secure: true };
+  }
+  if (port === 587 || port === 25) {
+    return { ...config, port, secure: false };
+  }
+  return { ...config, port };
+}
+
 /** Minimal SMTP client (STARTTLS / implicit TLS + AUTH LOGIN). */
 export async function sendSmtp(config: SmtpConfig, message: SmtpMessage): Promise<void> {
-  const host = config.host.trim();
-  const port = Number(config.port) || (config.secure ? 465 : 587);
+  const normalized = normalizeSmtpTls(config);
+  const host = normalized.host.trim();
+  const port = normalized.port;
+  const secure = normalized.secure;
   if (!host) throw new Error('SMTP host is not set.');
   if (!message.to.length) throw new Error('No recipients.');
 
-  let socket: net.Socket = await connectRaw(host, port, config.secure);
+  let socket: net.Socket = await connectRaw(host, port, secure);
   try {
     await cmd(socket, 200);
     await cmd(socket, 200, `EHLO urb-tectrack`);
 
-    if (!config.secure && port !== 465) {
+    if (!secure && port !== 465) {
       await cmd(socket, 200, 'STARTTLS');
       socket = await upgradeTls(socket, host);
       await cmd(socket, 200, `EHLO urb-tectrack`);
     }
 
-    if (config.user) {
+    if (normalized.user) {
       await cmd(socket, 300, 'AUTH LOGIN');
-      await cmd(socket, 300, b64(config.user));
-      await cmd(socket, 200, b64(config.pass));
+      await cmd(socket, 300, b64(normalized.user));
+      await cmd(socket, 200, b64(normalized.pass));
     }
 
-    const from = config.fromEmail.trim();
+    const from = normalized.fromEmail.trim();
     await cmd(socket, 200, `MAIL FROM:<${from}>`);
     for (const rcpt of message.to) {
       await cmd(socket, 200, `RCPT TO:<${rcpt}>`);
     }
     await cmd(socket, 300, 'DATA');
 
-    const fromHeader = config.fromName ? `"${config.fromName.replace(/"/g, '')}" <${from}>` : from;
+    const fromHeader = normalized.fromName ? `"${normalized.fromName.replace(/"/g, '')}" <${from}>` : from;
     const payload = [
       `From: ${fromHeader}`,
       `To: ${message.to.join(', ')}`,

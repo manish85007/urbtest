@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
-import { sendSmtp, type SmtpConfig } from '../lib/smtp.js';
+import { sendSmtp, type SmtpConfig, normalizeSmtpTls } from '../lib/smtp.js';
 
 export const SMTP_SETTING_KEY = 'email.smtp';
 
@@ -219,15 +219,15 @@ export async function saveCompanyProfile(
 
 export function toSmtpConfig(s: SmtpSettings): SmtpConfig | null {
   if (!s.enabled || !s.host) return null;
-  return {
+  return normalizeSmtpTls({
     host: s.host,
     port: s.port,
-    secure: s.secure || s.port === 465,
+    secure: s.secure,
     user: s.user,
     pass: s.pass,
     fromName: s.fromName,
     fromEmail: s.fromEmail,
-  };
+  });
 }
 
 export async function sendTestEmail(to: string) {
