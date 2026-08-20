@@ -10,6 +10,7 @@ import {
   type SessionUser,
 } from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
+import { isAdminUser, isStaffUser } from '../lib/permissions';
 
 function periodQs(period: PeriodQuery) {
   return `period=${encodeURIComponent(period.period ?? 'fy')}&fy=${encodeURIComponent(period.fy ?? '')}&year=${encodeURIComponent(period.year ?? '')}&from=${encodeURIComponent(period.from ?? '')}&to=${encodeURIComponent(period.to ?? '')}`;
@@ -22,11 +23,11 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
   const [msg, setMsg] = useState('');
   const [busyId, setBusyId] = useState('');
   const [period, setPeriod] = useState<PeriodQuery>({ period: 'fy' });
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user ? isAdminUser(user) : false;
+  const isStaff = user ? isStaffUser(user) : false;
 
   useEffect(() => {
     setError('');
-    const isStaff = user?.role === 'admin' || user?.role === 'factory';
     if (isStaff) {
       dataApi
         .register('sustain', period)
@@ -43,10 +44,12 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
         if (r.kind === 'client') {
           setReport(r);
           setStaffReport(null);
+        } else {
+          setError('Sustainability is only available for client accounts or staff roles.');
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
-  }, [period.period, period.fy, period.year, period.from, period.to, user?.role]);
+  }, [period.period, period.fy, period.year, period.from, period.to, isStaff]);
 
   const totals = useMemo(() => {
     if (!staffReport?.rows.length) return null;
