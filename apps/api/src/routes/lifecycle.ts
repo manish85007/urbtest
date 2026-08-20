@@ -8,7 +8,7 @@ import {
   rejectSubmission,
   updateSubmission,
 } from '../services/submission-service.js';
-import { addVehicle, deleteVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
+import { addVehicle, completeLoading, deleteVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 import {
   addPayment,
   updatePayment,
@@ -220,6 +220,15 @@ export async function lifecycleRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = weighmentSchema.parse(request.body);
       return await recordWeighment(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/submissions/:id/loading-complete', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      return await completeLoading(request.user!, id);
     } catch (err) {
       return handleServiceError(err, reply);
     }

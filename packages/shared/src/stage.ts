@@ -15,6 +15,8 @@ export interface SubmissionStageInput {
   acknowledged?: boolean;
   allVehiclesWeighed?: boolean;
   hasVehicles?: boolean;
+  /** All vehicles weighed and loading acknowledged — unlocks invoicing. */
+  loadingCompleted?: boolean;
 }
 
 export function invStage(inv: InvoiceStageInput | null | undefined): number {
@@ -36,8 +38,9 @@ export function subStage(s: SubmissionStageInput | null | undefined): number {
 
   if (!s.acknowledged) return 1;
   if (!s.hasVehicles) return 3;
-  if (s.allVehiclesWeighed) return 5;
-  return 4;
+  if (!s.allVehiclesWeighed) return 4;
+  if (!s.loadingCompleted) return 4;
+  return 5;
 }
 
 export function stageLabel(stage: number): string {

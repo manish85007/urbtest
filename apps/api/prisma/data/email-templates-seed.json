@@ -14,6 +14,55 @@
     "variables": ["request_id", "client_name", "client_code", "site_name", "location", "request_date", "raised_by", "raised_email", "site_contact", "site_phone", "approx_weight", "approx_qty", "notes", "portal_url"]
   },
   {
+    "key": "request_new_client",
+    "name": "New Request Confirmation",
+    "subject": "Your e-waste pickup request {{request_id}} has been submitted",
+    "body": "Dear {{contact_name}},\n\nYour e-waste collection request has been submitted to Urbeno.\n\n  Request ID     : {{request_id}}\n  Site           : {{site_name}}\n  Pickup address : {{location}}\n  Request date   : {{request_date}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\nOur operations team will review and acknowledge your request shortly. Track progress in your portal:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "site_name", "location", "request_date", "approx_weight", "approx_qty", "contact_name", "portal_url"]
+  },
+  {
+    "key": "loading_complete",
+    "name": "Loading Complete",
+    "subject": "Loading complete for request {{request_id}} — weighment slips ready",
+    "body": "Dear {{contact_name}},\n\nLoading has been completed and weighment documentation is ready for your request {{request_id}} at {{site_name}}.\n\n  Total net weight : {{net_weight}} kg\n  Vehicles         : {{vehicle_count}}\n\nInvoicing will proceed next. Track your request:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "site_name", "contact_name", "net_weight", "vehicle_count", "portal_url"]
+  },
+  {
+    "key": "invoice_generated",
+    "name": "Invoice & E-way Generated",
+    "subject": "Invoice {{invoice_no}} raised for request {{request_id}}",
+    "body": "Dear {{contact_name}},\n\nAn invoice and e-way bill have been generated for your request {{request_id}}.\n\n  Invoice   : {{invoice_no}}\n  E-way bill: {{eway_bill_no}}\n  Billed    : {{billing_weight}} kg\n  Amount    : {{invoice_total}}\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "invoice_no", "eway_bill_no", "billing_weight", "invoice_total", "portal_url"]
+  },
+  {
+    "key": "mrn_generated",
+    "name": "MRN Generated",
+    "subject": "Goods received — MRN {{mrn_no}} for invoice {{invoice_no}}",
+    "body": "Dear {{contact_name}},\n\nMaterial for request {{request_id}} has been received at our facility.\n\n  MRN     : {{mrn_no}}\n  Invoice : {{invoice_no}}\n  Facility: {{factory_name}}\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "mrn_no", "invoice_no", "factory_name", "portal_url"]
+  },
+  {
+    "key": "recycling_form6",
+    "name": "Recycling & Form 6",
+    "subject": "Form 6 {{form6_no}} issued for invoice {{invoice_no}}",
+    "body": "Dear {{contact_name}},\n\nRecycling has been completed and Form 6 has been issued for request {{request_id}}.\n\n  Form 6  : {{form6_no}}\n  Invoice : {{invoice_no}}\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "form6_no", "invoice_no", "portal_url"]
+  },
+  {
+    "key": "cod_generated",
+    "name": "Certificate of Destruction",
+    "subject": "Certificate {{cert_no}} issued for request {{request_id}}",
+    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction has been uploaded for request {{request_id}}.\n\n  Certificate : {{cert_no}}\n  Invoice     : {{invoice_no}}\n  Date        : {{cert_date}}\n\nPlease review and acknowledge closure in your portal when ready:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "cert_no", "invoice_no", "cert_date", "portal_url"]
+  },
+  {
+    "key": "request_closed",
+    "name": "Request Closed",
+    "subject": "Request {{request_id}} closed successfully",
+    "body": "Dear {{contact_name}},\n\nYour e-waste collection request {{request_id}} for {{site_name}} has been closed.\n\nThank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycle Heroes milestones.\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "site_name", "contact_name", "portal_url"]
+  },
+  {
     "key": "cod_delivery",
     "name": "Certificate of Destruction Delivery",
     "subject": "Certificate of Destruction {{cert_no}} for request {{request_id}}",

@@ -187,6 +187,8 @@ model Submission {
   createdAt    DateTime  @default(now()) @map("created_at")
   acknowledgedAt DateTime? @map("acknowledged_at")
   acknowledgedBy String? @map("acknowledged_by")
+  loadingCompletedAt DateTime? @map("loading_completed_at")
+  loadingCompletedBy String? @map("loading_completed_by")
   rejectNote   String?   @map("reject_note")
   rejectAt     DateTime? @map("reject_at")
   closedAt     DateTime? @map("closed_at")

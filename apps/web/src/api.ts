@@ -466,6 +466,8 @@ export interface SubmissionDetail {
   createdAt?: string;
   acknowledgedAt: string | null;
   acknowledgedBy?: string | null;
+  loadingCompletedAt?: string | null;
+  loadingCompletedBy?: string | null;
   closedAt?: string | null;
   derivedStage: number;
   client: { id: string; name: string; payTermsDays?: number };
@@ -1155,6 +1157,9 @@ export const lifecycleApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  completeLoading: (submissionId: string) =>
+    api<SubmissionDetail>(`/submissions/${submissionId}/loading-complete`, { method: 'POST' }),
 
   createInvoice: (
     submissionId: string,

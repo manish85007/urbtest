@@ -58,6 +58,9 @@ test.describe('full lifecycle', () => {
     await page.locator('.modal').getByRole('button', { name: 'Record weighment' }).click();
     await expect(page.getByText('Weighment recorded.')).toBeVisible({ timeout: 15_000 });
 
+    await page.getByRole('button', { name: 'Acknowledge loading complete' }).click();
+    await expect(page.getByText('Loading acknowledged')).toBeVisible({ timeout: 15_000 });
+
     // Stage 5 — raise invoice
     await page.getByRole('button', { name: 'Raise Invoice' }).click();
     await page.getByLabel('Invoice no.').fill(`INV-E2E-${uniq}`);

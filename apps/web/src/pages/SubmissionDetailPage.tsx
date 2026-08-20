@@ -136,10 +136,11 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const unweighed = sub.vehicles.filter((v) => !v.weighment);
   const netKg = sub.vehicles.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
   const allWeighed = sub.vehicles.length > 0 && sub.vehicles.every((v) => v.weighment);
+  const loadingComplete = !!sub.loadingCompletedAt;
   const hasMrn = sub.invoices.some((i) => i.mrn);
   const hasCod = sub.invoices.some((i) => i.certificates.length > 0);
   const phase2Locked = !sub.acknowledgedAt;
-  const phase3Locked = !allWeighed;
+  const phase3Locked = !loadingComplete;
   const phase4Locked = !hasMrn;
   const phase5Locked = !hasCod;
   const weighTarget =
@@ -192,7 +193,22 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             ⚖️ Weigh ({unweighed.length} pending)
           </button>
         ) : null}
-        {canManageInvoices && phase === 3 && allWeighed ? (
+        {canManageVehicles && phase === 2 && allWeighed && !loadingComplete ? (
+          <button
+            type="button"
+            className="btn bp"
+            disabled={busy}
+            onClick={() =>
+              void act(
+                () => lifecycleApi.completeLoading(sub.id),
+                'Loading acknowledged — invoicing is now unlocked.',
+              )
+            }
+          >
+            ✅ Acknowledge loading complete
+          </button>
+        ) : null}
+        {canManageInvoices && phase === 3 && loadingComplete ? (
           <button type="button" className="btn bp" onClick={() => setStep({ kind: 'invoice' })}>
             {sub.invoices.length ? '🧾 Add Invoice' : '🧾 Raise Invoice'}
           </button>
@@ -285,6 +301,34 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 void act(() => lifecycleApi.deleteVehicle(vehicleId), `Vehicle ${registration} removed.`);
               }}
             />
+            {canManageVehicles && allWeighed && !loadingComplete && !sub.closedAt ? (
+              <div className="card" style={{ marginTop: '.5rem' }}>
+                <div className="card-ttl">Acknowledge loading complete</div>
+                <p className="p-mu">
+                  All vehicles are weighed. Confirm loading is finished and weighment slips are uploaded to unlock
+                  invoicing.
+                </p>
+                <button
+                  type="button"
+                  className="btn bp"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(
+                      () => lifecycleApi.completeLoading(sub.id),
+                      'Loading acknowledged — invoicing is now unlocked.',
+                    )
+                  }
+                >
+                  ✅ Acknowledge loading complete
+                </button>
+              </div>
+            ) : null}
+            {loadingComplete ? (
+              <div className="dim" style={{ fontSize: '.78rem', marginTop: '.35rem' }}>
+                Loading acknowledged{sub.loadingCompletedBy ? ` by ${sub.loadingCompletedBy}` : ''}
+                {sub.loadingCompletedAt ? ` · ${fmtTS(sub.loadingCompletedAt)}` : ''}
+              </div>
+            ) : null}
           </WorkflowSection>
 
           <WorkflowSection
@@ -292,7 +336,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             current={phase === 3}
             done={phase > 3}
             locked={phase3Locked}
-            lockReason="Assign vehicles and record weighment on every vehicle before invoicing."
+            lockReason="Acknowledge loading complete after every vehicle is weighed and weighment slips are uploaded."
           >
             {sub.invoices.length ? (
               <>

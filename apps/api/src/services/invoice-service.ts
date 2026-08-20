@@ -11,7 +11,6 @@ import {
   formatMrnNumber,
   formatForm6Number,
   getFY,
-  stageLabel,
   type MaterialGroupCode,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
@@ -26,27 +25,60 @@ import {
   requirePermission,
   syncSubmissionClosure,
 } from '../lib/access.js';
-import { deriveInvoiceStage, deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
+import { deriveInvoiceStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { logSoD, sodCheck } from './compliance.js';
 import { assertFilesExist } from './file-service.js';
 import { assertCategoryCapacityOrOverride } from './category-capacity.js';
-import { sendTransactionalEmail } from './email.js';
+import { notifyClient } from './submission-notify.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
 
-async function emailStageChange(
-  beforeStage: number,
-  refreshed: Awaited<ReturnType<typeof loadSubmissionForActor>>,
-  detail: string,
+async function emailInvoiceGenerated(
+  sub: Awaited<ReturnType<typeof loadSubmissionForActor>>,
+  invoice: { invoiceNo: string; ewayBillNo: string; billingWeight: unknown; totalPaise: bigint },
 ) {
-  const afterStage = deriveSubmissionStage(refreshed);
-  if (afterStage === beforeStage) return;
-  await sendTransactionalEmail('request_stage_update', [refreshed.createdBy], {
-    request_id: refreshed.id,
-    site_name: refreshed.site.name,
-    contact_name: refreshed.createdBy,
-    stage_name: stageLabel(afterStage),
-    status_detail: detail,
+  await notifyClient(sub, 'invoice_generated', {
+    invoice_no: invoice.invoiceNo,
+    eway_bill_no: invoice.ewayBillNo,
+    billing_weight: Number(invoice.billingWeight),
+    invoice_total: `₹${(Number(invoice.totalPaise) / 100).toLocaleString('en-IN')}`,
+  });
+}
+
+async function emailMrnGenerated(
+  sub: Awaited<ReturnType<typeof loadSubmissionForActor>>,
+  invoiceNo: string,
+  mrnNo: string,
+  factoryName: string,
+) {
+  await notifyClient(sub, 'mrn_generated', {
+    invoice_no: invoiceNo,
+    mrn_no: mrnNo,
+    factory_name: factoryName,
+  });
+}
+
+async function emailRecyclingForm6(
+  sub: Awaited<ReturnType<typeof loadSubmissionForActor>>,
+  invoiceNo: string,
+  form6No: string,
+) {
+  await notifyClient(sub, 'recycling_form6', {
+    invoice_no: invoiceNo,
+    form6_no: form6No,
+  });
+}
+
+async function emailCodGenerated(
+  sub: Awaited<ReturnType<typeof loadSubmissionForActor>>,
+  invoiceNo: string,
+  certNo: string,
+  certDate: Date,
+) {
+  await notifyClient(sub, 'cod_generated', {
+    invoice_no: invoiceNo,
+    cert_no: certNo,
+    cert_date: certDate.toISOString().slice(0, 10),
   });
 }
 
@@ -271,6 +303,11 @@ export async function createInvoice(
   if (sub.closedAt) {
     throw new AppError('This request is closed. Edits are no longer available.');
   }
+  if (!sub.loadingCompletedAt) {
+    throw new AppError(
+      'Acknowledge loading complete after all vehicles are weighed and slips are uploaded before raising an invoice.',
+    );
+  }
 
   const duplicate = sub.invoices.some((i) => i.invoiceNo === input.invoiceNo.trim());
   if (duplicate) {
@@ -343,6 +380,7 @@ export async function createInvoice(
   );
 
   const refreshed = await loadSubmissionForActor(submissionId, actor);
+  await emailInvoiceGenerated(refreshed, invoice);
   return withDerivedStages(refreshed);
 }
 
@@ -644,7 +682,6 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   requireFactory(actor, input.factoryId);
   assertLifecycleOpen(invoice);
-  const beforeStage = deriveSubmissionStage(invoice.submission);
 
   if (invoice.mrn) throw new AppError('This invoice already has an MRN. Each invoice takes one MRN.');
 
@@ -697,7 +734,7 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   );
 
   const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailStageChange(beforeStage, refreshed, `MRN ${mrn.mrnNo} was created at ${factory.name}.`);
+  await emailMrnGenerated(refreshed, invoice.invoiceNo, mrn.mrnNo, factory.name);
 
   return mrn;
 }
@@ -763,7 +800,6 @@ export async function createRecycling(
 ) {
   requirePermission(actor, 'manageRecycling');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
-  const beforeStage = deriveSubmissionStage(invoice.submission);
   assertLifecycleOpen(invoice);
   if (!invoice.mrn) throw new AppError('Create the MRN before recycling this invoice.');
   if (invoice.recycling) throw new AppError('This invoice already has a recycling record.');
@@ -926,7 +962,7 @@ export async function createRecycling(
     invoice.submissionId,
   );
   const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailStageChange(beforeStage, refreshed, `Form 6 ${recycling.form6No} was issued.`);
+  await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
 
   return recycling;
 }
@@ -1098,7 +1134,6 @@ export async function uploadCertificate(
   requirePermission(actor, 'uploadCertificate');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertLifecycleOpen(invoice);
-  const beforeStage = deriveSubmissionStage(invoice.submission);
   if (!invoice.recycling) {
     throw new AppError('Issue Form 6 before uploading the Certificate of Destruction.');
   }
@@ -1141,11 +1176,7 @@ export async function uploadCertificate(
   });
 
   const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailStageChange(
-    beforeStage,
-    refreshed,
-    `Certificate of Destruction ${certificate.certNo} was uploaded.`,
-  );
+  await emailCodGenerated(refreshed, invoice.invoiceNo, certificate.certNo, certificate.certDate);
 
   return certificate;
 }
@@ -1163,7 +1194,6 @@ export async function closeInvoice(
   input: CloseInvoiceInput = {},
 ) {
   const invoice = await loadInvoiceForActor(invoiceId, actor);
-  const beforeStage = deriveSubmissionStage(invoice.submission);
   const stage = deriveInvoiceStage(invoice);
 
   if (invoice.closedAt) throw new AppError('This invoice is already closed.');
@@ -1240,6 +1270,7 @@ export async function closeInvoice(
     },
   });
 
+  const wasSubmissionClosed = !!invoice.submission.closedAt;
   await syncSubmissionClosure(invoice.submissionId);
 
   await auditLog({
@@ -1257,7 +1288,9 @@ export async function closeInvoice(
     invoice.submissionId,
   );
   const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailStageChange(beforeStage, refreshed, `${invoice.invoiceNo} was closed.`);
+  if (refreshed.closedAt && !wasSubmissionClosed) {
+    await notifyClient(refreshed, 'request_closed', {});
+  }
 
   return closed;
 }

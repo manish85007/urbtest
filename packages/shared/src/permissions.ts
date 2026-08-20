@@ -55,7 +55,8 @@ const OPERATIONS: RolePermissions = {
   editMrn: false,
   manageRecycling: false,
   uploadCertificate: false,
-  rejectRequest: false,
+  // Ops managers can "resend request to requestor" by raising clarifications.
+  rejectRequest: true,
   editRequestAsStaff: false,
   createRequestAsStaff: false,
   manageQueries: false,

@@ -5,11 +5,10 @@ import { roundKg, toKg } from '../lib/decimal.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude } from '../lib/db-helpers.js';
 import { loadSubmissionForActor, requirePermission } from '../lib/access.js';
-import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
+import { withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
-import { sendTransactionalEmail } from './email.js';
-import { stageLabel } from '@urb-tectrack/shared';
+import { notifyClient } from './submission-notify.js';
 
 export interface TeamMemberInput {
   name: string;
@@ -41,20 +40,31 @@ export interface WeighmentInput {
   pickupPhotoIds?: string[];
 }
 
-async function emailStageChange(
-  beforeStage: number,
-  refreshed: Awaited<ReturnType<typeof loadSubmissionForActor>>,
-  detail: string,
+function totalNetKg(vehicles: Awaited<ReturnType<typeof loadSubmissionForActor>>['vehicles']) {
+  return roundKg(vehicles.reduce((sum, v) => sum + Number(v.weighment?.netKg ?? 0), 0));
+}
+
+function assertReadyForLoadingComplete(
+  vehicles: Awaited<ReturnType<typeof loadSubmissionForActor>>['vehicles'],
 ) {
-  const afterStage = deriveSubmissionStage(refreshed);
-  if (afterStage === beforeStage) return;
-  await sendTransactionalEmail('request_stage_update', [refreshed.createdBy], {
-    request_id: refreshed.id,
-    site_name: refreshed.site.name,
-    contact_name: refreshed.createdBy,
-    stage_name: stageLabel(afterStage),
-    status_detail: detail,
-  });
+  if (!vehicles.length) {
+    throw new AppError('Assign at least one vehicle before acknowledging loading.');
+  }
+  for (const vehicle of vehicles) {
+    const w = vehicle.weighment;
+    if (!w) {
+      throw new AppError(`Vehicle ${vehicle.registration} still needs a weighment.`);
+    }
+    if (w.manual) {
+      if (!w.pickupPhotoIds?.length) {
+        throw new AppError(`Pickup photos are required for ${vehicle.registration}.`);
+      }
+      continue;
+    }
+    if (!w.slipPhotoIds?.length) {
+      throw new AppError(`Upload the weighment slip for ${vehicle.registration}.`);
+    }
+  }
 }
 
 export async function addVehicle(
@@ -64,7 +74,6 @@ export async function addVehicle(
 ) {
   requirePermission(actor, 'manageVehicles');
   const sub = await loadSubmissionForActor(submissionId, actor);
-  const beforeStage = deriveSubmissionStage(sub);
   if (!sub.acknowledgedAt) {
     throw new AppError('Acknowledge the request before assigning vehicles.');
   }
@@ -111,19 +120,14 @@ export async function addVehicle(
 
   const refreshed = await loadSubmissionForActor(submissionId, actor);
 
-  await sendTransactionalEmail('vehicle_assigned', [refreshed.createdBy], {
-    request_id: refreshed.id,
-    client_name: refreshed.client.name,
-    site_name: refreshed.site.name,
+  await notifyClient(refreshed, 'vehicle_assigned', {
     expected_date: input.expectedAt
       ? new Date(input.expectedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
       : '(TBD)',
     registration,
     driver_name: input.driverName.trim(),
     driver_phone: input.driverPhone,
-    contact_name: refreshed.createdBy,
   });
-  await emailStageChange(beforeStage, refreshed, `Pickup scheduled for ${vehicle.registration}.`);
 
   return { vehicle, submission: withDerivedStages(refreshed) };
 }
@@ -142,7 +146,6 @@ export async function recordWeighment(
   if (!vehicle) throw new AppError('Vehicle not found', 404);
 
   const sub = await loadSubmissionForActor(vehicle.submissionId, actor);
-  const beforeStage = deriveSubmissionStage(sub);
 
   let data;
   if (input.manual) {
@@ -228,8 +231,44 @@ export async function recordWeighment(
       });
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);
-  await emailStageChange(beforeStage, refreshed, `Weighment recorded for ${vehicle.registration}.`);
   return { weighment, submission: withDerivedStages(refreshed) };
+}
+
+export async function completeLoading(actor: SessionUser, submissionId: string) {
+  requirePermission(actor, 'manageVehicles');
+  const sub = await loadSubmissionForActor(submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is closed — loading cannot be acknowledged.');
+  }
+  if (sub.loadingCompletedAt) {
+    throw new AppError('Loading has already been acknowledged for this request.');
+  }
+  assertReadyForLoadingComplete(sub.vehicles);
+
+  const updated = await prisma.submission.update({
+    where: { id: submissionId },
+    data: {
+      loadingCompletedAt: new Date(),
+      loadingCompletedBy: actor.email,
+    },
+    include: submissionInclude,
+  });
+
+  await notifyClient(updated, 'loading_complete', {
+    net_weight: totalNetKg(updated.vehicles),
+    vehicle_count: updated.vehicles.length,
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'sub.loading_complete',
+    entity: 'submission',
+    entityId: submissionId,
+    details: { netKg: totalNetKg(updated.vehicles), vehicles: updated.vehicles.length },
+  });
+
+  return withDerivedStages(updated);
 }
 
 export async function updateVehicle(

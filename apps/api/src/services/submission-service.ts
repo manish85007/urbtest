@@ -9,9 +9,9 @@ import {
 } from '../lib/access.js';
 import { deriveSubmissionStage, withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
-import { sendTransactionalEmail } from './email.js';
 import { assertFilesExist } from './file-service.js';
 import { notifyAdmins, notifyClientUsers, notifyUsers } from './notifications.js';
+import { notifyClient, notifyStaffNewRequest } from './submission-notify.js';
 import { isPastCalendarDate } from '@urb-tectrack/shared';
 
 const PLACEHOLDER_ITEM = 'Mixed e-waste (see attached BoM)';
@@ -172,7 +172,7 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
     sub.id,
   );
 
-  await sendTransactionalEmail('request_new_admin', [], {
+  const staffVars = {
     request_id: sub.id,
     client_name: client.name,
     client_code: clientId,
@@ -186,6 +186,14 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
     site_contact: site.contactName ?? client.contact ?? '—',
     site_phone: site.contactPhone ?? client.phone ?? '—',
     notes: input.notes || '(none)',
+  };
+
+  await notifyStaffNewRequest(staffVars);
+  await notifyClient(sub, 'request_new_client', {
+    location: input.location || '—',
+    request_date: input.requestDate,
+    approx_weight: input.approxWeight ?? 0,
+    approx_qty: input.approxQty ?? 0,
   });
 
   return withDerivedStages(sub);
@@ -209,19 +217,15 @@ export async function acknowledgeSubmission(actor: SessionUser, submissionId: st
     include: submissionInclude,
   });
 
-  await sendTransactionalEmail('request_ack', [updated.createdBy], {
-    request_id: updated.id,
+  const contact = await notifyClient(updated, 'request_ack', {
     request_date: updated.requestDate.toISOString().slice(0, 10),
-    site_name: updated.site.name,
     location: updated.location,
     approx_weight: Number(updated.approxWeight),
     approx_qty: updated.approxQty,
-    contact_name: updated.createdBy,
-    client_name: updated.client.name,
   });
 
   await notifyUsers(
-    [updated.createdBy],
+    [contact.email],
     'sub.ack',
     `Request ${updated.id} acknowledged by Urbeno — pickup will be scheduled`,
     updated.id,
@@ -233,7 +237,7 @@ export async function acknowledgeSubmission(actor: SessionUser, submissionId: st
     action: 'sub.acknowledge',
     entity: 'submission',
     entityId: submissionId,
-    details: { emailed: updated.createdBy },
+    details: { emailed: contact.email },
   });
 
   return withDerivedStages(updated);
@@ -253,16 +257,12 @@ export async function rejectSubmission(actor: SessionUser, submissionId: string,
     include: submissionInclude,
   });
 
-  await sendTransactionalEmail('request_changes', [updated.createdBy], {
-    request_id: updated.id,
-    client_name: updated.client.name,
-    site_name: updated.site.name,
+  const contact = await notifyClient(updated, 'request_changes', {
     reason: reason.trim(),
-    contact_name: updated.createdBy,
   });
 
   await notifyUsers(
-    [updated.createdBy],
+    [contact.email],
     'sub.reject',
     `Request ${updated.id} needs changes: ${reason.trim()}`,
     updated.id,
