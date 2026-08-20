@@ -59,14 +59,14 @@
     "key": "request_closed",
     "name": "Request Closed",
     "subject": "Request {{request_id}} closed successfully",
-    "body": "Dear {{contact_name}},\n\nYour e-waste collection request {{request_id}} for {{site_name}} has been closed.\n\nThank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycle Heroes milestones.\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
+    "body": "Dear {{contact_name}},\n\nYour e-waste collection request {{request_id}} for {{site_name}} has been closed.\n\nThank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycling Heroes milestones.\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
     "variables": ["request_id", "site_name", "contact_name", "portal_url"]
   },
   {
     "key": "cod_delivery",
     "name": "Certificate of Destruction Delivery",
     "subject": "Certificate of Destruction {{cert_no}} for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction for your e-waste submission is now available and attached to this email.\n\n  Request ID       : {{request_id}}\n  Invoice          : {{invoice_no}}\n  Certificate No.  : {{cert_no}}\n  Certificate Date : {{cert_date}}\n  Covers           : {{department}}\n  Net weight       : {{net_weight}} kg\n\nWhere a single pickup covers more than one department, you will receive a separate certificate for each — please review them all before closing.\n\nPlease review the attached certificate and acknowledge closure of this request in your Urb TecTrack portal. Once acknowledged, the request lifecycle is complete and the tonnage counts toward your Recycle Heroes milestones.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction for your e-waste submission is now available and attached to this email.\n\n  Request ID       : {{request_id}}\n  Invoice          : {{invoice_no}}\n  Certificate No.  : {{cert_no}}\n  Certificate Date : {{cert_date}}\n  Covers           : {{department}}\n  Net weight       : {{net_weight}} kg\n\nWhere a single pickup covers more than one department, you will receive a separate certificate for each — please review them all before closing.\n\nPlease review the attached certificate and acknowledge closure of this request in your Urb TecTrack portal. Once acknowledged, the request lifecycle is complete and the tonnage counts toward your Recycling Heroes milestones.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
     "variables": ["request_id", "invoice_no", "cert_no", "cert_date", "department", "net_weight", "contact_name", "client_name"]
   },
   {

@@ -30,7 +30,7 @@ const KINDS: Array<{
   { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status' },
   { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category' },
   { id: 'sustain', label: 'Sustainability', description: 'Environmental impact with methodology', factoryHidden: true },
-  { id: 'heroes', label: 'Recycle Heroes', description: 'Tonnage and tree milestones', factoryHidden: true },
+  { id: 'heroes', label: 'Recycling Heroes', description: 'Tonnage and tree milestones', factoryHidden: true },
 ];
 
 const DISPLAY_CAP = 300;

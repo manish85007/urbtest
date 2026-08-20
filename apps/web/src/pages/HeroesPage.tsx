@@ -42,7 +42,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
     dataApi
       .heroes(period)
       .then((r) => {
-        if (r.view !== 'client') setError('Recycle Heroes client view is available to client users.');
+        if (r.view !== 'client') setError('Recycling Heroes client view is available to client users.');
         else setReport(r);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
@@ -65,7 +65,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
   const co2Seq = useAnimatedNumber(Math.round(seqKg));
   const perDayDisplay = useAnimatedNumber(Math.round(seqPerDay * 100)) / 100;
 
-  if (!report && !error) return <p className="muted">Loading Recycle Heroes…</p>;
+  if (!report && !error) return <p className="muted">Loading Recycling Heroes…</p>;
   if (!report) return <p className="error">{error}</p>;
 
   const h = report.metrics;
@@ -90,9 +90,10 @@ function HeroesClient({ user }: { user: SessionUser }) {
     <div className="heroes-client">
       <div className="heroes-client-hd f-row">
         <div>
-          <div className="h1">🌳 Recycle Heroes</div>
+          <div className="h1">🌳 Recycling Heroes</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            Every tonne you recycle plants a tree — click trees in your forest to explore each planting
+            Every tonne of closed e-waste earns one sapling — nurtured for {SUSTAINABILITY.nurtureYears} years toward
+            self-reliance. Click trees in your forest to explore each planting.
           </div>
         </div>
         <div className="spacer" />
@@ -311,7 +312,7 @@ function HeroesAdmin() {
     dataApi
       .heroes(period, ledgerClientId || undefined)
       .then((r) => {
-        if (r.view !== 'admin') setError('Recycle Heroes staff view is available to Urbeno users.');
+        if (r.view !== 'admin') setError('Recycling Heroes staff view is available to Urbeno users.');
         else setReport(r);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
@@ -332,7 +333,7 @@ function HeroesAdmin() {
   const earnedAnim = useAnimatedNumber(totEarned);
   const co2Anim = useAnimatedNumber(Math.round(totCo2));
 
-  if (!report && !error) return <p className="muted">Loading Recycle Heroes…</p>;
+  if (!report && !error) return <p className="muted">Loading Recycling Heroes…</p>;
   if (!report) return <p className="error">{error}</p>;
 
   const tot = report.totals;
@@ -387,9 +388,10 @@ function HeroesAdmin() {
     <div className="heroes-admin">
       <div className="heroes-client-hd f-row">
         <div>
-          <div className="h1">🌳 Recycle Heroes</div>
+          <div className="h1">🌳 Recycling Heroes</div>
           <div className="p-mu" style={{ margin: 0 }}>
-            Global tree ledger — {SUSTAINABILITY.treesPerTonne} tree/tonne · badge every {SUSTAINABILITY.heroMilestone} trees
+            Global sapling ledger — {SUSTAINABILITY.treesPerTonne} sapling/tonne · nurtured{' '}
+            {SUSTAINABILITY.nurtureYears} years · badge every {SUSTAINABILITY.heroMilestone} trees
           </div>
         </div>
         <div className="spacer" />

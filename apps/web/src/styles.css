@@ -533,7 +533,7 @@ label:not(.file-upload-label):not(.check-label):not(.btn) {
 .client-site-chip.on { background: var(--g3); border-color: var(--g); color: var(--g2); font-weight: 700; }
 .client-site-chip:hover { border-color: var(--g4); background: var(--g5); }
 
-/* ── Recycle Heroes (client) ── */
+/* ── Recycling Heroes (client) ── */
 @keyframes heroesSway {
   0%, 100% { transform: scale(var(--tree-scale, 1)) rotate(calc(var(--sway-amp, 1deg) * -1)); }
   50% { transform: scale(var(--tree-scale, 1)) rotate(var(--sway-amp, 1deg)); }
@@ -1123,7 +1123,7 @@ button.heroes-metric-card:hover {
   background: var(--g5);
 }
 
-/* ── Recycle Heroes admin ── */
+/* ── Recycling Heroes admin ── */
 .heroes-admin { animation: dashFadeIn .45s ease-out both; }
 .heroes-admin-hero { margin-bottom: 1rem; }
 .heroes-admin-charts {

@@ -105,7 +105,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
         </Link>
         <Link to="/heroes" className="admin-quick-tile">
           <span className="admin-quick-ico">🌳</span>
-          <span className="admin-quick-l">Recycle Heroes</span>
+          <span className="admin-quick-l">Recycling Heroes</span>
           <span className="admin-quick-s">Tree ledger &amp; planting</span>
         </Link>
         <Link to="/reports" className="admin-quick-tile">

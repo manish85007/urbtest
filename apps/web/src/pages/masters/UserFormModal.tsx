@@ -6,7 +6,7 @@ const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | '
   { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin', 'operations'] },
   { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin', 'operations'] },
   { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin', 'operations'] },
-  { id: 'reports.heroes', label: 'Report: Recycle Heroes', roles: ['admin', 'operations'] },
+  { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations'] },
   { id: 'reports.mrn', label: 'Report: MRN Register', roles: ['factory'] },
   { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory', 'client'] },
   { id: 'reports.cod', label: 'Report: Certificate Log', roles: ['factory', 'client'] },

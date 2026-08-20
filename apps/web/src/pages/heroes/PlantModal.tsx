@@ -69,8 +69,8 @@ export function PlantModal({ asClient, clientName, clientId, clients = [], onClo
     >
       <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.8rem' }}>
         {asClient
-          ? 'Planted trees through your own CSR programme? Log them here so your Recycle Heroes page shows the full picture. These are recorded separately from the trees Urbeno plants against your recycled tonnage.'
-          : "Log trees planted on a client's behalf. The client sees this on their Recycle Heroes page and gets a notification."}
+          ? 'Planted trees through your own CSR programme? Log them here so your Recycling Heroes page shows the full picture. These are recorded separately from the trees Urbeno plants against your recycled tonnage.'
+          : "Log trees planted on a client's behalf. The client sees this on their Recycling Heroes page and gets a notification."}
       </p>
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">

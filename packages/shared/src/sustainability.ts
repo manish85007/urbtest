@@ -6,7 +6,10 @@ export const SUSTAINABILITY = {
   co2PerTreeDay: 22 / 365,
   waterPerKg: 0.61,
   energyPerKg: 2.3,
+  /** One sapling earned per full tonne of closed e-waste. */
   treesPerTonne: 1,
+  /** Years Urbeno nurtures each sapling toward self-reliance. */
+  nurtureYears: 3,
   heroMilestone: 10,
   cite: {
     co2: 'US EPA WARM model v16 (2023), mixed-electronics pathway',
@@ -14,6 +17,7 @@ export const SUSTAINABILITY = {
     tree: 'US Forest Service, urban tree CO2 sequestration',
     water: 'UNEP Global E-waste Monitor 2024, virgin baseline',
     energy: 'UNEP Global E-waste Monitor 2024, virgin baseline',
+    sapling: 'Urbeno Recycling Heroes — 1 sapling per tonne, nurtured for 3 years',
   },
 } as const;
 

@@ -517,7 +517,7 @@ export async function getHeroesReport(
   period?: ReportPeriod,
   filters?: { clientId?: string },
 ) {
-  if (actor.role === 'factory') throw new AppError('Recycle Heroes report is not available for factory accounts.');
+  if (actor.role === 'factory') throw new AppError('Recycling Heroes report is not available for factory accounts.');
   if (!hasFeature(actor, 'reports.heroes')) throw new AppError('You do not have access to this report.', 403);
   const resolved = period ?? parseReportPeriod({ period: 'fy' });
   const periodMeta = {
@@ -644,7 +644,7 @@ export const REGISTER_KINDS = {
   cod: { title: 'Certificate Log', description: 'Certificates issued and closure status' },
   category: { title: 'Category Recovery', description: 'Weight recovered by authorized category' },
   sustain: { title: 'Sustainability', description: 'Environmental impact with methodology' },
-  heroes: { title: 'Recycle Heroes', description: 'Tonnage and tree milestones' },
+  heroes: { title: 'Recycling Heroes', description: 'Tonnage and tree milestones' },
 } as const;
 
 export type RegisterType = keyof typeof REGISTER_KINDS;

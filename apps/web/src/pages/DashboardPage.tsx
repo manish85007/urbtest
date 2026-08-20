@@ -99,7 +99,7 @@ function ClientDashboard({
         </Link>
         <Link to="/heroes" className="client-quick-tile">
           <span className="client-quick-tile-ico">🌳</span>
-          <span className="client-quick-tile-l">Recycle Heroes</span>
+          <span className="client-quick-tile-l">Recycling Heroes</span>
           <span className="client-quick-tile-s">{report.treesPlanted} trees planted</span>
         </Link>
         <Link to="/reports" className="client-quick-tile">

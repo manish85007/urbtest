@@ -88,7 +88,7 @@ const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: 
     body:
       'Dear {{contact_name}},\n\n' +
       'Your e-waste collection request {{request_id}} for {{site_name}} has been closed.\n\n' +
-      'Thank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycle Heroes milestones.\n\n' +
+      'Thank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycling Heroes milestones.\n\n' +
       '{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited',
   },
   request_stage_update: {

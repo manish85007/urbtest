@@ -11,7 +11,7 @@ export function navItems(role: SessionUser['role']): NavItem[] {
     return [
       { to: '/', label: 'Dashboard', match: (p) => p === '/' },
       { to: '/requests', label: 'Requests', match: (p) => p.startsWith('/requests') },
-      { to: '/heroes', label: 'Recycle Heroes' },
+      { to: '/heroes', label: 'Recycling Heroes' },
       { to: '/impact', label: 'Sustainability' },
       { to: '/capacity', label: 'Capacity' },
       { to: '/masters', label: 'Masters' },
@@ -24,7 +24,7 @@ export function navItems(role: SessionUser['role']): NavItem[] {
     return [
       { to: '/', label: 'Dashboard', match: (p) => p === '/' },
       { to: '/requests', label: 'Requests', match: (p) => p.startsWith('/requests') },
-      { to: '/heroes', label: 'Recycle Heroes' },
+      { to: '/heroes', label: 'Recycling Heroes' },
       { to: '/impact', label: 'Sustainability' },
       { to: '/capacity', label: 'Capacity' },
       { to: '/reports', label: 'Reports' },
@@ -41,7 +41,7 @@ export function navItems(role: SessionUser['role']): NavItem[] {
   return [
     { to: '/', label: 'Home', match: (p) => p === '/' },
     { to: '/requests', label: 'My Requests', match: (p) => p.startsWith('/requests') },
-    { to: '/heroes', label: 'Recycle Heroes' },
+    { to: '/heroes', label: 'Recycling Heroes' },
     { to: '/impact', label: 'Sustainability' },
     { to: '/reports', label: 'Reports' },
   ];

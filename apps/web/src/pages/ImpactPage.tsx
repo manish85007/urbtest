@@ -106,7 +106,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
             Portfolio PDF
           </a>
           <Link to="/heroes" className="btn bp">
-            Recycle Heroes →
+            Recycling Heroes →
           </Link>
         </div>
         {msg ? <p className="ok-msg">{msg}</p> : null}
@@ -225,7 +225,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
           Impact PDF
         </a>
         <Link to="/heroes" className="btn bp">
-          Recycle Heroes →
+          Recycling Heroes →
         </Link>
       </div>
 
@@ -276,11 +276,21 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
       <div className="card">
         <div className="section-hd">Methodology</div>
         <ul className="legal" style={{ marginLeft: '1.1rem' }}>
+          <li>
+            <b>Recycling Heroes promise:</b> every 1 tonne of closed e-waste earns 1 sapling, nurtured for{' '}
+            {SUSTAINABILITY.nurtureYears} years toward self-reliance
+          </li>
           <li>CO₂e avoided: {SUSTAINABILITY.co2PerKg} kg per kg e-waste — EPA WARM v16, mixed electronics</li>
           <li>Landfill diversion: {SUSTAINABILITY.landfillRatio} — R2v3 downstream recovery average</li>
-          <li>Tree equivalent: {SUSTAINABILITY.co2PerTree} kg CO₂ per tree per year — US Forest Service</li>
           <li>Water / energy: {SUSTAINABILITY.waterPerKg} kL and {SUSTAINABILITY.energyPerKg} kWh per kg</li>
+          <li>
+            One organisation’s tonne keeps toxins out of soil and water; the sapling it unlocks cools air, holds
+            soil, and benefits the wider neighbourhood over years — small closed loops that scale into public good
+          </li>
         </ul>
+        <a className="btn bs bsm" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+          📄 Open full methodology PDF
+        </a>
       </div>
     </div>
   );

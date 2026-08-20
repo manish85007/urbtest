@@ -26,8 +26,8 @@ test.describe('smoke', () => {
 
   test('admin can open recycle heroes', async ({ page }) => {
     await login(page, 'admin@urbeno.in');
-    await page.getByRole('link', { name: 'Recycle Heroes' }).click();
-    await expect(page.locator('.h1', { hasText: 'Recycle Heroes' })).toBeVisible();
+    await page.getByRole('link', { name: 'Recycling Heroes' }).click();
+    await expect(page.locator('.h1', { hasText: 'Recycling Heroes' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Record Planting/ })).toBeVisible();
   });
 
