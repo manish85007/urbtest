@@ -77,7 +77,7 @@ function submissionNetKg(sub: SubmissionFull): number {
 }
 
 function factoryCanSee(actor: SessionUser, inv: InvoiceRow): boolean {
-  if (actor.role === 'admin') return true;
+  if (actor.role === 'admin' || actor.role === 'operations') return true;
   if (actor.role !== 'factory') return false;
   if (!inv.mrn) return true;
   return factoryInScope(actor, inv.mrn.factoryId);

@@ -158,7 +158,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
                   {staffReport.head.map((head) => (
                     <th key={head}>{head}</th>
                   ))}
-                  {isAdmin ? <th></th> : null}
+                  {isAdmin || isStaff ? <th></th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -170,7 +170,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
                       {row.map((cell, cellIdx) => (
                         <td key={cellIdx}>{cell}</td>
                       ))}
-                      {isAdmin ? (
+                      {isAdmin || isStaff ? (
                         <td>
                           <div className="frow" style={{ flexWrap: 'nowrap' }}>
                             <a
@@ -181,14 +181,16 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
                             >
                               PDF
                             </a>
-                            <button
-                              type="button"
-                              className="btn bp bsm"
-                              disabled={!!busyId}
-                              onClick={() => void share(name, clientId)}
-                            >
-                              {busyId === clientId ? 'Sharing…' : 'Share'}
-                            </button>
+                            {isAdmin ? (
+                              <button
+                                type="button"
+                                className="btn bp bsm"
+                                disabled={!!busyId}
+                                onClick={() => void share(name, clientId)}
+                              >
+                                {busyId === clientId ? 'Sharing…' : 'Share'}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       ) : null}

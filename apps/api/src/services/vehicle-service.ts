@@ -67,6 +67,15 @@ function assertReadyForLoadingComplete(
   }
 }
 
+/** Adding/changing fleet after loading ack invalidates the gate until ops re-acknowledges. */
+async function clearLoadingCompleteIfSet(submissionId: string, previouslySet: boolean) {
+  if (!previouslySet) return;
+  await prisma.submission.update({
+    where: { id: submissionId },
+    data: { loadingCompletedAt: null, loadingCompletedBy: null },
+  });
+}
+
 export async function addVehicle(
   actor: SessionUser,
   submissionId: string,
@@ -76,6 +85,9 @@ export async function addVehicle(
   const sub = await loadSubmissionForActor(submissionId, actor);
   if (!sub.acknowledgedAt) {
     throw new AppError('Acknowledge the request before assigning vehicles.');
+  }
+  if (sub.closedAt) {
+    throw new AppError('This request is closed — vehicles can no longer be assigned.');
   }
 
   const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
@@ -109,13 +121,20 @@ export async function addVehicle(
     include: { team: true, weighment: true },
   });
 
+  await clearLoadingCompleteIfSet(submissionId, !!sub.loadingCompletedAt);
+
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
     action: 'veh.add',
     entity: 'vehicle',
     entityId: vehicle.id,
-    details: { submissionId, reg: vehicle.registration, team: vehicle.team.length },
+    details: {
+      submissionId,
+      reg: vehicle.registration,
+      team: vehicle.team.length,
+      clearedLoadingComplete: !!sub.loadingCompletedAt,
+    },
   });
 
   const refreshed = await loadSubmissionForActor(submissionId, actor);
@@ -229,6 +248,11 @@ export async function recordWeighment(
     : await prisma.weighment.create({
         data: { vehicleId, ...data },
       });
+
+  // Editing an existing weighment after loading ack means slips/weights may have changed.
+  if (vehicle.weighment && sub.loadingCompletedAt) {
+    await clearLoadingCompleteIfSet(sub.id, true);
+  }
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);
   return { weighment, submission: withDerivedStages(refreshed) };
@@ -369,13 +393,18 @@ export async function deleteVehicle(actor: SessionUser, vehicleId: string) {
   }
 
   await prisma.vehicle.delete({ where: { id: vehicleId } });
+  await clearLoadingCompleteIfSet(sub.id, !!sub.loadingCompletedAt);
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
     action: 'veh.delete',
     entity: 'vehicle',
     entityId: vehicleId,
-    details: { submissionId: sub.id, registration: vehicle.registration },
+    details: {
+      submissionId: sub.id,
+      registration: vehicle.registration,
+      clearedLoadingComplete: !!sub.loadingCompletedAt,
+    },
   });
 
   const refreshed = await loadSubmissionForActor(sub.id, actor);

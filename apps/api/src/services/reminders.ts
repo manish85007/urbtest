@@ -133,7 +133,7 @@ export async function runReminders() {
         const firstTime = await markReminderOnce(key);
         if (firstTime) {
           const staff = await prisma.user.findMany({
-            where: { role: { in: ['admin', 'factory'] }, active: true },
+            where: { role: { in: ['admin', 'operations', 'factory'] }, active: true },
             select: { email: true },
           });
           const to = staff.map((u) => u.email);

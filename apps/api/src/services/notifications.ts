@@ -38,7 +38,7 @@ export async function notifyAdmins(kind: string, text: string, link?: string) {
 
 export async function notifyStaff(kind: string, text: string, link?: string) {
   const staff = await prisma.user.findMany({
-    where: { role: { in: ['admin', 'factory'] }, active: true },
+    where: { role: { in: ['admin', 'operations', 'factory'] }, active: true },
     select: { email: true },
   });
   await notifyUsers(

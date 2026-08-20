@@ -143,6 +143,14 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const unweighed = sub.vehicles.filter((v) => !v.weighment);
   const netKg = sub.vehicles.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
   const allWeighed = sub.vehicles.length > 0 && sub.vehicles.every((v) => v.weighment);
+  const slipsReady =
+    allWeighed &&
+    sub.vehicles.every((v) => {
+      const w = v.weighment;
+      if (!w) return false;
+      if (w.manual) return (w.pickupPhotoIds?.length ?? 0) > 0;
+      return (w.slipPhotoIds?.length ?? 0) > 0 && (w.pickupPhotoIds?.length ?? 0) > 0;
+    });
   const loadingComplete = !!sub.loadingCompletedAt;
   const hasMrn = sub.invoices.some((i) => i.mrn);
   const hasCod = sub.invoices.some((i) => i.certificates.length > 0);
@@ -200,7 +208,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             ⚖️ Weigh ({unweighed.length} pending)
           </button>
         ) : null}
-        {canManageVehicles && phase === 2 && allWeighed && !loadingComplete ? (
+        {canManageVehicles && phase === 2 && slipsReady && !loadingComplete ? (
           <button
             type="button"
             className="btn bp"
@@ -308,11 +316,11 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 void act(() => lifecycleApi.deleteVehicle(vehicleId), `Vehicle ${registration} removed.`);
               }}
             />
-            {canManageVehicles && allWeighed && !loadingComplete && !sub.closedAt ? (
+            {canManageVehicles && slipsReady && !loadingComplete && !sub.closedAt ? (
               <div className="card" style={{ marginTop: '.5rem' }}>
                 <div className="card-ttl">Acknowledge loading complete</div>
                 <p className="p-mu">
-                  All vehicles are weighed. Confirm loading is finished and weighment slips are uploaded to unlock
+                  All vehicles are weighed with slips/photos uploaded. Confirm loading is finished to unlock
                   invoicing.
                 </p>
                 <button
