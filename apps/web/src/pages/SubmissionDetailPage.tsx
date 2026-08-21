@@ -1261,9 +1261,11 @@ function CertificatesCard({ sub }: { sub: SubmissionDetail }) {
                 <td>
                   {c.fileId ? (
                     <a className="btn bp bsm" href={filesApi.url(c.fileId)} target="_blank" rel="noreferrer">
-                      ⬇
+                      ⬇ Download
                     </a>
-                  ) : null}
+                  ) : (
+                    <span className="dim">—</span>
+                  )}
                 </td>
               </tr>
             ))}

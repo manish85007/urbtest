@@ -117,11 +117,19 @@ export function ReportsPage({ user }: ReportsPageProps) {
   function exportCsv() {
     if (!report?.rows.length) return;
     const slug = report.periodLabel.replace(/[^\w]+/g, '-');
-    downloadCsvGrid(`urbeno-${type}-${slug}.csv`, report.head, report.rows);
+    const skip = new Set(
+      report.head
+        .map((h, i) => (h === 'Download' ? i : -1))
+        .filter((i) => i >= 0),
+    );
+    const head = report.head.filter((_, i) => !skip.has(i));
+    const rows = report.rows.map((row) => row.filter((_, i) => !skip.has(i)));
+    downloadCsvGrid(`urbeno-${type}-${slug}.csv`, head, rows);
   }
 
   const shown = report?.rows.slice(0, DISPLAY_CAP) ?? [];
   const requestCol = report?.head.findIndex((h) => h === 'Request') ?? -1;
+  const downloadCol = report?.head.findIndex((h) => h === 'Download') ?? -1;
 
   return (
     <div>
@@ -242,6 +250,12 @@ export function ReportsPage({ user }: ReportsPageProps) {
                         <td key={ci} className={typeof cell === 'number' ? 'mono' : undefined}>
                           {ci === requestCol && typeof cell === 'string' && cell ? (
                             <Link to={`/requests/${cell}`}>{cell}</Link>
+                          ) : ci === downloadCol && typeof cell === 'string' && cell ? (
+                            <a className="btn bp bsm" href={filesApi.url(cell)} target="_blank" rel="noreferrer">
+                              ⬇ Download
+                            </a>
+                          ) : ci === downloadCol ? (
+                            <span className="dim">—</span>
                           ) : (
                             String(cell ?? '')
                           )}

@@ -407,16 +407,40 @@ export function InvoiceLifecyclePanel({
                       <thead>
                         <tr>
                           <th>Certificate</th>
+                          <th>Department / Scope</th>
                           <th>Issued</th>
                           <th>Emailed</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {invoice.certificates.map((c) => (
                           <tr key={c.id ?? c.certNo}>
-                            <td className="mono">{c.certNo}</td>
+                            <td className="mono">
+                              <b>{c.certNo}</b>
+                              {c.note ? (
+                                <div className="dim" style={{ fontSize: '.7rem' }}>
+                                  {c.note}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td>{c.department || <span className="dim">whole invoice</span>}</td>
                             <td className="dim">{fmtDate(c.certDate)}</td>
                             <td>{c.mailedAt ? <span className="badge bg-g">sent</span> : '—'}</td>
+                            <td>
+                              {c.fileId ? (
+                                <a
+                                  className="btn bp bsm"
+                                  href={filesApi.url(c.fileId)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  ⬇ Download
+                                </a>
+                              ) : (
+                                <span className="dim">—</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -470,11 +494,28 @@ export function InvoiceLifecyclePanel({
                 </button>
               )}
             </div>
-            <div className="dim" style={{ fontSize: '.83rem' }}>
+            <div className="dim" style={{ fontSize: '.83rem', marginBottom: '.45rem' }}>
               {isAdmin
                 ? 'This invoice is ready to close. The client must sign off via their portal.'
                 : 'Confirm you have received the Certificate of Destruction, then acknowledge closure.'}
             </div>
+            {invoice.certificates.some((c) => c.fileId) ? (
+              <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+                {invoice.certificates
+                  .filter((c) => c.fileId)
+                  .map((c) => (
+                    <a
+                      key={c.id ?? c.certNo}
+                      className="btn bs bsm"
+                      href={filesApi.url(c.fileId!)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      ⬇ {c.certNo}
+                    </a>
+                  ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="card" style={{ marginBottom: '.6rem' }}>
@@ -483,6 +524,23 @@ export function InvoiceLifecyclePanel({
               The certificate is on file. Closure waits until this invoice is paid — payment can be recorded
               any time under the client’s terms and does not block earlier steps.
             </p>
+            {invoice.certificates.some((c) => c.fileId) ? (
+              <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', marginTop: '.45rem' }}>
+                {invoice.certificates
+                  .filter((c) => c.fileId)
+                  .map((c) => (
+                    <a
+                      key={c.id ?? c.certNo}
+                      className="btn bs bsm"
+                      href={filesApi.url(c.fileId!)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      ⬇ Download {c.certNo}
+                    </a>
+                  ))}
+              </div>
+            ) : null}
           </div>
         )
       ) : null}

@@ -868,7 +868,7 @@ export async function getRegisterReport(
         Number(r.categories.reduce((a, c) => a + Number(c.weightKg), 0).toFixed(3)),
       ]);
   } else if (type === 'cod') {
-    head = ['Certificate', 'Date', 'Department', 'Invoice', 'Request', 'Client', 'Form 6', 'Uploaded', 'Emailed', 'Closed By', 'Closed On', 'Rating'];
+    head = ['Certificate', 'Date', 'Department', 'Invoice', 'Request', 'Client', 'Form 6', 'Uploaded', 'Emailed', 'Closed By', 'Closed On', 'Rating', 'Download'];
     const certs = await prisma.certificate.findMany({
       where: { invoice: { submission: scope } },
       include: {
@@ -895,6 +895,7 @@ export async function getRegisterReport(
       c.invoice.closedBy || '',
       c.invoice.closedAt ? fmtDate(c.invoice.closedAt) : '',
       c.invoice.closeRating ?? '',
+      c.fileId || '',
     ]);
   } else if (type === 'category') {
     head = ['Entry', 'Description', 'Group', 'Activity', 'Authorized TPA', 'Recovered kg', 'Utilization %'];

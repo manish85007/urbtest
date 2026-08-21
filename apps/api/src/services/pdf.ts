@@ -446,14 +446,20 @@ export async function registerPdf(
   if (!report.rows.length) throw new AppError('Nothing to export for this period.');
   const co = await getCompanyProfile();
 
-  const shown = report.rows.slice(0, 80).map((r) => r.map((c) => String(c ?? '')));
+  const skipIdx = new Set(
+    report.head.map((h, i) => (h === 'Download' ? i : -1)).filter((i) => i >= 0),
+  );
+  const headers = report.head.filter((_, i) => !skipIdx.has(i));
+  const shown = report.rows
+    .slice(0, 80)
+    .map((r) => r.filter((_, i) => !skipIdx.has(i)).map((c) => String(c ?? '')));
   const buffer = buildTextPdf(
     report.title,
     `${report.periodLabel} · ${report.scopeLabel} · ${report.total} rows`,
     [
       {
         heading: 'REGISTER',
-        table: { headers: report.head, rows: shown },
+        table: { headers, rows: shown },
       },
       ...(report.total > 80
         ? [{ heading: 'NOTE', lines: [`Showing 80 of ${report.total} rows. Export CSV for the full set.`] }]
