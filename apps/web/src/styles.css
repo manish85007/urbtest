@@ -31,8 +31,8 @@ body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sa
 .top{background:#fff;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:50}
 .top-in{max-width:1400px;margin:0 auto;padding:.55rem 1rem;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:.5rem;cursor:pointer}
-.brand-i{width:34px;height:34px;border-radius:8px;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;overflow:hidden;flex-shrink:0}
-.brand-i img{width:100%;height:100%;object-fit:contain}
+.brand-i{width:34px;height:34px;border-radius:8px;background:transparent;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;overflow:hidden;flex-shrink:0}
+.brand-i img{width:100%;height:100%;object-fit:contain;display:block}
 .brand-t{font-family:'DM Serif Display',Georgia,serif;font-weight:400;font-size:1.12rem;color:var(--g2);line-height:1.05}
 .brand-s{font-size:.66rem;color:var(--mu)}
 .nav{display:flex;gap:.15rem;flex-wrap:wrap}
@@ -363,6 +363,7 @@ a { color: inherit; text-decoration: none; }
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 .app .wrap { flex: 1; width: 100%; }
 .brand-i svg { width: 100%; height: 100%; display: block; }
+.brand-i img { width: 100%; height: 100%; display: block; }
 button.nbell, button.sres-i, button.nitem { font-family: inherit; color: inherit; }
 button.nbell { background: none; border: none; }
 label:not(.file-upload-label):not(.check-label):not(.btn) {

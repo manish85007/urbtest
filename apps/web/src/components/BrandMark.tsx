@@ -1,3 +1,5 @@
+import urbenoMark from '../assets/urbeno-mark.png';
+
 const MARK_PATHS = (
   <>
     <path d="M35.7 8.8 A22 22 0 0 1 50.7 37.5 L44.7 40.3 L43.2 34.8 A14 14 0 0 0 33.6 16.5 Z" />
@@ -14,12 +16,14 @@ const MARK_PATHS = (
 
 export function LogoIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Urbeno" className={className}>
-      <rect width="60" height="60" rx="12" fill="#3B6D11" />
-      <g transform="translate(5.4 5.4) scale(0.82)" fill="#fff">
-        {MARK_PATHS}
-      </g>
-    </svg>
+    <img
+      src={urbenoMark}
+      alt="Urbeno"
+      width={34}
+      height={34}
+      className={className}
+      draggable={false}
+    />
   );
 }
 
