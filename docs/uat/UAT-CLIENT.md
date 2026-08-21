@@ -3,6 +3,8 @@
 **Role:** Client · waste generator / requestor  
 **Business rules:** stages 1 and 9, R4 (no MRN), C4–C6, sustainability counts **closed** invoices only, X7 consent, X11 no Compliance.
 
+**Spreadsheet for client testers:** [Urb-TecTrack-Client-Portal-UAT.xlsx](./Urb-TecTrack-Client-Portal-UAT.xlsx) — share this Excel file so clients can capture Pass/Fail results and sign off.
+
 | Field | Value |
 |-------|--------|
 | Environment / URL | |
