@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { S3Client, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Storage as GcsClient } from '@google-cloud/storage';
+import { AppError } from './errors.js';
 
 export interface StoredBlob {
   buffer: Buffer;
@@ -29,8 +30,14 @@ export class LocalStorage implements ObjectStorage {
   }
 
   async read(key: string): Promise<StoredBlob> {
-    const buffer = await readFile(this.pathForKey(key));
-    return { buffer, mimeType: 'application/octet-stream' };
+    try {
+      const buffer = await readFile(this.pathForKey(key));
+      return { buffer, mimeType: 'application/octet-stream' };
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT') throw new AppError('File not found.', 404);
+      throw err;
+    }
   }
 
   async delete(key: string): Promise<void> {

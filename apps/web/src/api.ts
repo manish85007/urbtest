@@ -609,6 +609,7 @@ export interface ClientDashboardReport {
   }>;
   pendingClose: Array<{
     submissionId: string;
+    invoiceId: string;
     invoiceNo: string;
     certificates: string[];
     issuedAt: string | null;

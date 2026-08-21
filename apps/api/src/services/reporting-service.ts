@@ -309,15 +309,21 @@ export async function getImpactReport(
     include: {
       submission: true,
       certificates: true,
+      payments: true,
       mrn: true,
       recycling: true,
     },
   });
 
   const pending = pendingClose
-    .filter((inv) => invoiceStage(inv) === 8)
+    .filter((inv) => {
+      if (invoiceStage(inv) !== 8) return false;
+      const pay = getPayStatus(inv.totalPaise, settledPaise(inv.payments));
+      return pay.key === 'paid';
+    })
     .map((inv) => ({
       submissionId: inv.submissionId,
+      invoiceId: inv.id,
       invoiceNo: inv.invoiceNo,
       certificates: inv.certificates.map((c) => c.certNo),
       issuedAt: inv.certificates[0]?.uploadedAt.toISOString().slice(0, 10) ?? null,
