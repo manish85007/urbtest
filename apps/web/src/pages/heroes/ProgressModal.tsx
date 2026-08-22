@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { dataApi, type HeroesPlanting } from '../../api';
 import { FileUpload } from '../../components/FileUpload';
+import { DateField } from '../../components/DateField';
 import { Modal } from '../../components/Modal';
 import { daysBetween, fmtDate, todayIso } from '../../lib/format';
 
@@ -56,17 +57,14 @@ export function ProgressModal({ planting: t, onClose, onSaved }: ProgressModalPr
       </p>
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">
-        <div className="fg">
-          <label htmlFor="pg-dt">Photo Date *</label>
-          <input
-            id="pg-dt"
-            type="date"
-            value={notedAt}
-            min={t.plantedAt}
-            max={todayIso()}
-            onChange={(e) => setNotedAt(e.target.value)}
-          />
-        </div>
+        <DateField
+          id="pg-dt"
+          label="Photo Date *"
+          value={notedAt}
+          min={t.plantedAt}
+          max={todayIso()}
+          onChange={setNotedAt}
+        />
         <div className="fg">
           <label htmlFor="pg-n">Existing checks</label>
           <input id="pg-n" type="text" value={`${t.progress.length} on record`} disabled />

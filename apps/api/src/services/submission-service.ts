@@ -13,6 +13,10 @@ import { assertFilesExist } from './file-service.js';
 import { notifyAdmins, notifyClientUsers, notifyUsers } from './notifications.js';
 import { notifyClient, notifyStaffNewRequest } from './submission-notify.js';
 import { isPastCalendarDate } from '@urb-tectrack/shared';
+import {
+  logSubmissionLifecycle,
+  summarizeSubmissionChanges,
+} from './submission-lifecycle.js';
 
 const PLACEHOLDER_ITEM = 'Mixed e-waste (see attached BoM)';
 
@@ -166,6 +170,14 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
     details: { clientId, siteId: site.id, approxWeight: input.approxWeight ?? 0 },
   });
 
+  await logSubmissionLifecycle(
+    sub.id,
+    'created',
+    `Request raised by ${actor.name}`,
+    actor,
+    { approxWeight: input.approxWeight ?? 0, approxQty: input.approxQty ?? 0 },
+  );
+
   await notifyAdmins(
     'sub.new',
     `New request ${sub.id} from ${client.name} — ${input.approxWeight ?? 0} kg approx`,
@@ -213,6 +225,7 @@ export async function acknowledgeSubmission(actor: SessionUser, submissionId: st
       acknowledgedBy: actor.email,
       rejectNote: null,
       rejectAt: null,
+      rejectBy: null,
     },
     include: submissionInclude,
   });
@@ -240,6 +253,14 @@ export async function acknowledgeSubmission(actor: SessionUser, submissionId: st
     details: { emailed: contact.email },
   });
 
+  await logSubmissionLifecycle(
+    submissionId,
+    'acknowledged',
+    `Acknowledged by ${actor.name}`,
+    actor,
+    { emailed: contact.email },
+  );
+
   return withDerivedStages(updated);
 }
 
@@ -253,6 +274,7 @@ export async function rejectSubmission(actor: SessionUser, submissionId: string,
     data: {
       rejectNote: reason.trim(),
       rejectAt: new Date(),
+      rejectBy: actor.email,
     },
     include: submissionInclude,
   });
@@ -277,6 +299,14 @@ export async function rejectSubmission(actor: SessionUser, submissionId: string,
     details: { reason: reason.trim() },
   });
 
+  await logSubmissionLifecycle(
+    submissionId,
+    'returned',
+    reason.trim(),
+    actor,
+    { reason: reason.trim() },
+  );
+
   return withDerivedStages(updated);
 }
 
@@ -291,6 +321,7 @@ export interface UpdateSubmissionInput {
   items?: SubmissionLineInput[];
   siteId?: string;
   requestDate?: string;
+  responseNote?: string;
 }
 
 export async function updateSubmission(
@@ -340,6 +371,24 @@ export async function updateSubmission(
     }
   }
 
+  const isClientResubmit = actor.role === 'client' && !!sub.rejectNote;
+  if (isClientResubmit) {
+    const responseNote = input.responseNote?.trim();
+    if (!responseNote) {
+      throw new AppError('Add a response explaining the changes you made before resubmitting.');
+    }
+  }
+
+  const changeSummary = summarizeSubmissionChanges(sub, {
+    location: input.location,
+    approxQty: input.approxQty,
+    approxWeight: input.approxWeight,
+    notes: input.notes,
+    ref: input.ref,
+    siteId: input.siteId,
+    requestDate: input.requestDate,
+  });
+
   const updated = await prisma.submission.update({
     where: { id: submissionId },
     data: {
@@ -354,6 +403,7 @@ export async function updateSubmission(
       requestDate: input.requestDate ? new Date(input.requestDate) : undefined,
       rejectNote: actor.role === 'client' ? null : undefined,
       rejectAt: actor.role === 'client' ? null : undefined,
+      rejectBy: actor.role === 'client' ? null : undefined,
       ...(nextItems
         ? {
             items: {
@@ -375,10 +425,27 @@ export async function updateSubmission(
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
-    action: 'sub.update',
+    action: isClientResubmit ? 'sub.resubmit' : 'sub.update',
     entity: 'submission',
     entityId: submissionId,
+    details: isClientResubmit
+      ? {
+          responseNote: input.responseNote?.trim(),
+          changes: changeSummary,
+          previousRejectNote: sub.rejectNote,
+        }
+      : { changes: changeSummary },
   });
+
+  if (isClientResubmit) {
+    await logSubmissionLifecycle(
+      submissionId,
+      'resubmitted',
+      input.responseNote!.trim(),
+      actor,
+      { changes: changeSummary, previousRejectNote: sub.rejectNote },
+    );
+  }
 
   if (actor.role === 'client') {
     await notifyAdmins(

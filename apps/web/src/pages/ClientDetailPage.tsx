@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { dataApi, filesApi, type ClientDetail, type FactorySummary, type LookupRow, type SiteSummary } from '../api';
 import { CompletionDialog } from '../components/CompletionDialog';
 import { FileUpload } from '../components/FileUpload';
+import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
 import { UserFormModal } from './masters/UserFormModal';
 
@@ -602,10 +603,7 @@ function PlantingModal({
           Trees
           <input type="number" min={1} value={trees} onChange={(e) => setTrees(e.target.value)} />
         </label>
-        <label>
-          Date
-          <input type="date" value={plantedAt} onChange={(e) => setPlantedAt(e.target.value)} />
-        </label>
+        <DateField label="Date" value={plantedAt} onChange={setPlantedAt} />
       </div>
       <label>
         Location

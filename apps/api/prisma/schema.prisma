@@ -191,6 +191,7 @@ model Submission {
   loadingCompletedBy String? @map("loading_completed_by")
   rejectNote   String?   @map("reject_note")
   rejectAt     DateTime? @map("reject_at")
+  rejectBy     String?   @map("reject_by")
   closedAt     DateTime? @map("closed_at")
 
   client       Client    @relation(fields: [clientId], references: [id])
@@ -199,8 +200,24 @@ model Submission {
   invoices     Invoice[]
   queries      RequestQuery[]
   items        SubmissionItem[]
+  lifecycleEvents SubmissionLifecycleEvent[]
 
   @@map("submissions")
+}
+
+model SubmissionLifecycleEvent {
+  id           String   @id @default(cuid())
+  submissionId String   @map("submission_id") @db.VarChar(16)
+  event        String
+  summary      String
+  actorEmail   String   @map("actor_email")
+  details      Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId, createdAt])
+  @@map("submission_lifecycle_events")
 }
 
 model SubmissionItem {
@@ -228,7 +245,7 @@ model Vehicle {
   logisticsPartner String? @map("logistics_partner")
   driverName   String   @map("driver_name")
   driverPhone  String   @map("driver_phone")
-  expectedAt   DateTime? @map("expected_at") @db.Date
+  expectedAt   DateTime? @map("expected_at")
   changeRemark String?  @map("change_remark")
   createdAt    DateTime @default(now()) @map("created_at")
 

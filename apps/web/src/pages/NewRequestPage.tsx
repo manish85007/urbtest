@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dataApi, lifecycleApi, type SessionUser } from '../api';
 import { FileUpload } from '../components/FileUpload';
+import { DateField } from '../components/DateField';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { Modal } from '../components/Modal';
 import { todayIso } from '../lib/format';
@@ -216,17 +217,14 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
             <label htmlFor="ns-ref">Your PO / Reference</label>
             <input id="ns-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="PO-1234" />
           </div>
-          <div className="fg">
-            <label htmlFor="ns-date">Pick Up Request Date *</label>
-            <input
-              id="ns-date"
-              type="date"
-              value={requestDate}
-              min={todayIso()}
-              onChange={(e) => setRequestDate(e.target.value)}
-              required
-            />
-          </div>
+          <DateField
+            id="ns-date"
+            label="Pick Up Request Date *"
+            value={requestDate}
+            min={todayIso()}
+            onChange={setRequestDate}
+            required
+          />
           <div className="fg">
             <label htmlFor="ns-qty">Approx. Quantity (units) *</label>
             <input

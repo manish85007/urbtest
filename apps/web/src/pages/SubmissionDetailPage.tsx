@@ -17,11 +17,15 @@ import { WorkflowSection } from '../components/WorkflowSection';
 import { FileUpload } from '../components/FileUpload';
 import { FileRow } from '../components/FileThumb';
 import { QueryThread } from '../components/QueryThread';
+import { RequestLifecycleCard } from '../components/RequestLifecycleCard';
+import { DateField } from '../components/DateField';
+import { DateTimeField } from '../components/DateTimeField';
 import { PhoneField } from '../components/PhoneField';
 import { Modal } from '../components/Modal';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, fmtTS, num, todayIso } from '../lib/format';
+import { defaultDateTimeValue, localDateIso, splitDateTime } from '../lib/datetime';
 import { isStaffUser, userCan } from '../lib/permissions';
 
 type StepModal =
@@ -42,22 +46,6 @@ function clientEmailRecipient(sub: Pick<SubmissionDetail, 'onBehalfOf' | 'create
   const onBehalf = sub.onBehalfOf?.trim();
   if (onBehalf) return onBehalf;
   return sub.createdBy;
-}
-
-function formatPickupConfirm(value: string) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function localToday() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function dateInputValue(value?: string | null) {
-  return value ? value.slice(0, 10) : '';
 }
 
 function invoicePdfIds(inv?: InvoiceDetail | null) {
@@ -189,6 +177,11 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         <Link to="/requests" className="btn bs">
           ← Back
         </Link>
+        {showResubmit ? (
+          <button type="button" className="btn bp" disabled={busy} onClick={() => setStep({ kind: 'edit' })}>
+            ✉️ Respond & resubmit
+          </button>
+        ) : null}
         {canAck && phase === 1 && stage === 1 ? (
           <button type="button" className="btn bp" disabled={busy} onClick={() => setStep({ kind: 'ack' })}>
             ✅ Acknowledge Request
@@ -246,7 +239,19 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           {sub.rejectAt ? (
             <div className="dim" style={{ fontSize: '.73rem', marginTop: '.3rem' }}>
               {fmtTS(sub.rejectAt)}
+              {sub.rejectBy ? ` · ${sub.rejectBy}` : ''}
             </div>
+          ) : null}
+          {user.role === 'client' ? (
+            <button
+              type="button"
+              className="btn bp bsm"
+              style={{ marginTop: '.55rem' }}
+              disabled={busy}
+              onClick={() => setStep({ kind: 'edit' })}
+            >
+              Respond with updates
+            </button>
           ) : null}
         </div>
       ) : null}
@@ -497,6 +502,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
 
         <div>
           <DetailsCard sub={sub} />
+          <RequestLifecycleCard events={sub.lifecycleEvents ?? []} />
           <RecyclingSlaSidebar invoices={sub.invoices} />
           <QueryThread
             submissionId={sub.id}
@@ -667,7 +673,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
 
       {step?.kind === 'edit' ? (
         <Modal
-          title={`Edit Request — ${sub.id}`}
+          title={showResubmit ? `Respond & update — ${sub.id}` : `Edit Request — ${sub.id}`}
           onClose={() => setStep(null)}
           okLabel={showResubmit ? 'Save and resubmit' : 'Save changes'}
           form="edit-request-form"
@@ -1510,6 +1516,7 @@ function EditRequestForm({
     ref?: string;
     siteId?: string;
     requestDate?: string;
+    responseNote?: string;
     items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
   }) => void;
 }) {
@@ -1522,6 +1529,7 @@ function EditRequestForm({
   const [approxWeight, setApproxWeight] = useState(String(sub.approxWeight));
   const [notes, setNotes] = useState(sub.notes ?? '');
   const [ref, setRef] = useState(sub.ref ?? '');
+  const [responseNote, setResponseNote] = useState('');
   const [items, setItems] = useState<DraftLine[]>(
     sub.items?.length
       ? sub.items.map((i) => ({
@@ -1552,15 +1560,43 @@ function EditRequestForm({
           approxWeight: Number(approxWeight),
           notes,
           ref,
+          responseNote: resubmit ? responseNote.trim() : undefined,
           items: named,
         });
       }}
     >
+      {resubmit && sub.rejectNote ? (
+        <div className="card" style={{ background: 'var(--rd2)', borderColor: '#fecaca', marginBottom: '.8rem' }}>
+          <div className="card-ttl" style={{ color: 'var(--rd)', fontSize: '.82rem' }}>
+            Urbeno requested changes
+          </div>
+          <div style={{ fontSize: '.84rem', marginTop: '.25rem' }}>{sub.rejectNote}</div>
+          {sub.rejectAt ? (
+            <div className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
+              {fmtTS(sub.rejectAt)}
+              {sub.rejectBy ? ` · ${sub.rejectBy}` : ''}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <p className="dim" style={{ fontSize: '.8rem', marginBottom: '.8rem' }}>
         {resubmit
-          ? 'You can edit this request until Urbeno acknowledges it.'
+          ? 'Update the request details below, explain what you changed, then resubmit to Urbeno.'
           : 'Admin edit — all changes are audit-logged.'}
       </p>
+      {resubmit ? (
+        <div className="fg" style={{ marginBottom: '.8rem' }}>
+          <label htmlFor="er-response">Your response to Urbeno</label>
+          <textarea
+            id="er-response"
+            value={responseNote}
+            onChange={(e) => setResponseNote(e.target.value)}
+            required
+            rows={3}
+            placeholder="Explain the updates you made (e.g. revised pickup location, attached BoM, corrected quantities)."
+          />
+        </div>
+      ) : null}
       <div className="fr2">
         <div className="fg">
           <label htmlFor="er-site">Site</label>
@@ -1580,16 +1616,14 @@ function EditRequestForm({
           <label htmlFor="er-ref">PO / Reference</label>
           <input id="er-ref" value={ref} onChange={(e) => setRef(e.target.value)} />
         </div>
-        <div className="fg">
-          <label htmlFor="er-date">Pick Up Request Date</label>
-          <input
-            id="er-date"
-            type="date"
-            value={requestDate}
-            min={originalPickup < todayIso() ? originalPickup : todayIso()}
-            onChange={(e) => setRequestDate(e.target.value)}
-          />
-        </div>
+        <DateField
+          id="er-date"
+          label="Pick Up Request Date"
+          value={requestDate}
+          min={originalPickup < todayIso() ? originalPickup : todayIso()}
+          onChange={setRequestDate}
+          required
+        />
         <div className="fg">
           <label htmlFor="er-qty">Approx. Quantity</label>
           <input id="er-qty" type="number" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />
@@ -1676,11 +1710,6 @@ function RejectForm({
   );
 }
 
-function localDateTimeValue(d = new Date()) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function AssignVehicleForm({
   disabled,
   onAssign,
@@ -1711,9 +1740,9 @@ function AssignVehicleForm({
   const [driverName, setDriverName] = useState(vehicle?.driverName ?? '');
   const [driverPhone, setDriverPhone] = useState(vehicle?.driverPhone ?? '');
   const [partner, setPartner] = useState(vehicle?.logisticsPartner ?? '');
-  const initialExpected = vehicle?.expectedAt ? new Date(vehicle.expectedAt) : new Date();
-  const [expectedDraft, setExpectedDraft] = useState(localDateTimeValue(initialExpected));
-  const [expectedAt, setExpectedAt] = useState(vehicle?.expectedAt ? localDateTimeValue(initialExpected) : '');
+  const [expectedAt, setExpectedAt] = useState(
+    vehicle?.expectedAt ? vehicle.expectedAt : defaultDateTimeValue(),
+  );
   const [remark, setRemark] = useState(vehicle?.changeRemark ?? '');
   const [team, setTeam] = useState<Array<{ name: string; role: string; phone: string }>>(() => {
     if (!vehicle?.team?.length) return [];
@@ -1741,7 +1770,7 @@ function AssignVehicleForm({
         e.preventDefault();
         setError('');
         if (!expectedAt) {
-          setError('Select expected pickup date and time, then press OK.');
+          setError('Select expected pickup date and time.');
           return;
         }
         if (!/^[A-Z0-9]+$/.test(registration)) {
@@ -1821,45 +1850,15 @@ function AssignVehicleForm({
             ))}
           </select>
         </div>
-        <div className="fg">
-          <label htmlFor="vh-exp">Expected pickup date & time</label>
-          <div className="frow" style={{ alignItems: 'center', marginBottom: 0 }}>
-            <input
-              id="vh-exp"
-              type="datetime-local"
-              value={expectedDraft}
-              onChange={(e) => {
-                setExpectedDraft(e.target.value);
-                if (e.target.value !== expectedAt) setExpectedAt('');
-              }}
-              required={!expectedAt}
-              style={{ flex: 1 }}
-            />
-            <button
-              type="button"
-              id="vh-exp-ok"
-              className="btn bp bsm"
-              disabled={!expectedDraft}
-              onClick={() => {
-                if (!expectedDraft) {
-                  setError('Select date and time first.');
-                  return;
-                }
-                setExpectedAt(expectedDraft);
-                setError('');
-              }}
-            >
-              OK
-            </button>
-          </div>
-          {expectedAt ? (
-            <p className="ok-msg" style={{ margin: '.35rem 0 0' }}>
-              Confirmed pickup: {formatPickupConfirm(expectedAt)}
-            </p>
-          ) : (
-            <p className="hint" style={{ textAlign: 'left' }}>Select date and time, then press OK to confirm</p>
-          )}
-        </div>
+        <DateTimeField
+          id="vh-exp"
+          label="Expected pickup date & time"
+          value={expectedAt}
+          minDate={localDateIso()}
+          onChange={setExpectedAt}
+          required
+          hint="Choose a date, set the time (or tap a quick slot). No separate confirm step needed."
+        />
         <div className="fg">
           <label htmlFor="vh-drv">Driver name</label>
           <input id="vh-drv" value={driverName} onChange={(e) => setDriverName(e.target.value)} required />
@@ -2146,10 +2145,10 @@ function InvoiceForm({
   formId?: string;
   onSubmit: (body: InvoiceFormBody) => void;
 }) {
-  const today = localToday();
+  const today = localDateIso();
   const taxRates = useLookups('taxRate');
   const [invoiceNo, setInvoiceNo] = useState(invoice?.invoiceNo ?? '');
-  const [invoiceDate, setInvoiceDate] = useState(dateInputValue(invoice?.invoiceDate));
+  const [invoiceDate, setInvoiceDate] = useState(splitDateTime(invoice?.invoiceDate).date);
   const [taxableAmount, setTaxableAmount] = useState(
     invoice?.taxablePaise != null ? String(paiseToRupees(Number(invoice.taxablePaise))) : '',
   );
@@ -2158,7 +2157,7 @@ function InvoiceForm({
     invoice?.billingMode === 'client' ? 'client' : 'urbeno',
   );
   const [eway, setEway] = useState(invoice?.ewayBillNo ?? '');
-  const [ewayDate, setEwayDate] = useState(dateInputValue(invoice?.ewayBillDate));
+  const [ewayDate, setEwayDate] = useState(splitDateTime(invoice?.ewayBillDate).date);
   const [vehIds, setVehIds] = useState<string[]>(() =>
     invoice?.vehicleIds?.length ? invoice.vehicleIds : vehicles.map((v) => v.id),
   );
@@ -2293,10 +2292,14 @@ function InvoiceForm({
             style={{ fontFamily: 'ui-monospace, monospace' }}
           />
         </div>
-        <div className="fg">
-          <label htmlFor="iv-dt">Invoice date</label>
-          <input id="iv-dt" type="date" max={today} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} required />
-        </div>
+        <DateField
+          id="iv-dt"
+          label="Invoice date"
+          value={invoiceDate}
+          max={today}
+          onChange={setInvoiceDate}
+          required
+        />
       </div>
       <div className="fr3">
         <div className="fg">
@@ -2365,10 +2368,14 @@ function InvoiceForm({
             style={{ fontFamily: 'ui-monospace, monospace' }}
           />
         </div>
-        <div className="fg">
-          <label htmlFor="iv-ewdt">E-way bill date</label>
-          <input id="iv-ewdt" type="date" max={today} value={ewayDate} onChange={(e) => setEwayDate(e.target.value)} required />
-        </div>
+        <DateField
+          id="iv-ewdt"
+          label="E-way bill date"
+          value={ewayDate}
+          max={today}
+          onChange={setEwayDate}
+          required
+        />
       </div>
       <div className="fr2">
         <div className="fg">

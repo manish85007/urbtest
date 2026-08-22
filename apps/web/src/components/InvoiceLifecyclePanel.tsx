@@ -20,6 +20,7 @@ import { Modal } from './Modal';
 import { MrnForm } from './MrnForm';
 import { RecyclingForm } from './RecyclingForm';
 import { CollapsibleCard } from './CollapsibleCard';
+import { DateField } from './DateField';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 import { isStaffUser, userCan } from '../lib/permissions';
@@ -1251,10 +1252,13 @@ function CertificateForm({
             required
           />
         </label>
-        <label>
-          Certificate Date *
-          <input type="date" value={certDate} max={today} onChange={(e) => setCertDate(e.target.value)} required />
-        </label>
+        <DateField
+          label="Certificate Date *"
+          value={certDate}
+          max={today}
+          onChange={setCertDate}
+          required
+        />
       </div>
       <label>
         Department / Scope{' '}
@@ -1342,10 +1346,7 @@ function PaymentForm({
     >
       <h3>{existing ? 'Edit payment' : 'Record payment'}</h3>
       <div className="fr2">
-        <label>
-          Payment date
-          <input type="date" value={paidAt} max={todayYmd} onChange={(e) => setPaidAt(e.target.value)} required />
-        </label>
+        <DateField label="Payment date" value={paidAt} max={todayYmd} onChange={setPaidAt} required />
         <label>
           Payment mode
           <select value={mode} onChange={(e) => setMode(e.target.value)}>

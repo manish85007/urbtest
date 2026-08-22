@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { complianceApi, type ControlRow } from '../api';
+import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
 
 type Tab = 'controls' | 'security' | 'access' | 'incidents' | 'privacy' | 'retention' | 'evidence';
@@ -434,10 +435,11 @@ function IncidentsTab({ onError }: { onError: (s: string) => void }) {
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </div>
           <div className="fr2">
-            <div className="fg">
-              <label>Detected on</label>
-              <input type="date" value={form.detectedAt} onChange={(e) => setForm({ ...form, detectedAt: e.target.value })} />
-            </div>
+            <DateField
+              label="Detected on"
+              value={form.detectedAt}
+              onChange={(detectedAt) => setForm({ ...form, detectedAt })}
+            />
             <div className="fg">
               <label>Severity</label>
               <select value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>

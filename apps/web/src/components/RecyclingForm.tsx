@@ -10,6 +10,7 @@ import {
 } from '@urb-tectrack/shared';
 import { dataApi, type CategorySummary, type VehicleDetail } from '../api';
 import { FileUpload } from './FileUpload';
+import { DateField } from './DateField';
 import { num } from '../lib/format';
 
 const GROUPS: MaterialGroupCode[] = ['ITEW', 'CEEW', 'LSEEW', 'EETW', 'TLSEW', 'MDW', 'LIW'];
@@ -273,10 +274,13 @@ export function RecyclingForm({
         </div>
       </div>
       <div className="fr2">
-        <div className="fg">
-          <label htmlFor="rc-dt">Processing Date</label>
-          <input id="rc-dt" type="date" value={processedAt} onChange={(e) => setProcessedAt(e.target.value)} required />
-        </div>
+        <DateField
+          id="rc-dt"
+          label="Processing Date"
+          value={processedAt}
+          onChange={setProcessedAt}
+          required
+        />
         <div className="fg">
           <label htmlFor="rc-fac">Facility</label>
           <div className="tile" style={{ marginTop: '.15rem' }}>

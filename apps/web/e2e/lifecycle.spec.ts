@@ -41,8 +41,7 @@ test.describe('full lifecycle', () => {
     await page.getByLabel('Registration').fill(`KAE2E${uniq}`);
     await page.getByLabel('Driver name').fill('E2E Driver');
     await page.getByLabel('Driver phone').fill('9900112233');
-    await page.locator('#vh-exp-ok').click();
-    await expect(page.getByText(/Confirmed pickup:/)).toBeVisible();
+    await page.locator('#vh-exp-time').fill('09:00');
     await page.locator('.modal').getByRole('button', { name: 'Assign vehicle' }).click();
     await expect(page.getByText('Vehicle assigned.')).toBeVisible({ timeout: 10_000 });
 
@@ -155,6 +154,7 @@ test.describe('full lifecycle', () => {
     await login(page, 'ramesh@techcorp.in');
     await page.goto(`/requests/${submissionId}`);
     await expect(page.getByText('Please update pickup location details.')).toBeVisible();
+    await page.getByLabel('Your response to Urbeno').fill('Updated pickup location as requested.');
     await page.getByLabel('Pickup Location').fill(`Updated bay ${uniq}`);
     await page.locator('.modal').getByRole('button', { name: 'Save and resubmit' }).click();
     await expect(page.getByText('Request updated and sent back to Urbeno.')).toBeVisible();

@@ -30,6 +30,7 @@ export const submissionInclude = {
   },
   queries: { include: { replies: { orderBy: { createdAt: 'asc' as const } } }, orderBy: { createdAt: 'asc' as const } },
   items: { orderBy: { sortOrder: 'asc' as const } },
+  lifecycleEvents: { orderBy: { createdAt: 'asc' as const } },
 } satisfies Prisma.SubmissionInclude;
 
 export type SubmissionFull = Prisma.SubmissionGetPayload<{ include: typeof submissionInclude }>;

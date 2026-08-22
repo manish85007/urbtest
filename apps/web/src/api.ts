@@ -462,6 +462,8 @@ export interface SubmissionDetail {
   bomFileIds?: string[];
   rejectNote?: string | null;
   rejectAt?: string | null;
+  rejectBy?: string | null;
+  lifecycleEvents?: SubmissionLifecycleEvent[];
   createdBy: string;
   onBehalfOf?: string | null;
   createdAt?: string;
@@ -493,6 +495,15 @@ export interface SubmissionDetail {
     categoryId?: string | null;
     invoiceId?: string | null;
   }>;
+}
+
+export interface SubmissionLifecycleEvent {
+  id: string;
+  event: string;
+  summary: string;
+  actorEmail: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface QueueItem {
@@ -1095,6 +1106,7 @@ export const lifecycleApi = {
       items?: Array<{ name: string; qty?: number; weightKg?: number; hsn?: string }>;
       siteId?: string;
       requestDate?: string;
+      responseNote?: string;
     },
   ) =>
     api<SubmissionDetail>(`/submissions/${id}`, {

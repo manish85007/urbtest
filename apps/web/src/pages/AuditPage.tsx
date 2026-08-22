@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { dataApi, type AuditLogPage } from '../api';
 import { downloadCsvGrid } from '../lib/csv';
+import { DateField } from '../components/DateField';
 import { fmtTS } from '../lib/format';
 
 const EMPTY: AuditLogPage = {
@@ -167,14 +168,8 @@ export function AuditPage() {
           </div>
         </div>
         <div className="fr4">
-          <div className="fg">
-            <label>From</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="fg">
-            <label>To</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
+          <DateField label="From" value={from} onChange={setFrom} />
+          <DateField label="To" value={to} onChange={setTo} />
           <div className="fg">
             <label>Sort</label>
             <select value={sort} onChange={(e) => setSort(e.target.value)}>

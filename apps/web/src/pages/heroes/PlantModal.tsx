@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { dataApi, type HeroesAdminReport } from '../../api';
 import { FileUpload } from '../../components/FileUpload';
+import { DateField } from '../../components/DateField';
 import { Modal } from '../../components/Modal';
 import { todayIso } from '../../lib/format';
 
@@ -114,19 +115,14 @@ export function PlantModal({ asClient, clientName, clientId, clients = [], onClo
             onChange={(e) => setTrees(e.target.value)}
           />
         </div>
-        <div className="fg">
-          <label htmlFor="tp-dt">Planting Date *</label>
-          <input
-            id="tp-dt"
-            type="date"
-            value={plantedAt}
-            max={todayIso()}
-            onChange={(e) => setPlantedAt(e.target.value)}
-          />
-          <div className="dim" style={{ fontSize: '.71rem', marginTop: '.2rem' }}>
-            CO₂ capture accrues daily from this date
-          </div>
-        </div>
+        <DateField
+          id="tp-dt"
+          label="Planting Date *"
+          value={plantedAt}
+          max={todayIso()}
+          onChange={setPlantedAt}
+          hint="CO₂ capture accrues daily from this date"
+        />
         <div className="fg">
           <label htmlFor="tp-p">{asClient ? 'Drive / Programme' : 'Planting Partner'}</label>
           <input

@@ -1,5 +1,6 @@
 import { listFiscalYears, periodLabel, parseReportPeriod } from '@urb-tectrack/shared';
 import type { PeriodQuery } from '../api';
+import { DateField } from './DateField';
 
 export function PeriodPicker({
   value,
@@ -64,24 +65,20 @@ export function PeriodPicker({
       ) : null}
       {kind === 'custom' ? (
         <>
-          <div className="fg" style={{ margin: 0 }}>
-            <label htmlFor="period-from">From</label>
-            <input
-              id="period-from"
-              type="date"
-              value={value.from ?? ''}
-              onChange={(e) => onChange({ ...value, from: e.target.value })}
-            />
-          </div>
-          <div className="fg" style={{ margin: 0 }}>
-            <label htmlFor="period-to">To</label>
-            <input
-              id="period-to"
-              type="date"
-              value={value.to ?? ''}
-              onChange={(e) => onChange({ ...value, to: e.target.value })}
-            />
-          </div>
+          <DateField
+            id="period-from"
+            label="From"
+            className="compact"
+            value={value.from ?? ''}
+            onChange={(from) => onChange({ ...value, from })}
+          />
+          <DateField
+            id="period-to"
+            label="To"
+            className="compact"
+            value={value.to ?? ''}
+            onChange={(to) => onChange({ ...value, to })}
+          />
         </>
       ) : null}
       {variant === 'card' ? (

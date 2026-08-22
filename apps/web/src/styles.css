@@ -134,6 +134,13 @@ textarea{min-height:70px;resize:vertical}
 .fr4{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
 @media(max-width:700px){.fr2,.fr3,.fr4{grid-template-columns:1fr}}
 input[type=checkbox],input[type=radio]{width:auto}
+input[type=date],input[type=time],input[type=datetime-local]{color-scheme:light;min-height:2.35rem;cursor:pointer}
+.date-field-preview{font-size:.78rem;color:var(--g2);margin-top:.28rem;font-weight:600}
+.date-field.compact{margin-bottom:0}
+.dt-split{display:grid;grid-template-columns:1.35fr .85fr;gap:.45rem;align-items:center}
+.dt-presets{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.4rem}
+.dt-preset.on{background:var(--g3);border-color:var(--g);color:var(--g2);font-weight:700}
+@media(max-width:700px){.dt-split{grid-template-columns:1fr}}
 
 .phone-in{display:flex;align-items:stretch;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fff}
 .phone-in select{width:92px;flex:0 0 92px;border:none;border-right:1px solid var(--bd);border-radius:0;background:var(--g5);font-weight:700;padding:.45rem .4rem}

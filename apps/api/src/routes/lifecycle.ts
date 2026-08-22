@@ -178,6 +178,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           items: z.array(lineItemSchema).optional(),
           siteId: z.string().min(1).optional(),
           requestDate: z.string().optional(),
+          responseNote: z.string().optional(),
         })
         .parse(request.body);
       return await updateSubmission(request.user!, id, body);
