@@ -644,6 +644,10 @@ export async function getHeroesReport(
 
 export const REGISTER_KINDS = {
   summary: { title: 'Request Summary', description: 'Every request with stage, weight and dates' },
+  complete: {
+    title: 'Complete Request Summary',
+    description: 'Full lifecycle export — request, invoice, MRN, Form 6, CoD, materials and dates',
+  },
   invoices: { title: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding' },
   mrn: { title: 'MRN Register', description: 'Goods received at factory sites — internal', staffOnly: true },
   form6: { title: 'Form 6 Log', description: 'Processing records with categories' },
@@ -783,6 +787,90 @@ export async function getRegisterReport(
         s.closedAt ? fmtDate(s.closedAt) : '',
       ];
     });
+  } else if (type === 'complete') {
+    head = [
+      'Request',
+      'Client',
+      'Site',
+      'PO Ref',
+      'Request Date',
+      'Request Stage',
+      'Invoice No',
+      'Invoice Date',
+      'E-way Bill',
+      'Billing kg',
+      'Payment Status',
+      'MRN No',
+      'MRN Date',
+      'Factory',
+      'Form 6 No',
+      'Recycling Date',
+      'Categories',
+      'Material kg',
+      'Serial Count',
+      'CoD No',
+      'CoD Date',
+      'Invoice Closed',
+      'Request Closed',
+    ];
+    const invoices = await prisma.invoice.findMany({
+      where: { submission: scope },
+      include: {
+        payments: true,
+        mrn: { include: { factory: true } },
+        recycling: { include: { categories: { include: { category: true } }, serials: true, factory: true } },
+        certificates: { orderBy: { certDate: 'asc' } },
+        submission: { include: submissionInclude },
+      },
+      orderBy: [{ submission: { requestDate: 'desc' } }, { invoiceDate: 'desc' }],
+      take: 5000,
+    });
+    rows = invoices
+      .filter((inv) => inP(inv.invoiceDate))
+      .filter((inv) => actor.role !== 'factory' || !inv.mrn || factoryInScope(actor, inv.mrn.factoryId))
+      .filter(
+        (inv) =>
+          actor.role !== 'factory' ||
+          !inv.recycling ||
+          factoryInScope(actor, inv.recycling.factoryId),
+      )
+      .map((inv) => {
+        const sub = inv.submission;
+        const stage = deriveSubmissionStage(sub);
+        const paid = settledPaise(inv.payments);
+        const pay = getPayStatus(inv.totalPaise, paid);
+        const rec = inv.recycling;
+        const cats = rec?.categories ?? [];
+        const catLabels = cats.map((c) => c.entryId).join(' / ');
+        const catDesc = cats.map((c) => c.category?.description || c.entryId).join(' / ');
+        const matKg = cats.reduce((a, c) => a + Number(c.weightKg), 0);
+        const cert = inv.certificates[0];
+        return [
+          sub.id,
+          sub.client.name,
+          sub.site.name,
+          sub.ref || '',
+          fmtDate(sub.requestDate),
+          `${stage} · ${stageLabel(stage)}`,
+          inv.invoiceNo,
+          fmtDate(inv.invoiceDate),
+          inv.ewayBillNo || '',
+          Number(inv.billingWeight),
+          pay.label,
+          inv.mrn?.mrnNo || '',
+          inv.mrn ? fmtDate(inv.mrn.receivedAt) : '',
+          inv.mrn?.factory.name || rec?.factory.name || '',
+          rec?.form6No || '',
+          rec ? fmtDate(rec.processedAt) : '',
+          catLabels || catDesc,
+          matKg ? Number(matKg.toFixed(3)) : '',
+          rec?.serials.length ?? 0,
+          cert?.certNo || '',
+          cert ? fmtDate(cert.certDate) : '',
+          inv.closedAt ? fmtDate(inv.closedAt) : '',
+          sub.closedAt ? fmtDate(sub.closedAt) : '',
+        ];
+      });
   } else if (type === 'invoices') {
     head = ['Invoice', 'Request', 'Client', 'Date', 'Taxable', 'GST', 'Total', 'Paid', 'Outstanding', 'Status', 'E-way Bill', 'Stage'];
     const invoices = await prisma.invoice.findMany({

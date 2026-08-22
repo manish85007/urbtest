@@ -24,6 +24,7 @@ const KINDS: Array<{
   clientHidden?: boolean;
 }> = [
   { id: 'summary', label: 'Request Summary', description: 'Every request with stage, weight and dates', factoryHidden: true },
+  { id: 'complete', label: 'Complete Request Summary', description: 'Full lifecycle — invoice, MRN, Form 6, CoD, materials and dates' },
   { id: 'invoices', label: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding', factoryHidden: true },
   { id: 'mrn', label: 'MRN Register', description: 'Goods received at factory sites — internal', clientHidden: true },
   { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories' },

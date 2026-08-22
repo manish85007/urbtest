@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="utf-8"><title>Local UAT Feature Test Report</title>
+<style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+h1 { font-size: 18pt; color: #1a472a; }
+h2 { font-size: 13pt; margin-top: 18pt; }
+table { border-collapse: collapse; width: 100%; margin-top: 12pt; }
+th, td { border: 1px solid #999; padding: 6pt 8pt; vertical-align: top; }
+th { background: #e8f5e9; }
+.summary { margin: 12pt 0; }
+</style></head>
+<body>
+<h1>Urb TecTrack — Local UAT Feature Test Report</h1>
+<p><b>Environment:</b> http://localhost:8080<br>
+<b>Date:</b> 22/8/2026, 11:32:26 am<br>
+<b>Scope:</b> Serial search, duplicate checks, complete summary report</p>
+<div class="summary">
+<p><b>Summary:</b> 11 passed, 0 failed, 0 informational (11 total checks)</p>
+</div>
+<h2>Features Delivered</h2>
+<ol>
+<li><b>Serial number search</b> — Global search finds devices by serial and links to the parent request.</li>
+<li><b>Serial duplicate check (client level)</b> — Serials cannot be reused on another request; error cites existing REQ id.</li>
+<li><b>Invoice duplicate check (client level)</b> — Invoice numbers are unique per client account across all requests.</li>
+<li><b>Complete Request Summary report</b> — New report under Reports with CSV export (Excel-compatible) covering request, invoice, MRN, Form 6, CoD, materials and dates.</li>
+</ol>
+<h2>Test Results</h2>
+<table>
+<tr><th>Area</th><th>Test</th><th>Result</th><th>Detail</th><th>Fix / Notes</th></tr>
+<tr><td>Setup</td><td>Client login</td><td>PASS</td><td>ramesh@techcorp.in</td><td></td></tr>
+<tr><td>Serial search</td><td>Global search returns serial with request link</td><td>PASS</td><td>LPT-G3235X → REQ-00048</td><td></td></tr>
+<tr><td>Complete summary report</td><td>Excel/CSV export columns and data</td><td>PASS</td><td>21 rows, 23 columns</td><td></td></tr>
+<tr><td>Client reports</td><td>Register form6</td><td>PASS</td><td>20 rows</td><td></td></tr>
+<tr><td>Client reports</td><td>Register cod</td><td>PASS</td><td>17 rows</td><td></td></tr>
+<tr><td>Client reports</td><td>Register category</td><td>PASS</td><td>26 rows</td><td></td></tr>
+<tr><td>Client reports</td><td>Register complete</td><td>PASS</td><td>21 rows</td><td></td></tr>
+<tr><td>Client dashboard</td><td>Dashboard loads</td><td>PASS</td><td></td><td></td></tr>
+<tr><td>Invoice duplicate check</td><td>Client-level validation in create/update invoice</td><td>PASS</td><td>Validation added — reference INV-11111 on REQ-00094</td><td>assertClientInvoiceNoUnique() in invoice-service</td></tr>
+<tr><td>Setup</td><td>Staff login</td><td>PASS</td><td></td><td></td></tr>
+<tr><td>Serial duplicate check</td><td>Client-level validation on import/recycling</td><td>PASS</td><td>assertClientSerialsUnique() blocks cross-request reuse with REQ id in error</td><td>duplicate-service.ts + serial-service + recordRecycling</td></tr>
+</table>
+<h2>Sign-off</h2>
+<p>Tester: _________________________ &nbsp;&nbsp; Date: _____________</p>
+</body></html>

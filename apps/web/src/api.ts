@@ -33,6 +33,7 @@ export interface SessionUser {
 
 export type RegisterType =
   | 'summary'
+  | 'complete'
   | 'invoices'
   | 'mrn'
   | 'form6'

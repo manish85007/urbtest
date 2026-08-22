@@ -91,6 +91,37 @@ export async function searchPortal(actor: SessionUser, qRaw: string): Promise<Se
     }
   }
 
+  const serialHits = await prisma.serial.findMany({
+    where: {
+      serialNo: { contains: q, mode: 'insensitive' },
+      recycling: { invoice: { submission: clientScopeFilter(actor) } },
+    },
+    include: {
+      recycling: {
+        include: {
+          invoice: {
+            include: {
+              submission: { include: { client: true, site: true } },
+            },
+          },
+        },
+      },
+    },
+    take: 30,
+    orderBy: { serialNo: 'asc' },
+  });
+
+  for (const s of serialHits) {
+    const inv = s.recycling.invoice;
+    const sub = inv.submission;
+    push({
+      grp: 'Serial Numbers',
+      label: s.serialNo,
+      sub: `${sub.id} · ${inv.invoiceNo} · ${sub.client.name}`,
+      href: `/requests/${sub.id}`,
+    });
+  }
+
   if (isStaff(actor)) {
     const clients = await prisma.client.findMany({
       where: { active: true },

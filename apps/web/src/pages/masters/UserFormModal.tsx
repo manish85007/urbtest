@@ -4,6 +4,7 @@ import { Modal } from '../../components/Modal';
 
 const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | 'operations' | 'factory' | 'client'> }> = [
   { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin', 'operations'] },
+  { id: 'reports.complete', label: 'Report: Complete Request Summary', roles: ['admin', 'operations', 'client'] },
   { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin', 'operations'] },
   { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin', 'operations'] },
   { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations'] },

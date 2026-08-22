@@ -161,7 +161,7 @@ async function main() {
     await api('POST', `/submissions/${newId}/acknowledge`, { expect: [403, 401] });
   }
 
-  for (const type of ['form6', 'cod', 'category', 'invoices']) {
+  for (const type of ['form6', 'cod', 'category', 'invoices', 'complete']) {
     const r = await api('GET', `/reports/register/${type}?period=fy`);
     assert(`Report ${type}`, r.status === 200 && Array.isArray(r.data?.head));
   }

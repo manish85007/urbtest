@@ -5,6 +5,7 @@ import { nextSequence } from '../lib/db-helpers.js';
 import { loadInvoiceForActor, requirePermission } from '../lib/access.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
+import { assertClientSerialsUnique } from './duplicate-service.js';
 
 export interface SerialRowInput {
   serialNo: string;
@@ -92,6 +93,12 @@ export async function importSerials(
   }
   if (!rows.length) throw new AppError('No serial rows found in the file.');
   if (serialFileId) await assertFilesExist([serialFileId], ['serials']);
+
+  await assertClientSerialsUnique(
+    invoice.submission.clientId,
+    rows.map((r) => r.serialNo),
+    invoice.submissionId,
+  );
 
   await prisma.serial.createMany({
     data: rows.map((r) => ({

@@ -5,6 +5,8 @@
 
 **Spreadsheet for client testers:** [Urb-TecTrack-Client-Portal-UAT.xlsx](./Urb-TecTrack-Client-Portal-UAT.xlsx) — share this Excel file so clients can capture Pass/Fail results and sign off.
 
+**Latest automated feature test report (Local UAT):** [Local-UAT-Feature-Test-Report.doc](./Local-UAT-Feature-Test-Report.doc)
+
 | Field | Value |
 |-------|--------|
 | Environment / URL | |

@@ -30,6 +30,7 @@ import { auditLog } from './audit.js';
 import { logSoD, sodCheck } from './compliance.js';
 import { assertFilesExist } from './file-service.js';
 import { assertCategoryCapacityOrOverride } from './category-capacity.js';
+import { assertClientInvoiceNoUnique, assertClientSerialsUnique } from './duplicate-service.js';
 import { notifyClient } from './submission-notify.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
 
@@ -309,10 +310,12 @@ export async function createInvoice(
     );
   }
 
-  const duplicate = sub.invoices.some((i) => i.invoiceNo === input.invoiceNo.trim());
+  const trimmedNo = input.invoiceNo.trim();
+  const duplicate = sub.invoices.some((i) => i.invoiceNo === trimmedNo);
   if (duplicate) {
-    throw new AppError(`Invoice ${input.invoiceNo.trim()} already exists on this request.`);
+    throw new AppError(`Invoice ${trimmedNo} already exists on this request.`);
   }
+  await assertClientInvoiceNoUnique(sub.clientId, trimmedNo, { excludeSubmissionId: sub.id });
 
   assertNotFutureDate(input.invoiceDate, 'Invoice date');
   assertNotFutureDate(input.ewayBillDate, 'E-way bill date');
@@ -395,6 +398,10 @@ export async function updateInvoice(actor: SessionUser, invoiceId: string, input
   if (duplicate) {
     throw new AppError(`Invoice ${nextNo} already exists on this request.`);
   }
+  await assertClientInvoiceNoUnique(sub.clientId, nextNo, {
+    excludeInvoiceId: invoiceId,
+    excludeSubmissionId: sub.id,
+  });
 
   assertNotFutureDate(input.invoiceDate, 'Invoice date');
   assertNotFutureDate(input.ewayBillDate, 'E-way bill date');
@@ -902,6 +909,14 @@ export async function createRecycling(
   if (input.photoIds?.length) await assertFilesExist(input.photoIds, ['processing']);
   if (input.reportIds?.length) await assertFilesExist(input.reportIds, ['report']);
   if (input.serialFileId) await assertFilesExist([input.serialFileId], ['serials']);
+
+  if (input.serials?.length) {
+    await assertClientSerialsUnique(
+      invoice.submission.clientId,
+      input.serials.map((s) => s.serialNo),
+      invoice.submissionId,
+    );
+  }
 
   const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
   const processedAt = new Date(input.processedAt);
