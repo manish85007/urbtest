@@ -28,6 +28,11 @@ const KINDS: Array<{
   { id: 'invoices', label: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding', factoryHidden: true },
   { id: 'mrn', label: 'MRN Register', description: 'Goods received at factory sites — internal', clientHidden: true },
   { id: 'form6', label: 'Form 6 Log', description: 'FY-indexed manifests with invoice weight, vehicles and categories' },
+  {
+    id: 'serials',
+    label: 'Device Serials',
+    description: 'Per-device register — serial, asset tag, make/model, custody, Device CoD and recycling details',
+  },
   { id: 'cod', label: 'Certificate Log', description: 'Certificates issued and closure status' },
   { id: 'category', label: 'Category Recovery', description: 'Weight recovered by authorized category' },
   { id: 'sustain', label: 'Sustainability', description: 'Environmental impact with methodology', factoryHidden: true },

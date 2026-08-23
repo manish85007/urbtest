@@ -10,6 +10,7 @@ const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | '
   { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations'] },
   { id: 'reports.mrn', label: 'Report: MRN Register', roles: ['factory'] },
   { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory', 'client'] },
+  { id: 'reports.serials', label: 'Report: Device Serials', roles: ['admin', 'operations', 'factory', 'client'] },
   { id: 'reports.cod', label: 'Report: Certificate Log', roles: ['factory', 'client'] },
   { id: 'reports.category', label: 'Report: Category Recovery', roles: ['factory', 'client'] },
   { id: 'reports.capacity', label: 'Report: Capacity Utilisation', roles: ['factory'] },

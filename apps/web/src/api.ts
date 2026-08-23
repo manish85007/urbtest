@@ -37,6 +37,7 @@ export type RegisterType =
   | 'invoices'
   | 'mrn'
   | 'form6'
+  | 'serials'
   | 'cod'
   | 'category'
   | 'sustain'

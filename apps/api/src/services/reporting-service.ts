@@ -651,6 +651,10 @@ export const REGISTER_KINDS = {
   invoices: { title: 'Invoice Register', description: 'All invoices with e-way, payment status and outstanding' },
   mrn: { title: 'MRN Register', description: 'Goods received at factory sites — internal', staffOnly: true },
   form6: { title: 'Form 6 Log', description: 'Processing records with categories' },
+  serials: {
+    title: 'Device Serials',
+    description: 'Per-device serial register — custody, destruction and Device CoD for recycled assets',
+  },
   cod: { title: 'Certificate Log', description: 'Certificates issued and closure status' },
   category: { title: 'Category Recovery', description: 'Weight recovered by authorized category' },
   sustain: { title: 'Sustainability', description: 'Environmental impact with methodology' },
@@ -961,6 +965,78 @@ export async function getRegisterReport(
         r.serials.length,
         Number(r.categories.reduce((a, c) => a + Number(c.weightKg), 0).toFixed(3)),
       ]);
+  } else if (type === 'serials') {
+    head = [
+      'Serial',
+      'Asset Tag',
+      'Make',
+      'Model',
+      'Status',
+      'Device CoD',
+      'Destroy Std',
+      'Destroy Method',
+      'Destroy Op',
+      'Destroyed',
+      'Client',
+      'Site',
+      'Request',
+      'Invoice',
+      'Invoice Date',
+      'Form 6',
+      'Recycling Date',
+      'Factory',
+      'Request Closed',
+    ];
+    const serials = await prisma.serial.findMany({
+      where: { recycling: { invoice: { submission: scope } } },
+      include: {
+        recycling: {
+          include: {
+            factory: true,
+            invoice: {
+              include: {
+                submission: { include: { client: true, site: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ serialNo: 'asc' }],
+      take: 10000,
+    });
+    rows = serials
+      .filter((s) => {
+        const rec = s.recycling;
+        if (actor.role === 'factory' && !factoryInScope(actor, rec.factoryId)) return false;
+        const periodDate = s.destroyedAt ?? rec.processedAt;
+        return inP(periodDate);
+      })
+      .map((s) => {
+        const rec = s.recycling;
+        const inv = rec.invoice;
+        const sub = inv.submission;
+        return [
+          s.serialNo,
+          s.assetTag || '',
+          s.make || '',
+          s.model || '',
+          s.dcodNo ? 'Destroyed' : 'In custody',
+          s.dcodNo || '',
+          s.destroyStd || '',
+          s.destroyMethod || '',
+          s.destroyOp || '',
+          s.destroyedAt ? fmtDate(s.destroyedAt) : '',
+          sub.client.name,
+          sub.site.name,
+          sub.id,
+          inv.invoiceNo,
+          fmtDate(inv.invoiceDate),
+          rec.form6No,
+          fmtDate(rec.processedAt),
+          rec.factory.name,
+          sub.closedAt ? fmtDate(sub.closedAt) : '',
+        ];
+      });
   } else if (type === 'cod') {
     head = ['Certificate', 'Date', 'Department', 'Invoice', 'Request', 'Client', 'Form 6', 'Uploaded', 'Emailed', 'Closed By', 'Closed On', 'Rating', 'Download'];
     const certs = await prisma.certificate.findMany({
