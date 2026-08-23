@@ -3,7 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { legalApi } from '../api';
 import { COMPANY } from '../lib/company';
 
-export function LegalPage() {
+interface LegalPageProps {
+  standalone?: boolean;
+}
+
+export function LegalPage({ standalone = false }: LegalPageProps) {
   const { key } = useParams<{ key: string }>();
   const [doc, setDoc] = useState<{ title: string; version: string; body: string; effectiveDate: string } | null>(
     null,
@@ -30,9 +34,9 @@ export function LegalPage() {
   }, [key]);
 
   return (
-    <div>
+    <div className={standalone ? 'standalone-page' : undefined}>
       <p className="muted">
-        <Link to="/">← Dashboard</Link>
+        <Link to="/">{standalone ? '← Sign in' : '← Dashboard'}</Link>
       </p>
       {error ? <p className="error">{error}</p> : null}
       {!doc ? (

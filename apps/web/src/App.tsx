@@ -58,24 +58,38 @@ export function App() {
   }, [user]);
 
   if (loading) {
-    return <div className="center">Loading Urb TecTrack…</div>;
+    return (
+      <div className="page-root">
+        <div className="center">Loading Urb TecTrack…</div>
+      </div>
+    );
   }
 
   if (!user) {
     return (
-      <Routes>
-        <Route path="/legal/:key" element={<LegalPage />} />
-        <Route path="*" element={<LoginPage onLogin={setUser} />} />
-      </Routes>
+      <div className="page-root">
+        <Routes>
+          <Route path="/legal/:key" element={<LegalPage standalone />} />
+          <Route path="*" element={<LoginPage onLogin={setUser} />} />
+        </Routes>
+      </div>
     );
   }
 
   if (checkingLegal) {
-    return <div className="center">Checking policies…</div>;
+    return (
+      <div className="page-root">
+        <div className="center">Checking policies…</div>
+      </div>
+    );
   }
 
   if (!legalOk) {
-    return <LegalConsentGate onAccepted={() => setLegalOk(true)} />;
+    return (
+      <div className="page-root">
+        <LegalConsentGate onAccepted={() => setLegalOk(true)} />
+      </div>
+    );
   }
 
   return (
