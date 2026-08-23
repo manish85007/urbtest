@@ -25,6 +25,11 @@ import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 import { isStaffUser, userCan } from '../lib/permissions';
 
+/** Goods receipt exists — use hasMrn for clients (MRN payload is R4-redacted). */
+export function invoiceHasGoodsReceipt(invoice: Pick<InvoiceDetail, 'mrn' | 'hasMrn' | 'recycling' | 'certificates' | 'closedAt'>): boolean {
+  return !!(invoice.hasMrn || invoice.mrn || invoice.recycling || invoice.certificates?.length || invoice.closedAt);
+}
+
 export type InvoicePanelSection = 'invoice-mrn' | 'recycling' | 'close';
 
 interface InvoiceLifecyclePanelProps {
@@ -105,6 +110,7 @@ export function InvoiceLifecyclePanel({
       : vehicles;
   const billingKg = Number(invoice.billingWeight || 0);
   const vehicleNet = Number(invoice.vehicleNetKg ?? 0);
+  const hasGoodsReceipt = invoiceHasGoodsReceipt(invoice);
   const canCreateMrn = perms.createMrn && !invoice.mrn && !invoice.closedAt;
   const canCreateForm6 = perms.manageRecycling && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
   const canEditForm6 = perms.manageRecycling && !!invoice.recycling && !invoice.closedAt;
@@ -120,19 +126,31 @@ export function InvoiceLifecyclePanel({
         badge={
           <>
             <span className={`badge ${payCls(pay.key)}`}>{pay.label}</span>
-            {invoice.mrn ? (
-              <span className="badge bg-bl">MRN</span>
+            {isStaff ? (
+              invoice.mrn ? (
+                <span className="badge bg-bl">MRN</span>
+              ) : (
+                <span className="badge bg-am">MRN pending</span>
+              )
+            ) : hasGoodsReceipt ? (
+              <span className="badge bg-bl">Received</span>
             ) : (
-              <span className="badge bg-am">MRN pending</span>
+              <span className="badge bg-am">In transit</span>
             )}
           </>
         }
-        defaultOpen={!invoice.mrn || !isPaid}
+        defaultOpen={!hasGoodsReceipt || !isPaid}
         style={{ marginBottom: '.6rem' }}
         summary={
           <span>
             {fmtDate(invoice.invoiceDate)} · {num(billingKg)} kg billed
-            {invoice.mrn ? ` · ${invoice.mrn.mrnNo}` : ' · awaiting goods receipt'}
+            {isStaff
+              ? invoice.mrn
+                ? ` · ${invoice.mrn.mrnNo}`
+                : ' · awaiting goods receipt'
+              : hasGoodsReceipt
+                ? ' · received at facility'
+                : ' · awaiting facility receipt'}
           </span>
         }
         actions={
@@ -374,11 +392,13 @@ export function InvoiceLifecyclePanel({
       ) : null}
 
       {section === 'recycling' ? (
-        !invoice.mrn ? (
+        !hasGoodsReceipt ? (
           <div className="card" style={{ marginBottom: '.6rem' }}>
             <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
             <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
-              Record the MRN for this invoice before Form 6 can be issued.
+              {isStaff
+                ? 'Record the MRN for this invoice before Form 6 can be issued.'
+                : 'Recycling and certificates appear after the material is received at the facility.'}
             </p>
           </div>
         ) : (
@@ -461,8 +481,13 @@ export function InvoiceLifecyclePanel({
                 </p>
               </div>
             )}
-            {isStaff && invoice.recycling ? (
-              <SerialPanel invoice={invoice} disabled={disabled || !!invoice.closedAt} onAction={onAction} />
+            {invoice.recycling ? (
+              <SerialPanel
+                invoice={invoice}
+                disabled={disabled || !!invoice.closedAt}
+                readOnly={!isStaff}
+                onAction={onAction}
+              />
             ) : null}
           </>
         )
@@ -1162,10 +1187,19 @@ function RecyclingCard({
               </div>
             </>
           ) : null}
-          {isStaff ? (
+          {serials.length ? (
             <div style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--g2)', margin: '.6rem 0 .3rem' }}>
-              Serial-level custody ({serials.length})
-              {serials.length ? <span className="badge bg-g" style={{ marginLeft: '.4rem' }}>{destroyed} destroyed</span> : null}
+              Device serial tracking ({serials.length})
+              <span className="badge bg-g" style={{ marginLeft: '.4rem' }}>{destroyed} destroyed</span>
+              {serials.length - destroyed > 0 ? (
+                <span className="badge bg-am" style={{ marginLeft: '.35rem' }}>
+                  {serials.length - destroyed} in custody
+                </span>
+              ) : null}
+            </div>
+          ) : isStaff ? (
+            <div style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--g2)', margin: '.6rem 0 .3rem' }}>
+              Serial-level custody (0)
             </div>
           ) : null}
         </>
@@ -1452,14 +1486,17 @@ function CloseForm({
 function SerialPanel({
   invoice,
   disabled,
+  readOnly = false,
   onAction,
 }: {
   invoice: InvoiceDetail;
   disabled: boolean;
+  readOnly?: boolean;
   onAction: (fn: () => Promise<unknown>, success: string) => Promise<boolean> | boolean | void;
 }) {
   const serials = invoice.recycling?.serials ?? [];
   const pending = serials.filter((s) => !s.dcodNo).length;
+  const destroyed = serials.length - pending;
   const standards = useLookups('destructStd');
   const [std, setStd] = useState('NIST');
   const [destroyOpen, setDestroyOpen] = useState(false);
@@ -1484,22 +1521,36 @@ function SerialPanel({
   }
 
   return (
-    <div className="sub-form">
-      <h3>Serial-level custody ({serials.length})</h3>
+    <div className="sub-form" id="serial-tracking">
+      <h3>{readOnly ? 'Device last-mile tracking' : 'Serial-level custody'} ({serials.length})</h3>
       <p className="dim" style={{ fontSize: '.8rem' }}>
-        Upload a CSV with headers Serial, AssetTag, Item, Condition, Weight —{' '}
-        <a href={filesApi.pdf('/serials/template.csv')}>sample CSV</a>.
+        {readOnly ? (
+          'Search any device serial or asset tag in the header to jump here. Status shows custody through secure destruction.'
+        ) : (
+          <>
+            Upload a CSV with headers Serial, AssetTag, Item, Condition, Weight —{' '}
+            <a href={filesApi.pdf('/serials/template.csv')}>sample CSV</a>.
+          </>
+        )}
       </p>
-      <input type="file" accept=".csv,text/csv" disabled={disabled} onChange={(e) => void onCsv(e.target.files)} />
       {serials.length ? (
-        <div className="tw" style={{ maxHeight: 260, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>
+          <span className="badge bg-g">{destroyed} destroyed</span>
+          {pending > 0 ? <span className="badge bg-am">{pending} in custody</span> : null}
+        </div>
+      ) : null}
+      {!readOnly ? (
+        <input type="file" accept=".csv,text/csv" disabled={disabled} onChange={(e) => void onCsv(e.target.files)} />
+      ) : null}
+      {serials.length ? (
+        <div className="tw" style={{ maxHeight: 320, overflowY: 'auto' }}>
           <table>
             <thead>
               <tr>
                 <th>Serial</th>
                 <th>Asset Tag</th>
-                <th>Standard</th>
-                <th>Operator</th>
+                <th>Device</th>
+                <th>Status</th>
                 <th>Device CoD</th>
               </tr>
             </thead>
@@ -1510,14 +1561,14 @@ function SerialPanel({
                     <b>{s.serialNo}</b>
                   </td>
                   <td className="mono dim">{s.assetTag || '—'}</td>
+                  <td className="dim">{[s.make, s.model].filter(Boolean).join(' ') || '—'}</td>
                   <td>
-                    {s.destroyStd ? (
-                      <span className="badge bg-bl">{lookupLabel(standards, s.destroyStd, s.destroyStd)}</span>
+                    {s.destroyStd || s.dcodNo ? (
+                      <span className="badge bg-bl">{lookupLabel(standards, s.destroyStd, s.destroyStd || 'Destroyed')}</span>
                     ) : (
-                      <span className="badge bg-am">pending</span>
+                      <span className="badge bg-am">in custody</span>
                     )}
                   </td>
-                  <td className="dim">{s.destroyOp || '—'}</td>
                   <td className="mono">{s.dcodNo || '—'}</td>
                 </tr>
               ))}
@@ -1526,8 +1577,14 @@ function SerialPanel({
         </div>
       ) : (
         <div className="dim" style={{ fontSize: '.8rem' }}>
-          No serials imported yet. Upload a CSV with the headers{' '}
-          <span className="mono">Serial, AssetTag, Item, Condition, Weight</span>.
+          {readOnly ? (
+            'No device serials recorded on this request yet.'
+          ) : (
+            <>
+              No serials imported yet. Upload a CSV with the headers{' '}
+              <span className="mono">Serial, AssetTag, Item, Condition, Weight</span>.
+            </>
+          )}
         </div>
       )}
       {serials.length > 60 ? (
@@ -1535,7 +1592,7 @@ function SerialPanel({
           Showing 60 of {serials.length}
         </div>
       ) : null}
-      {pending > 0 ? (
+      {!readOnly && pending > 0 ? (
         <button type="button" className="btn bp bsm" disabled={disabled} onClick={() => setDestroyOpen(true)}>
           Record destruction ({pending})
         </button>

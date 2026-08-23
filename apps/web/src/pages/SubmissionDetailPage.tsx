@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL, settledPaise } from '@urb-tectrack/shared';
 import {
   dataApi,
@@ -12,7 +12,7 @@ import {
 } from '../api';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { StageBadge, StageProgress } from '../components/StageProgress';
-import { InvoiceLifecyclePanel } from '../components/InvoiceLifecyclePanel';
+import { InvoiceLifecyclePanel, invoiceHasGoodsReceipt } from '../components/InvoiceLifecyclePanel';
 import { WorkflowSection } from '../components/WorkflowSection';
 import { FileUpload } from '../components/FileUpload';
 import { FileRow } from '../components/FileThumb';
@@ -70,6 +70,7 @@ function invoiceDeletable(inv: InvoiceDetail, requestClosed?: string | null) {
 
 export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [sub, setSub] = useState<SubmissionDetail | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -93,6 +94,14 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
       setStep({ kind: 'edit' });
     }
   }, [user.role, sub?.id, sub?.derivedStage, sub?.rejectNote]);
+
+  useEffect(() => {
+    if (!sub || searchParams.get('focus') !== 'serials') return;
+    const t = window.setTimeout(() => {
+      document.getElementById('serial-tracking')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [sub?.id, searchParams]);
 
   async function act(fn: () => Promise<unknown>, success: string): Promise<boolean> {
     setBusy(true);
@@ -140,7 +149,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
       return (w.slipPhotoIds?.length ?? 0) > 0 && (w.pickupPhotoIds?.length ?? 0) > 0;
     });
   const loadingComplete = !!sub.loadingCompletedAt;
-  const hasMrn = sub.invoices.some((i) => i.mrn);
+  const hasMrn = sub.invoices.some((i) => invoiceHasGoodsReceipt(i));
   const hasCod = sub.invoices.some((i) => i.certificates.length > 0);
   const phase2Locked = !sub.acknowledgedAt;
   const phase3Locked = !loadingComplete;
@@ -391,10 +400,12 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                                 </span>
                               </td>
                               <td>
-                                {inv.mrn ? (
+                                {isStaff && inv.mrn ? (
                                   <span className="badge bg-bl">{inv.mrn.mrnNo}</span>
+                                ) : invoiceHasGoodsReceipt(inv) ? (
+                                  <span className="badge bg-bl">Received</span>
                                 ) : (
-                                  <span className="badge bg-am">Pending</span>
+                                  <span className="badge bg-am">{isStaff ? 'Pending' : 'In transit'}</span>
                                 )}
                               </td>
                             </tr>

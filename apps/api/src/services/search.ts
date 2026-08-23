@@ -93,8 +93,14 @@ export async function searchPortal(actor: SessionUser, qRaw: string): Promise<Se
 
   const serialHits = await prisma.serial.findMany({
     where: {
-      serialNo: { contains: q, mode: 'insensitive' },
       recycling: { invoice: { submission: clientScopeFilter(actor) } },
+      OR: [
+        { serialNo: { contains: q, mode: 'insensitive' } },
+        { assetTag: { contains: q, mode: 'insensitive' } },
+        { make: { contains: q, mode: 'insensitive' } },
+        { model: { contains: q, mode: 'insensitive' } },
+        { dcodNo: { contains: q, mode: 'insensitive' } },
+      ],
     },
     include: {
       recycling: {
@@ -114,11 +120,14 @@ export async function searchPortal(actor: SessionUser, qRaw: string): Promise<Se
   for (const s of serialHits) {
     const inv = s.recycling.invoice;
     const sub = inv.submission;
+    const status = s.dcodNo ? `Destroyed · ${s.dcodNo}` : 'In custody';
+    const asset = s.assetTag ? ` · ${s.assetTag}` : '';
+    const device = [s.make, s.model].filter(Boolean).join(' ');
     push({
-      grp: 'Serial Numbers',
+      grp: 'Device Serials',
       label: s.serialNo,
-      sub: `${sub.id} · ${inv.invoiceNo} · ${sub.client.name}`,
-      href: `/requests/${sub.id}`,
+      sub: `${status}${asset}${device ? ` · ${device}` : ''} · ${sub.id} · ${sub.client.name}`,
+      href: `/requests/${sub.id}?focus=serials`,
     });
   }
 

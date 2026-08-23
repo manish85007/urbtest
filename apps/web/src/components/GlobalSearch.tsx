@@ -45,7 +45,7 @@ export function GlobalSearch() {
       <input
         type="text"
         value={q}
-        placeholder="Search anything — ID, serial, invoice, CoD, MRN…"
+        placeholder="Search device serial, asset tag, request, invoice, CoD…"
         onChange={(e) => setQ(e.target.value)}
         onFocus={() => {
           if (q.trim().length >= 2) setOpen(true);

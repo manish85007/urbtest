@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { seedLookups } from '../src/services/lookups.js';
 import { backfillAuditHashes } from '../src/services/audit.js';
 import { seedLifecycleSamples } from './seed-lifecycle.js';
+import { seedSerialTrackingDemo } from './seed-serials.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 for (const envPath of [resolve(here, '../.env'), resolve(here, '../../../.env')]) {
@@ -467,6 +468,8 @@ async function main() {
     BHRT: bhrtSite.id,
   });
 
+  await seedSerialTrackingDemo(prisma, site.id);
+
   await seedLookups();
 
   await prisma.treePlanting.upsert({
@@ -594,7 +597,7 @@ async function main() {
   await backfillAuditHashes();
 
   console.log(
-    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, demo requests, 25 closed lifecycle samples, lookups, v6.4 compliance registers`,
+    `Seeded ${factories.length} factories, ${users.length} users, ${categories.length} categories, ${emailTemplates.length} email templates, ${legalDocs.length} legal documents, demo requests, 25 closed lifecycle samples, device serials (last-mile search), lookups, v6.4 compliance registers`,
   );
 }
 

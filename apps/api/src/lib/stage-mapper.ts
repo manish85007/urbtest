@@ -37,6 +37,8 @@ export function withDerivedStages(sub: SubmissionFull) {
     invoices: sub.invoices.map((inv) => ({
       ...inv,
       derivedStage: deriveInvoiceStage(inv),
+      /** Preserved for clients after MRN redaction (R4). */
+      hasMrn: !!inv.mrn,
     })),
   };
 }

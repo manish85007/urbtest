@@ -384,6 +384,8 @@ export interface InvoiceDetail {
   ewayFileIds?: string[];
   vehicleIds?: string[];
   derivedStage: number;
+  /** True when an MRN exists; still set for clients after MRN payload is redacted. */
+  hasMrn?: boolean;
   closedAt: string | null;
   closedBy?: string | null;
   closeRating?: number | null;
