@@ -25,7 +25,7 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { clientScopeFilter, factoryInScope, hasFeature, isStaff } from '../lib/auth-context.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
-import { deriveSubmissionStage } from '../lib/stage-mapper.js';
+import { deriveSubmissionStage, recyclingApproved } from '../lib/stage-mapper.js';
 import { AppError } from '../lib/errors.js';
 import { requireAdmin } from '../lib/access.js';
 import { sendTransactionalEmail } from './email.js';
@@ -61,13 +61,13 @@ async function loadInvoiceRows(actor: SessionUser) {
 function invoiceStage(inv: {
   closedAt: Date | null;
   certificates: unknown[];
-  recycling: unknown | null;
+  recycling: { reviewStatus?: string } | null;
   mrn: unknown | null;
 }): number {
   return invStage({
     closedAt: inv.closedAt,
     hasCertificate: inv.certificates.length > 0,
-    hasRecycling: !!inv.recycling,
+    hasRecycling: recyclingApproved(inv.recycling),
     hasMrn: !!inv.mrn,
   });
 }
@@ -843,8 +843,10 @@ export async function getRegisterReport(
         const stage = deriveSubmissionStage(sub);
         const paid = settledPaise(inv.payments);
         const pay = getPayStatus(inv.totalPaise, paid);
-        const rec = inv.recycling;
-        const cats = rec?.categories ?? [];
+        const showMrn = isStaff(actor);
+        const showForm6 = isStaff(actor) || recyclingApproved(inv.recycling);
+        const form6Rec = showForm6 ? inv.recycling : null;
+        const cats = form6Rec?.categories ?? [];
         const catLabels = cats.map((c) => c.entryId).join(' / ');
         const catDesc = cats.map((c) => c.category?.description || c.entryId).join(' / ');
         const matKg = cats.reduce((a, c) => a + Number(c.weightKg), 0);
@@ -861,14 +863,16 @@ export async function getRegisterReport(
           inv.ewayBillNo || '',
           Number(inv.billingWeight),
           pay.label,
-          inv.mrn?.mrnNo || '',
-          inv.mrn ? fmtDate(inv.mrn.receivedAt) : '',
-          inv.mrn?.factory.name || rec?.factory.name || '',
-          rec?.form6No || '',
-          rec ? fmtDate(rec.processedAt) : '',
+          showMrn ? inv.mrn?.mrnNo || '' : '',
+          showMrn && inv.mrn ? fmtDate(inv.mrn.receivedAt) : '',
+          showMrn
+            ? inv.mrn?.factory.name || form6Rec?.factory.name || ''
+            : form6Rec?.factory.name || '',
+          form6Rec?.form6No || '',
+          form6Rec ? fmtDate(form6Rec.processedAt) : '',
           catLabels || catDesc,
           matKg ? Number(matKg.toFixed(3)) : '',
-          rec?.serials.length ?? 0,
+          form6Rec?.serials.length ?? 0,
           cert?.certNo || '',
           cert ? fmtDate(cert.certDate) : '',
           inv.closedAt ? fmtDate(inv.closedAt) : '',
@@ -940,7 +944,10 @@ export async function getRegisterReport(
   } else if (type === 'form6') {
     head = ['Form 6', 'Invoice', 'Request', 'Client', 'Processed', 'Facility', 'E-way Bill', 'Vehicles', 'Categories', 'Devices', 'Weight kg'];
     const recys = await prisma.recycling.findMany({
-      where: { invoice: { submission: scope } },
+      where: {
+        invoice: { submission: scope },
+        ...(actor.role === 'client' ? { reviewStatus: 'approved' } : {}),
+      },
       include: {
         factory: true,
         categories: true,
@@ -988,7 +995,12 @@ export async function getRegisterReport(
       'Request Closed',
     ];
     const serials = await prisma.serial.findMany({
-      where: { recycling: { invoice: { submission: scope } } },
+      where: {
+        recycling: {
+          invoice: { submission: scope },
+          ...(actor.role === 'client' ? { reviewStatus: 'approved' } : {}),
+        },
+      },
       include: {
         recycling: {
           include: {
@@ -1008,6 +1020,7 @@ export async function getRegisterReport(
       .filter((s) => {
         const rec = s.recycling;
         if (actor.role === 'factory' && !factoryInScope(actor, rec.factoryId)) return false;
+        if (actor.role === 'client' && !recyclingApproved(rec)) return false;
         const periodDate = s.destroyedAt ?? rec.processedAt;
         return inP(periodDate);
       })
@@ -1052,14 +1065,17 @@ export async function getRegisterReport(
       orderBy: { certDate: 'desc' },
       take: 2000,
     });
-    rows = certs.filter((c) => inP(c.certDate)).map((c) => [
+    rows = certs
+      .filter((c) => inP(c.certDate))
+      .filter((c) => actor.role !== 'client' || recyclingApproved(c.invoice.recycling))
+      .map((c) => [
       c.certNo,
       fmtDate(c.certDate),
       c.department || '',
       c.invoice.invoiceNo,
       c.invoice.submissionId,
       c.invoice.submission.client.name,
-      c.invoice.recycling?.form6No || '',
+      recyclingApproved(c.invoice.recycling) || isStaff(actor) ? c.invoice.recycling?.form6No || '' : '',
       fmtTs(c.uploadedAt),
       c.mailedAt ? 'Yes' : 'No',
       c.invoice.closedBy || '',

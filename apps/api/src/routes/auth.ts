@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { signIn, signOut, changePassword, AuthError, startMfaEnrol, confirmMfaEnrol, disableMfa, mfaStatus } from '../services/auth.js';
 import { confirmPasswordReset, requestPasswordReset } from '../services/password-reset.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
@@ -34,9 +34,9 @@ export async function authRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
   app.post('/auth/login', async (request, reply) => {
-    checkLoginRateLimit(request.ip);
-    const body = loginSchema.parse(request.body);
     try {
+      checkLoginRateLimit(request.ip);
+      const body = loginSchema.parse(request.body);
       const { user, token } = await signIn(body.email, body.password, body.mfaCode, request.headers['user-agent']);
       reply.setCookie(SESSION_COOKIE, token, {
         httpOnly: true,
@@ -48,6 +48,16 @@ export async function authRoutes(app: FastifyInstance) {
       });
       return { user };
     } catch (err) {
+      if (err instanceof ZodError) {
+        return reply.status(400).send({
+          message: err.issues[0]?.message ?? 'Email and password are required.',
+          error: 'Bad Request',
+          statusCode: 400,
+        });
+      }
+      if (err instanceof Error && /Too many sign-in attempts/.test(err.message)) {
+        return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
+      }
       const message = err instanceof Error ? err.message : 'Login failed';
       const mfaRequired = err instanceof AuthError && err.mfaRequired;
       return reply.status(400).send({ message, error: 'Bad Request', statusCode: 400, mfaRequired });

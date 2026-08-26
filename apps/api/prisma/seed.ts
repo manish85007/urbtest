@@ -468,6 +468,19 @@ async function main() {
     BHRT: bhrtSite.id,
   });
 
+  // Pre-review / demo Form 6 rows that already have CoD or closure must remain client-visible.
+  await prisma.recycling.updateMany({
+    where: {
+      reviewStatus: 'pending_review',
+      OR: [{ invoice: { certificates: { some: {} } } }, { invoice: { closedAt: { not: null } } }],
+    },
+    data: {
+      reviewStatus: 'approved',
+      reviewedAt: new Date(),
+      reviewedBy: 'system-seed',
+    },
+  });
+
   await seedSerialTrackingDemo(prisma, site.id);
 
   await seedLookups();

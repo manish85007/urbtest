@@ -12,7 +12,8 @@ function sixDigitCode(): string {
 }
 
 function allowDemoCode(): boolean {
-  return process.env.NODE_ENV !== 'production' || process.env.E2E_TEST === 'true';
+  // Never expose reset OTPs on UAT/production-like hosts — only local dev or explicit e2e.
+  return process.env.NODE_ENV === 'development' || process.env.E2E_TEST === 'true';
 }
 
 export async function requestPasswordReset(emailRaw: string): Promise<{ sent: true; demoCode?: string | null }> {

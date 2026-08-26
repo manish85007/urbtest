@@ -7,9 +7,9 @@ import { toSessionUser } from '../lib/auth-context.js';
 import { deriveSubmissionStage } from '../lib/stage-mapper.js';
 import { submissionInclude } from '../lib/db-helpers.js';
 import { createSubmission, acknowledgeSubmission } from '../services/submission-service.js';
-import { addVehicle, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 import {
   addPayment,
+  approveRecycling,
   closeInvoice,
   createInvoice,
   createMrn,
@@ -18,6 +18,7 @@ import {
   updateRecycling,
   uploadCertificate,
 } from '../services/invoice-service.js';
+import { addVehicle, completeLoading, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 
 const hasDb = !!process.env.DATABASE_URL;
 
@@ -150,6 +151,8 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       pickupPhotoIds: [pick.id],
     });
 
+    await completeLoading(admin, submissionId);
+
     const invoiced = await createInvoice(admin, submissionId, {
       invoiceNo: `INV-INT-${Date.now()}`,
       invoiceDate: '2026-08-16',
@@ -241,6 +244,17 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       categories: [{ entryId: 'REC-ITEW2', groupCode: 'ITEW', weightKg: 50 }],
     });
     expect(edited.devicesDestroyed).toBe(11);
+    expect(edited.reviewStatus).toBe('pending_review');
+
+    await expect(
+      uploadCertificate(admin, invoiceId, {
+        certNo: `URB/INT/${Date.now()}`,
+        certDate: today,
+        fileId: (await seedFile('certificate', admin.email)).id,
+      }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/approve Form 6/i) });
+
+    await approveRecycling(admin, invoiceId);
 
     const certFile = await seedFile('certificate', admin.email);
     await uploadCertificate(admin, invoiceId, {

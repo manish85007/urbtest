@@ -70,7 +70,10 @@ export async function searchPortal(actor: SessionUser, qRaw: string): Promise<Se
           href: `/requests/${s.id}`,
         });
       }
-      if (inv.recycling?.form6No.toLowerCase().includes(q)) {
+      if (
+        inv.recycling?.form6No.toLowerCase().includes(q) &&
+        (isStaff(actor) || inv.recycling.reviewStatus === 'approved')
+      ) {
         push({
           grp: 'Form 6',
           label: inv.recycling.form6No,

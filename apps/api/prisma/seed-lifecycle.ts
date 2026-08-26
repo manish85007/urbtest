@@ -255,6 +255,9 @@ export async function seedLifecycleSamples(
         recoveryPcb: rec.pcb,
         vehicleIds: [vehicle.id],
         createdBy: 'blr@urbeno.in',
+        reviewStatus: 'approved',
+        reviewedAt: recyAt,
+        reviewedBy: 'admin@urbeno.in',
         categories: {
           create: [
             {

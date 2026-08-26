@@ -5,6 +5,8 @@ function recyclingApproved(recycling: { reviewStatus?: string } | null | undefin
   return !!recycling && recycling.reviewStatus === 'approved';
 }
 
+export { recyclingApproved };
+
 export function deriveSubmissionStage(sub: SubmissionFull): number {
   return subStage({
     acknowledged: !!sub.acknowledgedAt,
