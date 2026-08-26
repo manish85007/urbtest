@@ -2,7 +2,7 @@
 export const COMPANY = {
   name: 'Urbeno Private Limited',
   brand: 'Recycling Heroes™',
-  email: 'ops@urbeno.in',
+  email: 'noreply@urbeno.in',
   phone: '1800-123-4567',
   phoneTel: '18001234567',
   wa: '919902299007',

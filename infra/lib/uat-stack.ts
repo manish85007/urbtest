@@ -1,4 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecsPatterns from 'aws-cdk-lib/aws-ecs-patterns';
@@ -12,6 +13,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** Public UAT hostname (DNS already points at the ALB). */
+const UAT_DOMAIN = 'uat.urbeno.in';
+/** Existing ACM certificate in ap-south-1 (ISSUED). */
+const UAT_CERT_ARN =
+  'arn:aws:acm:ap-south-1:750390205684:certificate/d7c9300e-2def-47ea-8a8c-69475873fd13';
 
 export class UrbTecTrackUatStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -66,6 +73,16 @@ export class UrbTecTrackUatStack extends cdk.Stack {
       },
     });
 
+    // App password for noreply@urbeno.in — value created outside git (see infra/README.md).
+    const smtpPassSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'SmtpPassSecret',
+      'UrbTecTrackUat/SmtpPass',
+    );
+
+    const certificate = acm.Certificate.fromCertificateArn(this, 'UatCert', UAT_CERT_ARN);
+    const origin = `https://${UAT_DOMAIN}`;
+
     const cluster = new ecs.Cluster(this, 'Cluster', { vpc, containerInsights: false });
 
     const service = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'App', {
@@ -74,8 +91,10 @@ export class UrbTecTrackUatStack extends cdk.Stack {
       memoryLimitMiB: 1024,
       desiredCount: 1,
       publicLoadBalancer: true,
-      listenerPort: 80,
-      protocol: elbv2.ApplicationProtocol.HTTP,
+      listenerPort: 443,
+      protocol: elbv2.ApplicationProtocol.HTTPS,
+      certificate,
+      redirectHTTP: true,
       circuitBreaker: { rollback: true },
       minHealthyPercent: 0,
       maxHealthyPercent: 200,
@@ -97,9 +116,17 @@ export class UrbTecTrackUatStack extends cdk.Stack {
           API_PORT: '3001',
           WEB_DIST: '/app/apps/web/dist',
           UAT_SEED: 'true',
-          COOKIE_SECURE: 'false',
-          EMAIL_PROVIDER: 'console',
-          EMAIL_REDIRECT_TO: 'uat.urbeno@gmail.com',
+          COOKIE_SECURE: 'true',
+          PORTAL_URL: origin,
+          CORS_ORIGIN: origin,
+          EMAIL_PROVIDER: 'smtp',
+          SMTP_HOST: 'smtp.gmail.com',
+          SMTP_PORT: '587',
+          SMTP_SECURE: 'false',
+          SMTP_USER: 'noreply@urbeno.in',
+          SMTP_FROM_NAME: 'Urb TecTrack',
+          SMTP_FROM_EMAIL: 'noreply@urbeno.in',
+          URBENO_EMAIL: 'noreply@urbeno.in',
           ENABLE_JOBS: 'true',
           AWS_S3_BUCKET: uploads.bucketName,
           DATABASE_USER: 'tectrack',
@@ -109,6 +136,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
         secrets: {
           DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(db.secret!, 'password'),
           SESSION_SECRET: ecs.Secret.fromSecretsManager(sessionSecret, 'secret'),
+          SMTP_PASS: ecs.Secret.fromSecretsManager(smtpPassSecret),
         },
       },
     });
@@ -122,16 +150,12 @@ export class UrbTecTrackUatStack extends cdk.Stack {
       unhealthyThresholdCount: 5,
     });
 
-    const origin = `http://${service.loadBalancer.loadBalancerDnsName}`;
-    service.taskDefinition.defaultContainer?.addEnvironment('PORTAL_URL', origin);
-    service.taskDefinition.defaultContainer?.addEnvironment('CORS_ORIGIN', origin);
-
     db.connections.allowDefaultPortFrom(service.service);
     uploads.grantReadWrite(service.taskDefinition.taskRole);
 
     new cdk.CfnOutput(this, 'UatUrl', {
       value: origin,
-      description: 'Urb TecTrack UAT URL — sign in with admin@urbeno.in / demo',
+      description: 'Urb TecTrack UAT HTTPS URL — sign in with admin@urbeno.in / demo',
     });
   }
 }

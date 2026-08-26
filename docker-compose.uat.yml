@@ -23,6 +23,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:3001"
+    env_file:
+      - path: .env.uat
+        required: false
     environment:
       DATABASE_HOST: db
       DATABASE_USER: tectrack
@@ -32,8 +35,15 @@ services:
       SESSION_SECRET: "urb-tectrack-uat-session-secret-change-for-staging"
       UAT_SEED: "true"
       COOKIE_SECURE: "false"
-      EMAIL_PROVIDER: console
-      EMAIL_REDIRECT_TO: uat.urbeno@gmail.com
+      EMAIL_PROVIDER: "${EMAIL_PROVIDER:-smtp}"
+      SMTP_HOST: "${SMTP_HOST:-smtp.gmail.com}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_SECURE: "${SMTP_SECURE:-false}"
+      SMTP_USER: "${SMTP_USER:-noreply@urbeno.in}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+      SMTP_FROM_NAME: "${SMTP_FROM_NAME:-Urb TecTrack}"
+      SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL:-noreply@urbeno.in}"
+      URBENO_EMAIL: "${URBENO_EMAIL:-noreply@urbeno.in}"
       PORTAL_URL: http://localhost:8080
       CORS_ORIGIN: http://localhost:8080
       ENABLE_JOBS: "true"

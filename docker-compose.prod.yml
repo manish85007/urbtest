@@ -47,9 +47,10 @@ services:
       AWS_S3_BUCKET: "<BUCKET_NAME>"
       # GCS_BUCKET: "<BUCKET_NAME>"
       # ── Email ─────────────────────────────────────────────────────────────
-      EMAIL_PROVIDER: smtp    # configure SMTP credentials in Masters → Email & Templates
-      SMTP_FROM_EMAIL: "ops@<YOUR_DOMAIN>"
+      EMAIL_PROVIDER: smtp
+      SMTP_FROM_EMAIL: "noreply@urbeno.in"
       SMTP_FROM_NAME: "Urb TecTrack"
+      URBENO_EMAIL: "noreply@urbeno.in"
       # ── Optional tuning ───────────────────────────────────────────────────
       ENABLE_JOBS: "true"
       EMAIL_POLL_MS: "30000"
