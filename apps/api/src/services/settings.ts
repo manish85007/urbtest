@@ -52,32 +52,43 @@ export function smtpPublicView(s: SmtpSettings) {
     port: s.port,
     secure: s.secure,
     user: s.user,
-    passwordSet: Boolean(s.pass),
+    passwordSet: Boolean(resolveSmtpPass(s.pass)),
     fromName: s.fromName,
     fromEmail: s.fromEmail,
   };
 }
 
-export async function getSmtpSettings(): Promise<SmtpSettings> {
-  const fromEnv = (): SmtpSettings => ({
+/** Prefer env/Secrets Manager; legacy DB pass only until the next Masters save clears it. */
+function resolveSmtpPass(storedPass?: string): string {
+  const fromEnv = process.env.SMTP_PASS?.trim();
+  if (fromEnv) return fromEnv;
+  return storedPass?.trim() || '';
+}
+
+function smtpFromEnv(): SmtpSettings {
+  return {
     ...EMPTY,
     host: process.env.SMTP_HOST ?? '',
     port: Number(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER ?? '',
-    pass: process.env.SMTP_PASS ?? '',
+    pass: resolveSmtpPass(),
     fromName: process.env.SMTP_FROM_NAME ?? EMPTY.fromName,
     fromEmail: process.env.SMTP_FROM_EMAIL ?? EMPTY.fromEmail,
     enabled: Boolean(process.env.SMTP_HOST),
-  });
+  };
+}
 
+export async function getSmtpSettings(): Promise<SmtpSettings> {
   const row = await prisma.appSetting.findUnique({ where: { key: SMTP_SETTING_KEY } });
-  if (!row) return fromEnv();
+  if (!row) return smtpFromEnv();
 
   const stored = parseSmtpSettings(row.value);
-  // Env-injected SMTP (AWS/GCP/Docker) wins unless Masters has outgoing mail explicitly enabled.
-  if (!stored.enabled && process.env.SMTP_HOST) return fromEnv();
-  return stored;
+  // Masters "Send outgoing mail" checkbox is authoritative when a row exists.
+  return {
+    ...stored,
+    pass: resolveSmtpPass(stored.pass),
+  };
 }
 
 export async function saveSmtpSettings(
@@ -85,6 +96,15 @@ export async function saveSmtpSettings(
   actorEmail: string,
 ) {
   const prev = await getSmtpSettings();
+  if (input.pass !== undefined && input.pass !== '') {
+    // Password must live in SMTP_PASS (env / Secrets Manager), never in app_settings.
+    if (!process.env.SMTP_PASS?.trim()) {
+      throw new AppError(
+        'SMTP password is not stored in the database. Set SMTP_PASS in the environment (or Secrets Manager), then save again without pasting the password.',
+      );
+    }
+  }
+
   const next: SmtpSettings = {
     ...prev,
     enabled: input.enabled ?? prev.enabled,
@@ -92,12 +112,17 @@ export async function saveSmtpSettings(
     port: input.port !== undefined ? Number(input.port) || 587 : prev.port,
     secure: input.secure ?? prev.secure,
     user: input.user !== undefined ? String(input.user).trim() : prev.user,
-    pass: input.pass !== undefined && input.pass !== '' ? input.pass : prev.pass,
+    pass: '', // never persist credentials
     fromName: input.fromName !== undefined ? String(input.fromName).trim() : prev.fromName,
     fromEmail: input.fromEmail !== undefined ? String(input.fromEmail).trim() : prev.fromEmail,
   };
   if (next.enabled && !next.host) throw new AppError('SMTP host is required when outgoing mail is enabled.');
   if (next.enabled && !next.fromEmail) throw new AppError('From address is required when outgoing mail is enabled.');
+  if (next.enabled && !resolveSmtpPass()) {
+    throw new AppError(
+      'SMTP_PASS is not set. Configure the app password via environment or Secrets Manager before enabling outgoing mail.',
+    );
+  }
 
   await prisma.appSetting.upsert({
     where: { key: SMTP_SETTING_KEY },
@@ -111,7 +136,7 @@ export async function saveSmtpSettings(
       updatedBy: actorEmail,
     },
   });
-  return smtpPublicView(next);
+  return smtpPublicView({ ...next, pass: resolveSmtpPass() });
 }
 
 export const COMPANY_SETTING_KEY = 'company.profile';

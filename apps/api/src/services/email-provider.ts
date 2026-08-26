@@ -7,7 +7,7 @@ export interface OutboundEmail {
   body: string;
 }
 
-/** In UAT, funnel all outbound mail to one inbox while preserving intended recipients in the body. */
+/** Optional UAT funnel — leave unset to deliver to real recipients (default). */
 export function applyEmailRedirect(email: OutboundEmail): OutboundEmail {
   const redirect = process.env.EMAIL_REDIRECT_TO?.trim();
   if (!redirect) return email;

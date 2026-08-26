@@ -44,7 +44,8 @@ aws secretsmanager put-secret-value \
   --region ap-south-1
 ```
 
-Mail is sent via Gmail SMTP as **noreply@urbeno.in**.
+Mail is sent via Gmail SMTP as **noreply@urbeno.in** to **real recipient addresses** (no UAT redirect funnel).  
+The app password lives only in Secrets Manager (`SMTP_PASS`); Masters never persists it.
 
 ## Deploy
 

@@ -487,8 +487,9 @@ function SmtpSettingsForm({ onChanged }: { onChanged: (msg: string) => void }) {
         Outgoing mail (SMTP)
       </div>
       <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.7rem', maxWidth: 640 }}>
-        Used for password-reset OTPs, request acknowledgements, certificates and payment reminders. Leave disabled to
-        log mail to the server console in development.
+        Used for password-reset OTPs, request acknowledgements, certificates and payment reminders. Mail is delivered
+        to each recipient&apos;s real address. The SMTP password is read from <code>SMTP_PASS</code> (environment /
+        Secrets Manager) and is never stored in the database — leave the password field blank when saving.
       </p>
       {error ? <p className="error">{error}</p> : null}
       <label style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.7rem' }}>
@@ -519,7 +520,7 @@ function SmtpSettingsForm({ onChanged }: { onChanged: (msg: string) => void }) {
           <input value={user} onChange={(e) => setUser(e.target.value)} autoComplete="off" />
         </div>
         <div className="fg">
-          <label>Password {passwordSet ? <span className="hint">saved — leave blank to keep</span> : null}</label>
+          <label>Password {passwordSet ? <span className="hint">set via SMTP_PASS — leave blank</span> : <span className="hint">set SMTP_PASS in env</span>}</label>
           <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
         </div>
         <div className="fg">

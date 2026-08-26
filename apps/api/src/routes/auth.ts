@@ -15,19 +15,59 @@ const LOGIN_MAX_PER_IP =
   process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 30 : 1000;
 const ipLoginCounts = new Map<string, { count: number; resetAt: number }>();
 
-function checkLoginRateLimit(ip: string) {
+const RESET_IP_WINDOW_MS = 15 * 60 * 1000;
+const RESET_EMAIL_WINDOW_MS = 60 * 60 * 1000;
+const RESET_MAX_PER_IP =
+  process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 10 : 100;
+const RESET_MAX_PER_EMAIL =
+  process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 3 : 20;
+const ipResetCounts = new Map<string, { count: number; resetAt: number }>();
+const emailResetCounts = new Map<string, { count: number; resetAt: number }>();
+
+function bumpWindow(
+  map: Map<string, { count: number; resetAt: number }>,
+  key: string,
+  windowMs: number,
+  max: number,
+  message: string,
+) {
   if (process.env.E2E_TEST === 'true' || process.env.NODE_ENV === 'test') return;
   const now = Date.now();
-  const rec = ipLoginCounts.get(ip) ?? { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+  const rec = map.get(key) ?? { count: 0, resetAt: now + windowMs };
   if (now > rec.resetAt) {
     rec.count = 0;
-    rec.resetAt = now + LOGIN_WINDOW_MS;
+    rec.resetAt = now + windowMs;
   }
   rec.count += 1;
-  ipLoginCounts.set(ip, rec);
-  if (rec.count > LOGIN_MAX_PER_IP) {
-    throw new Error('Too many sign-in attempts from this network. Try again later.');
-  }
+  map.set(key, rec);
+  if (rec.count > max) throw new Error(message);
+}
+
+function checkLoginRateLimit(ip: string) {
+  bumpWindow(
+    ipLoginCounts,
+    ip,
+    LOGIN_WINDOW_MS,
+    LOGIN_MAX_PER_IP,
+    'Too many sign-in attempts from this network. Try again later.',
+  );
+}
+
+function checkResetRateLimit(ip: string, email: string) {
+  bumpWindow(
+    ipResetCounts,
+    ip,
+    RESET_IP_WINDOW_MS,
+    RESET_MAX_PER_IP,
+    'Too many password-reset requests from this network. Try again later.',
+  );
+  bumpWindow(
+    emailResetCounts,
+    email.trim().toLowerCase(),
+    RESET_EMAIL_WINDOW_MS,
+    RESET_MAX_PER_EMAIL,
+    'Too many password-reset requests for this email. Try again later.',
+  );
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -67,7 +107,14 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/logout', { preHandler: requireAuth }, async (request, reply) => {
     const token = request.cookies[SESSION_COOKIE];
     if (token) await signOut(token, request.user!);
-    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    reply.clearCookie(SESSION_COOKIE, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure:
+        process.env.COOKIE_SECURE === 'true' ||
+        (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production'),
+    });
     return { ok: true };
   });
 
@@ -90,10 +137,21 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.post('/auth/reset/request', async (request, reply) => {
-    const body = z.object({ email: z.string().email() }).parse(request.body);
     try {
+      const body = z.object({ email: z.string().email() }).parse(request.body);
+      checkResetRateLimit(request.ip, body.email);
       return await requestPasswordReset(body.email);
     } catch (err) {
+      if (err instanceof ZodError) {
+        return reply.status(400).send({
+          message: err.issues[0]?.message ?? 'A valid email is required.',
+          error: 'Bad Request',
+          statusCode: 400,
+        });
+      }
+      if (err instanceof Error && /Too many password-reset/.test(err.message)) {
+        return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
+      }
       return reply.badRequest(err instanceof Error ? err.message : 'Reset request failed');
     }
   });
