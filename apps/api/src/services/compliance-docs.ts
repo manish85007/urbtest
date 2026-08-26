@@ -40,6 +40,9 @@ export async function sendComplianceDocuments(
     if (!inv?.recycling) {
       throw new AppError('One or more Form 6 documents could not be found on this request.');
     }
+    if (inv.recycling.reviewStatus !== 'approved') {
+      throw new AppError(`Form 6 ${inv.recycling.form6No} must be approved before it can be emailed.`);
+    }
   }
 
   for (const c of certs) {

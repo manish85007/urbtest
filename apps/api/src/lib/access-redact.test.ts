@@ -24,7 +24,12 @@ const admin: SessionUser = {
   featureAccess: null,
 };
 
-type Inv = { invoiceNo: string; hasMrn?: boolean; mrn: { mrnNo: string } | null; recycling?: { form6No: string } | null };
+type Inv = {
+  invoiceNo: string;
+  hasMrn?: boolean;
+  mrn: { mrnNo: string } | null;
+  recycling?: { form6No: string; reviewStatus?: string } | null;
+};
 
 describe('redactSubmissionForActor', () => {
   it('strips MRN for clients but preserves hasMrn for lifecycle UI', () => {
@@ -35,7 +40,7 @@ describe('redactSubmissionForActor', () => {
           invoiceNo: 'INV-1',
           hasMrn: true,
           mrn: { mrnNo: 'MRN/URB-BLR/2627/0001' },
-          recycling: { form6No: 'F6/1' },
+          recycling: { form6No: 'F6/1', reviewStatus: 'approved' },
         },
       ] satisfies Inv[],
     };
@@ -43,7 +48,23 @@ describe('redactSubmissionForActor', () => {
     const redacted = redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].mrn).toBeNull();
     expect(redacted.invoices[0].hasMrn).toBe(true);
-    expect(redacted.invoices[0].recycling).toEqual({ form6No: 'F6/1' });
+    expect(redacted.invoices[0].recycling).toEqual({ form6No: 'F6/1', reviewStatus: 'approved' });
+  });
+
+  it('hides Form 6 from clients until admin approval', () => {
+    const sub = {
+      id: 'REQ-00090',
+      invoices: [
+        {
+          invoiceNo: 'INV-1',
+          hasMrn: true,
+          mrn: { mrnNo: 'MRN/1' },
+          recycling: { form6No: 'F6/1', reviewStatus: 'pending_review' },
+        },
+      ] satisfies Inv[],
+    };
+    const redacted = redactSubmissionForActor(sub, client);
+    expect(redacted.invoices[0].recycling).toBeNull();
   });
 
   it('infers hasMrn from mrn when flag was not pre-set', () => {

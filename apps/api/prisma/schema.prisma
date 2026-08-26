@@ -401,6 +401,11 @@ model Recycling {
   photoIds     String[] @default([]) @map("photo_ids")
   reportIds    String[] @default([]) @map("report_ids")
   vehicleIds   String[] @default([]) @map("vehicle_ids")
+  /** pending_review | approved | rejected — clients only see approved Form 6. */
+  reviewStatus String   @default("pending_review") @map("review_status") @db.VarChar(24)
+  reviewedAt   DateTime? @map("reviewed_at")
+  reviewedBy   String?  @map("reviewed_by")
+  reviewNote   String?  @map("review_note")
   createdBy    String   @map("created_by")
   createdAt    DateTime @default(now()) @map("created_at")
 

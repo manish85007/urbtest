@@ -14,6 +14,7 @@ import {
 } from '../services/reporting-service.js';
 import { recordTreePlanting, recordTreeProgress, removeTreePlanting, removeTreeProgress } from '../services/tree-planting.js';
 import { form6Pdf, impactPdf, methodologyPdf, mrnPdf, registerPdf } from '../services/pdf.js';
+import { contentDisposition } from '../lib/http-headers.js';
 import { isAppError } from '../lib/errors.js';
 
 const registerTypes = Object.keys(REGISTER_KINDS) as RegisterType[];
@@ -95,7 +96,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       );
       return reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Disposition', contentDisposition('attachment', filename))
         .send(buffer);
     } catch (err) {
       return handleErr(err, reply);
@@ -165,7 +166,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       const { filename, buffer } = await mrnPdf(request.user!, id);
       return reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Disposition', contentDisposition('attachment', filename))
         .send(buffer);
     } catch (err) {
       return handleErr(err, reply);
@@ -179,7 +180,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       const { filename, buffer } = await form6Pdf(request.user!, id);
       return reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Disposition', contentDisposition('attachment', filename))
         .send(buffer);
     } catch (err) {
       return handleErr(err, reply);
@@ -198,7 +199,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       );
       return reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Disposition', contentDisposition('attachment', filename))
         .send(buffer);
     } catch (err) {
       return handleErr(err, reply);
@@ -227,7 +228,7 @@ export async function reportsRoutes(app: FastifyInstance) {
     const { filename, buffer } = await methodologyPdf(request.user!);
     return reply
       .header('Content-Type', 'application/pdf')
-      .header('Content-Disposition', `attachment; filename="${filename}"`)
+      .header('Content-Disposition', contentDisposition('attachment', filename))
       .send(buffer);
   });
 }

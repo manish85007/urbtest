@@ -1,6 +1,10 @@
 import { invStage, subStage } from '@urb-tectrack/shared';
 import type { SubmissionFull } from './db-helpers.js';
 
+function recyclingApproved(recycling: { reviewStatus?: string } | null | undefined): boolean {
+  return !!recycling && recycling.reviewStatus === 'approved';
+}
+
 export function deriveSubmissionStage(sub: SubmissionFull): number {
   return subStage({
     acknowledged: !!sub.acknowledgedAt,
@@ -10,7 +14,7 @@ export function deriveSubmissionStage(sub: SubmissionFull): number {
     invoices: sub.invoices.map((inv) => ({
       closedAt: inv.closedAt,
       hasCertificate: inv.certificates.length > 0,
-      hasRecycling: !!inv.recycling,
+      hasRecycling: recyclingApproved(inv.recycling),
       hasMrn: !!inv.mrn,
     })),
   });
@@ -19,13 +23,13 @@ export function deriveSubmissionStage(sub: SubmissionFull): number {
 export function deriveInvoiceStage(inv: {
   closedAt: Date | string | null;
   certificates: unknown[];
-  recycling: unknown | null;
+  recycling: { reviewStatus?: string } | null;
   mrn: unknown | null;
 }): number {
   return invStage({
     closedAt: inv.closedAt,
     hasCertificate: inv.certificates.length > 0,
-    hasRecycling: !!inv.recycling,
+    hasRecycling: recyclingApproved(inv.recycling),
     hasMrn: !!inv.mrn,
   });
 }

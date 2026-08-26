@@ -85,11 +85,15 @@ export function requireFactory(actor: SessionUser, factoryId: string) {
   }
 }
 
-/** Rule R4 — clients never see MRN documents, but keep hasMrn for lifecycle UI. */
-export function redactSubmissionForActor<T extends { invoices: Array<{ mrn: unknown; hasMrn?: boolean }> }>(
-  sub: T,
-  actor: SessionUser,
-): T {
+/** Rule R4 — clients never see MRN documents, but keep hasMrn for lifecycle UI.
+ *  Form 6 is hidden from clients until admin approval (reviewStatus === 'approved'). */
+export function redactSubmissionForActor<T extends {
+  invoices: Array<{
+    mrn: unknown;
+    hasMrn?: boolean;
+    recycling?: { reviewStatus?: string } | null;
+  }>;
+}>(sub: T, actor: SessionUser): T {
   if (isStaff(actor)) return sub;
   return {
     ...sub,
@@ -97,6 +101,7 @@ export function redactSubmissionForActor<T extends { invoices: Array<{ mrn: unkn
       ...inv,
       hasMrn: inv.hasMrn ?? !!inv.mrn,
       mrn: null,
+      recycling: inv.recycling?.reviewStatus === 'approved' ? inv.recycling : null,
     })),
   };
 }

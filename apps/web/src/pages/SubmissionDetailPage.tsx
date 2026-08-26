@@ -1336,7 +1336,7 @@ function ComplianceCard({
         internal: true,
       });
     }
-    if (inv.recycling) {
+    if (inv.recycling && (inv.recycling.reviewStatus === 'approved' || !inv.recycling.reviewStatus)) {
       docs.push({
         key: `form6:${inv.id}`,
         kind: 'Form 6',

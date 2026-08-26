@@ -11,6 +11,7 @@ import {
 import { dataApi, type CategorySummary, type VehicleDetail } from '../api';
 import { FileUpload } from './FileUpload';
 import { DateField } from './DateField';
+import { localDateIso } from '../lib/datetime';
 import { num } from '../lib/format';
 
 const GROUPS: MaterialGroupCode[] = ['ITEW', 'CEEW', 'LSEEW', 'EETW', 'TLSEW', 'MDW', 'LIW'];
@@ -279,7 +280,9 @@ export function RecyclingForm({
           label="Processing Date"
           value={processedAt}
           onChange={setProcessedAt}
+          max={localDateIso()}
           required
+          hint="Today or an earlier date only"
         />
         <div className="fg">
           <label htmlFor="rc-fac">Facility</label>

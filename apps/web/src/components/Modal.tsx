@@ -1,4 +1,6 @@
 import type { FormEvent, ReactNode } from 'react';
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   title: string;
@@ -34,6 +36,19 @@ export function Modal({
 }: ModalProps) {
   const TitleTag = heading ? 'h1' : 'div';
 
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
   async function handleOk(e: FormEvent) {
     e.preventDefault();
     await onOk?.();
@@ -60,7 +75,7 @@ export function Modal({
       </>
     ) : null);
 
-  return (
+  return createPortal(
     <div className="modal-bg" onClick={onClose} role="presentation">
       <div
         className="modal"
@@ -81,6 +96,7 @@ export function Modal({
         <div className="m-bd">{children}</div>
         {actions ? <div className="m-ft">{actions}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

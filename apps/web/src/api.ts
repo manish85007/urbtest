@@ -418,6 +418,10 @@ export interface InvoiceDetail {
     recoveryPcb?: string;
     photoIds?: string[];
     reportIds?: string[];
+    reviewStatus?: 'pending_review' | 'approved' | 'rejected' | string;
+    reviewedAt?: string | null;
+    reviewedBy?: string | null;
+    reviewNote?: string | null;
     categories?: Array<{
       entryId: string;
       groupCode: string;
@@ -1340,6 +1344,18 @@ export const lifecycleApi = {
     api<{ form6No: string }>(`/invoices/${invoiceId}/recycling`, {
       method: 'PATCH',
       body: JSON.stringify(body),
+    }),
+
+  approveRecycling: (invoiceId: string) =>
+    api<{ form6No: string; reviewStatus: string }>(`/invoices/${invoiceId}/recycling/approve`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  rejectRecycling: (invoiceId: string, body?: { note?: string }) =>
+    api<{ form6No: string; reviewStatus: string }>(`/invoices/${invoiceId}/recycling/reject`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
     }),
 
   uploadCertificate: (

@@ -19,6 +19,8 @@ interface FileUploadProps {
   label: string;
   hint?: string;
   accept?: string;
+  /** Hint mobile browsers to open the camera for image capture. */
+  capture?: boolean | 'user' | 'environment';
   disabled?: boolean;
   required?: boolean;
   value: string[];
@@ -30,6 +32,7 @@ export function FileUpload({
   label,
   hint,
   accept,
+  capture,
   disabled,
   required,
   value,
@@ -77,6 +80,7 @@ export function FileUpload({
         ref={inputRef}
         type="file"
         accept={accept}
+        capture={capture === true ? 'environment' : capture || undefined}
         multiple
         disabled={disabled || busy}
         onChange={(e) => void onPick(e.target.files)}

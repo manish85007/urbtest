@@ -3,6 +3,7 @@ import { formatMrnNumber, getFY } from '@urb-tectrack/shared';
 import { dataApi, type InvoiceDetail, type VehicleDetail } from '../api';
 import { FileUpload } from './FileUpload';
 import { DateField } from './DateField';
+import { localDateIso } from '../lib/datetime';
 import { num } from '../lib/format';
 
 type LineSeed = { name: string; qty: number; weightKg: string | number };
@@ -244,7 +245,9 @@ export function MrnForm({
           label="Receiving Date"
           value={receivedAt}
           onChange={setReceivedAt}
+          max={localDateIso()}
           required
+          hint="Today or an earlier date only"
         />
       </div>
 

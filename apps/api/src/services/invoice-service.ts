@@ -701,6 +701,7 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   const { gatePhotoIds, materialPhotoIds } = await resolveMrnPhotos(input);
   assertInvoiceVehiclesWeighed(invoice);
 
+  assertNotFutureDate(input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
 
   const mrn = await prisma.$transaction(async (tx) => {
@@ -762,6 +763,7 @@ export async function updateMrn(actor: SessionUser, invoiceId: string, input: Mr
   const { gatePhotoIds, materialPhotoIds } = await resolveMrnPhotos(input, existing);
   assertInvoiceVehiclesWeighed(invoice);
 
+  assertNotFutureDate(input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
 
   const mrn = await prisma.mrn.update({
@@ -919,7 +921,9 @@ export async function createRecycling(
   }
 
   const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
+  assertNotFutureDate(input.processedAt, 'Processing date');
   const processedAt = new Date(input.processedAt);
+  const autoApprove = actor.role === 'admin';
 
   const recycling = await prisma.$transaction(async (tx) => {
     const form6No = await allocateForm6InTx(tx, processedAt);
@@ -940,6 +944,10 @@ export async function createRecycling(
         reportIds: input.reportIds ?? [],
         serialFileId: input.serialFileId ?? null,
         vehicleIds,
+        reviewStatus: autoApprove ? 'approved' : 'pending_review',
+        reviewedAt: autoApprove ? new Date() : null,
+        reviewedBy: autoApprove ? actor.email : null,
+        reviewNote: null,
         createdBy: actor.email,
         categories: { create: categoryRows },
         serials: input.serials?.length
@@ -967,17 +975,26 @@ export async function createRecycling(
       submissionId: invoice.submissionId,
       invNo: invoice.invoiceNo,
       cats: input.categories.map((c) => c.entryId),
+      reviewStatus: recycling.reviewStatus,
     },
   });
 
-  await notifyClientUsers(
-    invoice.submission.clientId,
-    'recy.done',
-    `${invoice.invoiceNo} processed — Form 6 ${recycling.form6No} issued`,
-    invoice.submissionId,
-  );
-  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
+  if (autoApprove) {
+    await notifyClientUsers(
+      invoice.submission.clientId,
+      'recy.done',
+      `${invoice.invoiceNo} processed — Form 6 ${recycling.form6No} issued`,
+      invoice.submissionId,
+    );
+    const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+    await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
+  } else {
+    await notifyAdmins(
+      'form6.review',
+      `Form 6 ${recycling.form6No} for ${invoice.invoiceNo} awaits admin review`,
+      invoice.submissionId,
+    );
+  }
 
   return recycling;
 }
@@ -1098,12 +1115,14 @@ export async function updateRecycling(
   if (input.serialFileId) await assertFilesExist([input.serialFileId], ['serials']);
 
   const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
+  assertNotFutureDate(input.processedAt, 'Processing date');
   const processedAt = new Date(input.processedAt);
   const photoIds = input.photoIds?.length ? input.photoIds : existing.photoIds;
   const reportIds = input.reportIds?.length ? input.reportIds : existing.reportIds;
 
   const recycling = await prisma.$transaction(async (tx) => {
     await tx.recyclingCategory.deleteMany({ where: { recyclingId: existing.id } });
+    const needsReReview = existing.reviewStatus !== 'pending_review' && actor.role !== 'admin';
     return tx.recycling.update({
       where: { id: existing.id },
       data: {
@@ -1119,6 +1138,14 @@ export async function updateRecycling(
         reportIds,
         serialFileId: input.serialFileId ?? existing.serialFileId,
         vehicleIds,
+        ...(needsReReview || existing.reviewStatus === 'rejected'
+          ? {
+              reviewStatus: 'pending_review',
+              reviewedAt: null,
+              reviewedBy: null,
+              reviewNote: null,
+            }
+          : {}),
         categories: { create: categoryRows },
       },
       include: { categories: true },
@@ -1135,7 +1162,94 @@ export async function updateRecycling(
       submissionId: invoice.submissionId,
       invNo: invoice.invoiceNo,
       cats: input.categories.map((c) => c.entryId),
+      reviewStatus: recycling.reviewStatus,
     },
+  });
+
+  if (recycling.reviewStatus === 'pending_review' && actor.role !== 'admin') {
+    await notifyAdmins(
+      'form6.review',
+      `Form 6 ${recycling.form6No} for ${invoice.invoiceNo} awaits admin review`,
+      invoice.submissionId,
+    );
+  }
+
+  return recycling;
+}
+
+export async function approveRecycling(actor: SessionUser, invoiceId: string) {
+  requireAdmin(actor);
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertLifecycleOpen(invoice);
+  const existing = invoice.recycling;
+  if (!existing) throw new AppError('Issue Form 6 before approving it.');
+  if (existing.reviewStatus === 'approved') {
+    throw new AppError('This Form 6 is already approved.');
+  }
+
+  const recycling = await prisma.recycling.update({
+    where: { id: existing.id },
+    data: {
+      reviewStatus: 'approved',
+      reviewedAt: new Date(),
+      reviewedBy: actor.email,
+      reviewNote: null,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'recy.approve',
+    entity: 'recycling',
+    entityId: recycling.form6No,
+    details: { submissionId: invoice.submissionId, invNo: invoice.invoiceNo },
+  });
+
+  await notifyClientUsers(
+    invoice.submission.clientId,
+    'recy.done',
+    `${invoice.invoiceNo} processed — Form 6 ${recycling.form6No} issued`,
+    invoice.submissionId,
+  );
+  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+  await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
+
+  return recycling;
+}
+
+export async function rejectRecycling(
+  actor: SessionUser,
+  invoiceId: string,
+  input: { note?: string },
+) {
+  requireAdmin(actor);
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertLifecycleOpen(invoice);
+  const existing = invoice.recycling;
+  if (!existing) throw new AppError('Issue Form 6 before rejecting it.');
+  if (existing.reviewStatus === 'approved') {
+    throw new AppError('Approved Form 6 cannot be rejected — ask the factory to revise after an admin unlock if needed.');
+  }
+
+  const note = input.note?.trim() || null;
+  const recycling = await prisma.recycling.update({
+    where: { id: existing.id },
+    data: {
+      reviewStatus: 'rejected',
+      reviewedAt: new Date(),
+      reviewedBy: actor.email,
+      reviewNote: note,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'recy.reject',
+    entity: 'recycling',
+    entityId: recycling.form6No,
+    details: { submissionId: invoice.submissionId, invNo: invoice.invoiceNo, note },
   });
 
   return recycling;
@@ -1151,6 +1265,9 @@ export async function uploadCertificate(
   assertLifecycleOpen(invoice);
   if (!invoice.recycling) {
     throw new AppError('Issue Form 6 before uploading the Certificate of Destruction.');
+  }
+  if (invoice.recycling.reviewStatus !== 'approved') {
+    throw new AppError('Admin must approve Form 6 before the Certificate of Destruction can be uploaded.');
   }
 
   const certNo = input.certNo.trim();

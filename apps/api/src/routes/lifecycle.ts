@@ -13,11 +13,13 @@ import {
   addPayment,
   updatePayment,
   deletePayment,
+  approveRecycling,
   closeInvoice,
   createInvoice,
   createMrn,
   createRecycling,
   deleteInvoice,
+  rejectRecycling,
   updateInvoice,
   updateMrn,
   updateRecycling,
@@ -407,6 +409,16 @@ export async function lifecycleRoutes(app: FastifyInstance) {
           reportIds: z.array(z.string()).optional(),
           serialFileId: z.string().optional(),
           vehicleIds: z.array(z.string()).optional(),
+          serials: z
+            .array(
+              z.object({
+                serialNo: z.string(),
+                assetTag: z.string().optional(),
+                make: z.string().optional(),
+                model: z.string().optional(),
+              }),
+            )
+            .optional(),
         })
         .parse(request.body);
       return await updateRecycling(request.user!, id, {
@@ -423,6 +435,25 @@ export async function lifecycleRoutes(app: FastifyInstance) {
             | 'LIW',
         })),
       });
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/invoices/:id/recycling/approve', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      return await approveRecycling(request.user!, id);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/invoices/:id/recycling/reject', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z.object({ note: z.string().optional() }).parse(request.body ?? {});
+      return await rejectRecycling(request.user!, id, body);
     } catch (err) {
       return handleServiceError(err, reply);
     }

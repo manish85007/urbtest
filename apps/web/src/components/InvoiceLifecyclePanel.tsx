@@ -113,8 +113,16 @@ export function InvoiceLifecyclePanel({
   const hasGoodsReceipt = invoiceHasGoodsReceipt(invoice);
   const canCreateMrn = perms.createMrn && !invoice.mrn && !invoice.closedAt;
   const canCreateForm6 = perms.manageRecycling && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
-  const canEditForm6 = perms.manageRecycling && !!invoice.recycling && !invoice.closedAt;
-  const canUploadCod = perms.uploadCertificate && !!invoice.recycling && !invoice.closedAt;
+  const form6Status = invoice.recycling?.reviewStatus ?? 'approved';
+  const form6Approved = !invoice.recycling || form6Status === 'approved';
+  const canEditForm6 =
+    perms.manageRecycling &&
+    !!invoice.recycling &&
+    !invoice.closedAt &&
+    (isAdmin || form6Status !== 'approved');
+  const canUploadCod = perms.uploadCertificate && !!invoice.recycling && form6Approved && !invoice.closedAt;
+  const canReviewForm6 =
+    isAdmin && !!invoice.recycling && form6Status === 'pending_review' && !invoice.closedAt;
   const panelId =
     section === 'recycling' ? `inv-${invoice.id}-recy` : section === 'close' ? `inv-${invoice.id}-close` : `inv-${invoice.id}`;
 
@@ -407,9 +415,23 @@ export function InvoiceLifecyclePanel({
               invoice={invoice}
               canCreate={canCreateForm6}
               canEdit={canEditForm6}
+              canReview={canReviewForm6}
               isStaff={isStaff}
+              isAdmin={isAdmin}
+              disabled={disabled}
               onCreateClick={() => setPanel('recy')}
               onEditClick={() => setPanel('recy')}
+              onApprove={() =>
+                void run(() => lifecycleApi.approveRecycling(invoice.id), 'Form 6 approved — client notified.')
+              }
+              onReject={() => {
+                const note = window.prompt('Reason for returning Form 6 to the factory (optional):');
+                if (note === null) return;
+                void run(
+                  () => lifecycleApi.rejectRecycling(invoice.id, { note: note.trim() || undefined }),
+                  'Form 6 returned to factory for revision.',
+                );
+              }}
             />
             {invoice.recycling ? (
               <div className="card" style={{ marginBottom: '.6rem' }}>
@@ -469,7 +491,9 @@ export function InvoiceLifecyclePanel({
                   </div>
                 ) : (
                   <div className="dim" style={{ fontSize: '.83rem' }}>
-                    Form 6 {invoice.recycling.form6No} is on file. Upload the signed certificate PDF when ready.
+                    {invoice.recycling.reviewStatus && invoice.recycling.reviewStatus !== 'approved'
+                      ? 'Admin must approve Form 6 before the Certificate of Destruction can be uploaded.'
+                      : `Form 6 ${invoice.recycling.form6No} is on file. Upload the signed certificate PDF when ready.`}
                   </div>
                 )}
               </div>
@@ -641,7 +665,13 @@ export function InvoiceLifecyclePanel({
         <Modal
           title={`${invoice.recycling ? 'Edit Form 6' : 'Process Invoice'} — ${invoice.invoiceNo}`}
           onClose={() => setPanel(null)}
-          okLabel={invoice.recycling ? 'Save Form 6' : 'Issue Form 6'}
+          okLabel={
+            invoice.recycling
+              ? 'Save Form 6'
+              : isAdmin
+                ? 'Issue Form 6'
+                : 'Submit for Admin Review'
+          }
           form="recy-form"
           busy={disabled}
           wide
@@ -694,8 +724,16 @@ export function InvoiceLifecyclePanel({
             disabled={disabled}
             onSubmit={(body) =>
               invoice.recycling
-                ? run(() => lifecycleApi.updateRecycling(invoice.id, body), 'Form 6 updated.')
-                : run(() => lifecycleApi.createRecycling(invoice.id, body), 'Recycling recorded.')
+                ? run(
+                    () => lifecycleApi.updateRecycling(invoice.id, body),
+                    isAdmin ? 'Form 6 updated.' : 'Form 6 updated and sent for admin review.',
+                  )
+                : run(
+                    () => lifecycleApi.createRecycling(invoice.id, body),
+                    isAdmin
+                      ? 'Form 6 issued and emailed to the client.'
+                      : 'Form 6 submitted for admin review.',
+                  )
             }
           />
         </Modal>
@@ -975,18 +1013,32 @@ function RecyclingCard({
   invoice,
   canCreate,
   canEdit,
+  canReview,
   isStaff,
+  isAdmin,
+  disabled,
   onCreateClick,
   onEditClick,
+  onApprove,
+  onReject,
 }: {
   invoice: InvoiceDetail;
   canCreate: boolean;
   canEdit?: boolean;
+  canReview?: boolean;
   isStaff: boolean;
+  isAdmin?: boolean;
+  disabled?: boolean;
   onCreateClick: () => void;
   onEditClick?: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
 }) {
   const r = invoice.recycling;
+  const status = r?.reviewStatus ?? (r ? 'approved' : undefined);
+  const approved = status === 'approved';
+  const pending = status === 'pending_review';
+  const rejected = status === 'rejected';
   const cats = r?.categories ?? [];
   const serials = r?.serials ?? [];
   const destroyed = serials.filter((s) => s.dcodNo).length;
@@ -996,16 +1048,27 @@ function RecyclingCard({
   const recPcb = Number(r?.recoveryPcb ?? 0);
   const hasRecovery = recFe + recNfe + recPl + recPcb > 0;
 
+  const statusBadge = !r ? (
+    <span className="badge bg-am">Pending</span>
+  ) : pending ? (
+    <span className="badge bg-am">Awaiting admin review</span>
+  ) : rejected ? (
+    <span className="badge bg-rd">Returned for revision</span>
+  ) : (
+    <span className="badge bg-g mono">{r.form6No}</span>
+  );
+
   return (
     <CollapsibleCard
       title="♻️ Recycling / Form 6"
-      badge={r ? <span className="badge bg-g mono">{r.form6No}</span> : <span className="badge bg-am">Pending</span>}
-      defaultOpen={!r || !invoice.certificates.length}
+      badge={statusBadge}
+      defaultOpen={!r || pending || rejected || !invoice.certificates.length}
       style={{ marginBottom: '.6rem' }}
       summary={
         r ? (
           <span>
             Invoice {invoice.invoiceNo} · {fmtDate(r.processedAt)} · billed {num(Number(invoice.billingWeight))} kg
+            {pending ? ' · submitted for review' : rejected ? ' · needs revision' : ''}
           </span>
         ) : (
           'Awaiting processing'
@@ -1019,9 +1082,11 @@ function RecyclingCard({
                 Edit Form 6
               </button>
             ) : null}
-            <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
-              ⬇ Form 6
-            </a>
+            {(approved || isStaff) ? (
+              <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
+                ⬇ Form 6{approved ? '' : ' (preview)'}
+              </a>
+            ) : null}
           </>
         ) : null
       }
@@ -1033,12 +1098,56 @@ function RecyclingCard({
           </div>
           {canCreate ? (
             <button type="button" className="btn bp bsm" style={{ marginTop: '.5rem' }} onClick={onCreateClick}>
-              Process & Issue Form 6
+              {isAdmin ? 'Process & Issue Form 6' : 'Process & Submit Form 6 for Review'}
             </button>
           ) : null}
         </>
       ) : (
         <>
+          {canReview ? (
+            <div
+              className="card"
+              style={{
+                marginBottom: '.75rem',
+                background: 'var(--am2)',
+                borderColor: '#fcd34d',
+                padding: '.75rem',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: 'var(--g2)', marginBottom: '.35rem' }}>
+                Admin review — Form 6 {r.form6No}
+              </div>
+              <p className="dim" style={{ fontSize: '.82rem', margin: '0 0 .65rem' }}>
+                The factory has completed entry. Approve to generate the client-facing Form 6, email the client,
+                and show it on their portal. Return it if revisions are needed.
+              </p>
+              {r.reviewNote ? (
+                <p className="dim" style={{ fontSize: '.8rem', marginBottom: '.5rem' }}>
+                  Previous note: {r.reviewNote}
+                </p>
+              ) : null}
+              <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn bp bsm" disabled={disabled} onClick={onApprove}>
+                  Approve &amp; release Form 6
+                </button>
+                <button type="button" className="btn bs bsm" disabled={disabled} onClick={onReject}>
+                  Return to factory
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {pending && !canReview && isStaff ? (
+            <div className="note-box" style={{ marginBottom: '.65rem' }}>
+              Form 6 {r.form6No} is waiting for admin approval before the client is notified.
+            </div>
+          ) : null}
+          {rejected ? (
+            <div className="note-box" style={{ marginBottom: '.65rem', background: 'var(--rd2)' }}>
+              Returned for revision{r.reviewedBy ? ` by ${r.reviewedBy}` : ''}
+              {r.reviewNote ? `: ${r.reviewNote}` : '.'}
+              {canEdit ? ' Edit and resubmit for review.' : ''}
+            </div>
+          ) : null}
           <div
             style={{
               display: 'grid',
@@ -1054,6 +1163,12 @@ function RecyclingCard({
             <div className="tile">
               <div className="tile-l">Form 6 #</div>
               <div className="tile-v mono">{r.form6No}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Review</div>
+              <div className="tile-v">
+                {approved ? 'Approved' : pending ? 'Pending admin' : rejected ? 'Returned' : status}
+              </div>
             </div>
             <div className="tile">
               <div className="tile-l">Processed</div>

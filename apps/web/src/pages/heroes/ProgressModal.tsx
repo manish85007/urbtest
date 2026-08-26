@@ -28,6 +28,10 @@ export function ProgressModal({ planting: t, onClose, onSaved }: ProgressModalPr
       setError('The photo cannot pre-date the planting.');
       return;
     }
+    if (notedAt > todayIso()) {
+      setError('Photo date cannot be in the future.');
+      return;
+    }
     if (!photoIds[0]) {
       setError('Attach the photo.');
       return;
@@ -52,8 +56,8 @@ export function ProgressModal({ planting: t, onClose, onSaved }: ProgressModalPr
       onOk={() => void save()}
     >
       <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.8rem' }}>
-        Planted {fmtDate(t.plantedAt)}, {days} days ago. Adding dated photos over time gives the CSR
-        activity a verifiable record an auditor can follow.
+        Planted {fmtDate(t.plantedAt)}, {days} days ago. Add a dated photo so the CSR activity has a verifiable
+        audit trail.
       </p>
       {error ? <p className="error">{error}</p> : null}
       <div className="fr2">
@@ -83,12 +87,13 @@ export function ProgressModal({ planting: t, onClose, onSaved }: ProgressModalPr
         />
       </div>
       <div className="section-hd" style={{ marginTop: '.3rem' }}>
-        Photo * <span className="hint" style={{ fontWeight: 400 }}>required</span>
+        Photo * <span className="hint" style={{ fontWeight: 400 }}>JPEG / PNG / WebP — take or choose a picture</span>
       </div>
       <FileUpload
         kind="planting"
-        label="📷 Attach photo"
-        accept="image/jpeg,image/png,image/webp"
+        label="📷 Take or upload photo"
+        accept="image/jpeg,image/png,image/webp,image/*"
+        capture="environment"
         required
         value={photoIds}
         onChange={(ids) => setPhotoIds(ids.slice(-1))}

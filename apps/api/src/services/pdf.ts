@@ -163,6 +163,9 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const recy = invoice.recycling;
   if (!recy) throw new AppError('This invoice has not been processed yet.');
+  if (actor.role === 'client' && recy.reviewStatus !== 'approved') {
+    throw new AppError('Form 6 is awaiting admin approval and is not available yet.');
+  }
 
   const factory = await prisma.factorySite.findUnique({ where: { id: recy.factoryId } });
   const sub = invoice.submission;
@@ -273,7 +276,10 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
     details: { submissionId: sub.id, invNo: invoice.invoiceNo },
   });
 
-  return { filename: `${recy.form6No}-${invoice.invoiceNo.replace(/[^\w]/g, '')}.pdf`, buffer };
+  return {
+    filename: `${recy.form6No.replace(/\//g, '-')}-${invoice.invoiceNo.replace(/[^\w]/g, '')}.pdf`,
+    buffer,
+  };
 }
 
 export async function impactPdf(

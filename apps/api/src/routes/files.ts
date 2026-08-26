@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import multipart from '@fastify/multipart';
 import { FileKind } from '@prisma/client';
 import { isAppError } from '../lib/errors.js';
+import { contentDisposition } from '../lib/http-headers.js';
 import { attachSession, requireAuth } from '../middleware/session.js';
 import { readFileBlob, uploadFile } from '../services/file-service.js';
 
@@ -72,7 +73,7 @@ export async function filesRoutes(app: FastifyInstance) {
       const { file, buffer } = await readFileBlob(request.user!, id);
       return reply
         .header('Content-Type', file.mimeType)
-        .header('Content-Disposition', `inline; filename="${file.name.replace(/"/g, '')}"`)
+        .header('Content-Disposition', contentDisposition('inline', file.name))
         .send(buffer);
     } catch (err) {
       return handleServiceError(err, reply);
