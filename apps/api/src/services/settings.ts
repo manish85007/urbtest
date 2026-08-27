@@ -24,7 +24,7 @@ const EMPTY: SmtpSettings = {
   user: '',
   pass: '',
   fromName: 'Urb TecTrack',
-  fromEmail: process.env.URBENO_EMAIL ?? 'noreply@urbeno.in',
+  fromEmail: process.env.SMTP_FROM_EMAIL ?? 'noreply@urbeno.in',
 };
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -163,7 +163,7 @@ export const DEFAULT_COMPANY: CompanyProfile = {
   gst: process.env.URBENO_GST ?? '29AABCU1234R1ZX',
   cin: process.env.URBENO_CIN ?? '',
   phone: process.env.URBENO_PHONE ?? '1800-123-4567',
-  email: process.env.URBENO_EMAIL ?? 'noreply@urbeno.in',
+  email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
   wa: process.env.URBENO_WA ?? '919902299007',
   cpcb: process.env.URBENO_CPCB ?? 'CPCB/EPR/2022/KA/00817',
   kspcb: process.env.URBENO_KSPCB ?? 'KSPCB/HWM/AUTH/2024-27/1142',

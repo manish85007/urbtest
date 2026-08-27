@@ -711,10 +711,10 @@ function qs(params: Record<string, string | undefined>): string {
 
 export const legalApi = {
   list: () =>
-    api<Array<{ key: string; version: string; title: string; effectiveDate: string }>>('/legal'),
+    api<Array<{ key: string; version: string; title: string; effectiveDate: string }>>('/legal-documents'),
   document: (key: string) =>
     api<{ key: string; version: string; title: string; body: string; effectiveDate: string }>(
-      `/legal/${key}`,
+      `/legal-documents/${key}`,
     ),
 };
 

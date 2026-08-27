@@ -45,7 +45,7 @@ aws secretsmanager put-secret-value \
 ```
 
 Mail is sent via Gmail SMTP as **noreply@urbeno.in** to **real recipient addresses** (no UAT redirect funnel).  
-The app password lives only in Secrets Manager (`SMTP_PASS`); Masters never persists it.
+Public contact and support references use **info@urbeno.in** (`URBENO_EMAIL`). The app password lives only in Secrets Manager (`SMTP_PASS`).
 
 ## Deploy
 

@@ -10,9 +10,10 @@ import {
 import { listAudit } from '../services/audit.js';
 
 export async function legalRoutes(app: FastifyInstance) {
-  app.get('/legal', async () => listLegalDocuments());
+  // Use /legal-documents so paths do not collide with the SPA at /legal/:key.
+  app.get('/legal-documents', async () => listLegalDocuments());
 
-  app.get('/legal/:key', async (request, reply) => {
+  app.get('/legal-documents/:key', async (request, reply) => {
     const { key } = request.params as { key: string };
     const doc = await getLegalDocument(key);
     if (!doc) return reply.notFound('Legal document not found.');

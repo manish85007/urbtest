@@ -43,7 +43,7 @@ services:
       SMTP_USER: noreply@urbeno.in
       SMTP_FROM_NAME: Urb TecTrack
       SMTP_FROM_EMAIL: noreply@urbeno.in
-      URBENO_EMAIL: noreply@urbeno.in
+      URBENO_EMAIL: info@urbeno.in
       PORTAL_URL: http://localhost:8080
       CORS_ORIGIN: http://localhost:8080
       ENABLE_JOBS: "true"

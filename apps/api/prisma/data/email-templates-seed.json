@@ -3,8 +3,8 @@
     "key": "request_ack",
     "name": "Request Acknowledgement",
     "subject": "Your e-waste pickup request {{request_id}} has been received",
-    "body": "Dear {{contact_name}},\n\nThank you for raising an e-waste collection request with Urbeno.\n\nYour request {{request_id}} dated {{request_date}} for {{site_name}} has been received and accepted. Our operations team will attend to it shortly and will confirm the pickup schedule with you.\n\nRequest summary\n  Request ID     : {{request_id}}\n  Site           : {{site_name}}\n  Location       : {{location}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\nYou can track this request at any time from your Urb TecTrack portal.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "request_date", "site_name", "location", "approx_weight", "approx_qty", "contact_name", "client_name"]
+    "body": "Dear {{contact_name}},\n\nThank you for raising an e-waste collection request with Urbeno.\n\nYour request {{request_id}} dated {{request_date}} for {{site_name}} has been received and accepted. Our operations team will attend to it shortly and will confirm the pickup schedule with you.\n\nRequest summary\n  Request ID     : {{request_id}}\n  Site           : {{site_name}}\n  Location       : {{location}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\nTrack this request in Urb TecTrack: {{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "request_date", "site_name", "location", "approx_weight", "approx_qty", "contact_name", "client_name", "portal_url", "contact_email"]
   },
   {
     "key": "request_new_admin",
@@ -17,64 +17,64 @@
     "key": "request_new_client",
     "name": "New Request Confirmation",
     "subject": "Your e-waste pickup request {{request_id}} has been submitted",
-    "body": "Dear {{contact_name}},\n\nYour e-waste collection request has been submitted to Urbeno.\n\n  Request ID     : {{request_id}}\n  Site           : {{site_name}}\n  Pickup address : {{location}}\n  Request date   : {{request_date}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\nOur operations team will review and acknowledge your request shortly. Track progress in your portal:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "site_name", "location", "request_date", "approx_weight", "approx_qty", "contact_name", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nYour e-waste collection request has been submitted to Urbeno.\n\n  Request ID     : {{request_id}}\n  Site           : {{site_name}}\n  Pickup address : {{location}}\n  Request date   : {{request_date}}\n  Approx. weight : {{approx_weight}} kg\n  Approx. units  : {{approx_qty}}\n\nOur operations team will review and acknowledge your request shortly.\n\nTrack progress: {{portal_url}}\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "site_name", "location", "request_date", "approx_weight", "approx_qty", "contact_name", "portal_url", "contact_email"]
   },
   {
     "key": "loading_complete",
     "name": "Loading Complete",
     "subject": "Loading complete for request {{request_id}} — weighment slips ready",
-    "body": "Dear {{contact_name}},\n\nLoading has been completed and weighment documentation is ready for your request {{request_id}} at {{site_name}}.\n\n  Total net weight : {{net_weight}} kg\n  Vehicles         : {{vehicle_count}}\n\nInvoicing will proceed next. Track your request:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
-    "variables": ["request_id", "site_name", "contact_name", "net_weight", "vehicle_count", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nLoading has been completed and weighment documentation is ready for your request {{request_id}} at {{site_name}}.\n\n  Total net weight : {{net_weight}} kg\n  Vehicles         : {{vehicle_count}}\n\nInvoicing will proceed next.\n\nTrack your request: {{portal_url}}\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "site_name", "contact_name", "net_weight", "vehicle_count", "portal_url", "contact_email"]
   },
   {
     "key": "invoice_generated",
     "name": "Invoice & E-way Generated",
     "subject": "Invoice {{invoice_no}} raised for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nAn invoice and e-way bill have been generated for your request {{request_id}}.\n\n  Invoice   : {{invoice_no}}\n  E-way bill: {{eway_bill_no}}\n  Billed    : {{billing_weight}} kg\n  Amount    : {{invoice_total}}\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
-    "variables": ["request_id", "contact_name", "invoice_no", "eway_bill_no", "billing_weight", "invoice_total", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nAn invoice and e-way bill have been generated for your request {{request_id}}.\n\n  Invoice   : {{invoice_no}}\n  E-way bill: {{eway_bill_no}}\n  Billed    : {{billing_weight}} kg\n  Amount    : {{invoice_total}}\n\nView in Urb TecTrack: {{portal_url}}\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "invoice_no", "eway_bill_no", "billing_weight", "invoice_total", "portal_url", "contact_email"]
   },
   {
     "key": "mrn_generated",
     "name": "MRN Generated",
     "subject": "Goods received — MRN {{mrn_no}} for invoice {{invoice_no}}",
-    "body": "Dear {{contact_name}},\n\nMaterial for request {{request_id}} has been received at our facility.\n\n  MRN     : {{mrn_no}}\n  Invoice : {{invoice_no}}\n  Facility: {{factory_name}}\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
-    "variables": ["request_id", "contact_name", "mrn_no", "invoice_no", "factory_name", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nMaterial for request {{request_id}} has been received at our facility.\n\n  MRN     : {{mrn_no}}\n  Invoice : {{invoice_no}}\n  Facility: {{factory_name}}\n\nTrack progress: {{portal_url}}\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "mrn_no", "invoice_no", "factory_name", "portal_url", "contact_email"]
   },
   {
     "key": "recycling_form6",
     "name": "Recycling & Form 6",
     "subject": "Form 6 {{form6_no}} issued for invoice {{invoice_no}}",
-    "body": "Dear {{contact_name}},\n\nRecycling has been completed and Form 6 has been issued for request {{request_id}}.\n\n  Form 6  : {{form6_no}}\n  Invoice : {{invoice_no}}\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
-    "variables": ["request_id", "contact_name", "form6_no", "invoice_no", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nRecycling has been completed and Form 6 has been issued for request {{request_id}}.\n\n  Form 6  : {{form6_no}}\n  Invoice : {{invoice_no}}\n\nView documents: {{portal_url}}\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "form6_no", "invoice_no", "portal_url", "contact_email"]
   },
   {
     "key": "cod_generated",
     "name": "Certificate of Destruction",
     "subject": "Certificate {{cert_no}} issued for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction has been uploaded for request {{request_id}}.\n\n  Certificate : {{cert_no}}\n  Invoice     : {{invoice_no}}\n  Date        : {{cert_date}}\n\nPlease review and acknowledge closure in your portal when ready:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
-    "variables": ["request_id", "contact_name", "cert_no", "invoice_no", "cert_date", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction has been uploaded for request {{request_id}}.\n\n  Certificate : {{cert_no}}\n  Invoice     : {{invoice_no}}\n  Date        : {{cert_date}}\n\nPlease review and acknowledge closure in your portal when ready:\n{{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "contact_name", "cert_no", "invoice_no", "cert_date", "portal_url", "contact_email"]
   },
   {
     "key": "request_closed",
     "name": "Request Closed",
     "subject": "Request {{request_id}} closed successfully",
-    "body": "Dear {{contact_name}},\n\nYour e-waste collection request {{request_id}} for {{site_name}} has been closed.\n\nThank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycling Heroes milestones.\n\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited",
-    "variables": ["request_id", "site_name", "contact_name", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nYour e-waste collection request {{request_id}} for {{site_name}} has been closed.\n\nThank you for partnering with Urbeno. Your recycled tonnage counts toward your Recycling Heroes milestones.\n\n{{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "variables": ["request_id", "site_name", "contact_name", "portal_url", "contact_email"]
   },
   {
     "key": "cod_delivery",
     "name": "Certificate of Destruction Delivery",
     "subject": "Certificate of Destruction {{cert_no}} for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction for your e-waste submission is now available and attached to this email.\n\n  Request ID       : {{request_id}}\n  Invoice          : {{invoice_no}}\n  Certificate No.  : {{cert_no}}\n  Certificate Date : {{cert_date}}\n  Covers           : {{department}}\n  Net weight       : {{net_weight}} kg\n\nWhere a single pickup covers more than one department, you will receive a separate certificate for each — please review them all before closing.\n\nPlease review the attached certificate and acknowledge closure of this request in your Urb TecTrack portal. Once acknowledged, the request lifecycle is complete and the tonnage counts toward your Recycling Heroes milestones.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "invoice_no", "cert_no", "cert_date", "department", "net_weight", "contact_name", "client_name"]
+    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction for your e-waste submission is now available and attached to this email.\n\n  Request ID       : {{request_id}}\n  Invoice          : {{invoice_no}}\n  Certificate No.  : {{cert_no}}\n  Certificate Date : {{cert_date}}\n  Covers           : {{department}}\n  Net weight       : {{net_weight}} kg\n\nWhere a single pickup covers more than one department, you will receive a separate certificate for each — please review them all before closing.\n\nPlease review the attached certificate and acknowledge closure in Urb TecTrack:\n{{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "invoice_no", "cert_no", "cert_date", "department", "net_weight", "contact_name", "client_name", "portal_url", "contact_email"]
   },
   {
     "key": "payment_reminder",
     "name": "Payment Reminder",
     "subject": "Payment reminder — invoice {{invoice_no}} for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nThis is a reminder that the following invoice is outstanding.\n\n  Request ID     : {{request_id}}\n  Invoice        : {{invoice_no}} dated {{invoice_date}}\n  Invoice value  : {{invoice_total}}\n  Received       : {{amount_paid}}\n  Outstanding    : {{amount_due}}\n  Payment terms  : {{payment_terms}}\n  Due date       : {{due_date}}\n  {{overdue_line}}\n\nPlease arrange payment at your earliest convenience. If payment has already been made, share the UTR and we will reconcile it against this invoice.\n\nNote that a request cannot be closed in Urb TecTrack until the invoice against it is fully settled.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "invoice_no", "invoice_date", "invoice_total", "amount_paid", "amount_due", "payment_terms", "due_date", "overdue_line", "contact_name", "client_name"]
+    "body": "Dear {{contact_name}},\n\nThis is a reminder that the following invoice is outstanding.\n\n  Request ID     : {{request_id}}\n  Invoice        : {{invoice_no}} dated {{invoice_date}}\n  Invoice value  : {{invoice_total}}\n  Received       : {{amount_paid}}\n  Outstanding    : {{amount_due}}\n  Payment terms  : {{payment_terms}}\n  Due date       : {{due_date}}\n  {{overdue_line}}\n\nPlease arrange payment at your earliest convenience. If payment has already been made, share the UTR and we will reconcile it against this invoice.\n\nNote that a request cannot be closed in Urb TecTrack until the invoice against it is fully settled.\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "invoice_no", "invoice_date", "invoice_total", "amount_paid", "amount_due", "payment_terms", "due_date", "overdue_line", "contact_name", "client_name", "contact_email"]
   },
   {
     "key": "sla_alert",
@@ -87,35 +87,35 @@
     "key": "request_changes",
     "name": "Changes Requested",
     "subject": "Action required — your request {{request_id}} needs changes",
-    "body": "Dear {{contact_name}},\n\nOur operations team has reviewed your e-waste collection request and would like you to make some changes before we can proceed.\n\n  Request ID : {{request_id}}\n  Site       : {{site_name}}\n\nChanges requested:\n  {{reason}}\n\nPlease sign in to your Urb TecTrack portal, open this request, and update it as requested. Once you save, our team will be notified immediately.\n\nIf you have any questions, please reply to this email or reach us on WhatsApp.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "client_name", "site_name", "reason", "contact_name"]
+    "body": "Dear {{contact_name}},\n\nOur operations team has reviewed your e-waste collection request and would like you to make some changes before we can proceed.\n\n  Request ID : {{request_id}}\n  Site       : {{site_name}}\n\nChanges requested:\n  {{reason}}\n\nPlease sign in to Urb TecTrack, open this request, and update it as requested:\n{{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "client_name", "site_name", "reason", "contact_name", "portal_url", "contact_email"]
   },
   {
     "key": "vehicle_assigned",
     "name": "Pickup Scheduled",
     "subject": "Pickup scheduled for request {{request_id}} — {{expected_date}}",
-    "body": "Dear {{contact_name}},\n\nGreat news! A pickup has been scheduled for your e-waste collection request.\n\n  Request ID      : {{request_id}}\n  Site            : {{site_name}}\n  Expected arrival: {{expected_date}}\n  Vehicle         : {{registration}}\n  Driver          : {{driver_name}} · {{driver_phone}}\n\nPlease ensure the material is ready and accessible at the pickup location. If you need to reschedule or have any concerns, contact us as soon as possible.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "site_name", "expected_date", "registration", "driver_name", "driver_phone", "contact_name", "client_name"]
+    "body": "Dear {{contact_name}},\n\nGreat news! A pickup has been scheduled for your e-waste collection request.\n\n  Request ID      : {{request_id}}\n  Site            : {{site_name}}\n  Expected arrival: {{expected_date}}\n  Vehicle         : {{registration}}\n  Driver          : {{driver_name}} · {{driver_phone}}\n\nPlease ensure the material is ready and accessible at the pickup location. If you need to reschedule, contact us at {{contact_email}}.\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "site_name", "expected_date", "registration", "driver_name", "driver_phone", "contact_name", "client_name", "contact_email"]
   },
   {
     "key": "request_stage_update",
     "name": "Request Stage Update",
     "subject": "Update on your request {{request_id}} — now at {{stage_name}}",
-    "body": "Dear {{contact_name}},\n\nYour Urb TecTrack request has moved to the next stage.\n\n  Request ID : {{request_id}}\n  Site       : {{site_name}}\n  New stage  : {{stage_name}}\n  Update     : {{status_detail}}\n\nYou can review the latest status in your Urb TecTrack portal:\n{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "site_name", "stage_name", "status_detail", "contact_name", "portal_url"]
+    "body": "Dear {{contact_name}},\n\nYour Urb TecTrack request has moved to the next stage.\n\n  Request ID : {{request_id}}\n  Site       : {{site_name}}\n  New stage  : {{stage_name}}\n  Update     : {{status_detail}}\n\nReview the latest status: {{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["request_id", "site_name", "stage_name", "status_detail", "contact_name", "portal_url", "contact_email"]
   },
   {
     "key": "password_reset",
     "name": "Password Reset Code",
     "subject": "Your Urb TecTrack password reset code",
-    "body": "Dear {{user_name}},\n\nA password reset was requested for your Urb TecTrack account.\n\nYour 6-digit code is: {{code}}\n\nIt expires in {{expiry_minutes}} minutes. If you did not request this, ignore this email and contact {{support_email}}.\n\nUrb TecTrack",
-    "variables": ["user_name", "code", "expiry_minutes", "support_email"]
+    "body": "Dear {{user_name}},\n\nA password reset was requested for your Urb TecTrack account.\n\nYour 6-digit code is: {{code}}\n\nIt expires in {{expiry_minutes}} minutes. If you did not request this, ignore this email and contact {{support_email}}.\n\nSign in: {{portal_url}}\n\nUrb TecTrack · Urbeno Private Limited",
+    "variables": ["user_name", "code", "expiry_minutes", "support_email", "portal_url"]
   },
   {
     "key": "user_welcome",
     "name": "New User Welcome",
     "subject": "Welcome to Urb TecTrack — your account is ready",
-    "body": "Hello {{user_name}},\n\nAn Urb TecTrack account has been created for you on behalf of {{client_name}}.\n\n  Sign-in email     : {{user_email}}\n  Temporary password: {{temp_password}}\n\nPlease sign in and change your password on first use.\n\nUrb TecTrack lets you raise e-waste collection requests, track them through every stage, download compliance documents, and view your sustainability impact.\n\nWarm regards,\n{{admin_name}}\nUrbeno Private Limited",
-    "variables": ["user_name", "user_email", "client_name", "temp_password", "admin_name"]
+    "body": "Hello {{user_name}},\n\nAn Urb TecTrack account has been created for you on behalf of {{client_name}}.\n\n  Sign-in email     : {{user_email}}\n  Temporary password: {{temp_password}}\n\nSign in to Urb TecTrack:\n{{portal_url}}\n\nPlease sign in and change your password on first use.\n\nUrb TecTrack lets you raise e-waste collection requests, track them through every stage, download compliance documents, and view your sustainability impact.\n\nQuestions? {{contact_email}}\n\nWarm regards,\n{{admin_name}}\nUrbeno Private Limited\nRecycling Heroes™",
+    "variables": ["user_name", "user_email", "client_name", "temp_password", "admin_name", "portal_url", "contact_email"]
   }
 ]

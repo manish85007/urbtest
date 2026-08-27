@@ -378,8 +378,19 @@ a { color: inherit; text-decoration: none; }
 .tab.on { background: #fff; color: var(--g2); }
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem; margin: 1rem 0; }
 .check-label { display: flex; align-items: center; gap: .5rem; font-weight: 600; padding-top: 1.4rem; }
-.legal-doc .legal-body { white-space: pre-wrap; font-size: .88rem; line-height: 1.65; margin-top: 1rem; }
+.legal-doc .legal-body { font-size: .88rem; line-height: 1.65; margin-top: 1rem; }
+.legal-doc .legal-body .legal-bullet { margin: .15rem 0 .15rem .2rem; }
 .legal-consent .list { margin: 1rem 0; }
+.legal-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  margin: 1rem 0;
+  font-size: .84rem;
+  line-height: 1.55;
+}
+.legal-consent-check input { margin-top: .2rem; flex-shrink: 0; }
+.legal-consent-foot { font-size: .74rem; margin-top: .75rem; }
 .avatar-link { display: inline-flex; align-items: center; gap: .5rem; }
 .mt { margin-top: 1rem; }
 .app { flex: 1; width: 100%; min-height: 100%; min-height: 100dvh; display: flex; flex-direction: column; }

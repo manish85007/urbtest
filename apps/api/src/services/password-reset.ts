@@ -38,7 +38,7 @@ export async function requestPasswordReset(emailRaw: string): Promise<{ sent: tr
       user_name: user.name,
       code,
       expiry_minutes: RESET_MINS,
-      support_email: process.env.URBENO_EMAIL ?? 'noreply@urbeno.in',
+      support_email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
     });
     await processEmailQueue(5).catch(() => undefined);
     await auditLog({ actorEmail: email, action: 'auth.reset.request', entity: 'user', entityId: email });

@@ -157,7 +157,7 @@ gcloud run deploy "${SERVICE}" \
   --max-instances 2 \
   --cpu-boost \
   --set-secrets "DATABASE_PASSWORD=${SECRET_DB}:latest,SESSION_SECRET=${SECRET_SESSION}:latest,SMTP_PASS=${SECRET_SMTP}:latest" \
-  --set-env-vars "NODE_ENV=uat,UAT_SEED=true,API_HOST=0.0.0.0,WEB_DIST=/app/apps/web/dist,COOKIE_SECURE=true,ENABLE_JOBS=true,EMAIL_PROVIDER=smtp,SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_SECURE=false,SMTP_USER=noreply@urbeno.in,SMTP_FROM_NAME=Urb TecTrack,SMTP_FROM_EMAIL=noreply@urbeno.in,URBENO_EMAIL=noreply@urbeno.in,DATABASE_USER=${DB_USER},DATABASE_NAME=${DB_NAME},CLOUD_SQL_CONNECTION_NAME=${SQL_CONN},GCS_BUCKET=${BUCKET}" \
+  --set-env-vars "NODE_ENV=uat,UAT_SEED=true,API_HOST=0.0.0.0,WEB_DIST=/app/apps/web/dist,COOKIE_SECURE=true,ENABLE_JOBS=true,EMAIL_PROVIDER=smtp,SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_SECURE=false,SMTP_USER=noreply@urbeno.in,SMTP_FROM_NAME=Urb TecTrack,SMTP_FROM_EMAIL=noreply@urbeno.in,URBENO_EMAIL=info@urbeno.in,DATABASE_USER=${DB_USER},DATABASE_NAME=${DB_NAME},CLOUD_SQL_CONNECTION_NAME=${SQL_CONN},GCS_BUCKET=${BUCKET}" \
   --quiet
 
 URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT}" --format='value(status.url)')"

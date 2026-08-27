@@ -50,7 +50,7 @@ services:
       EMAIL_PROVIDER: smtp
       SMTP_FROM_EMAIL: "noreply@urbeno.in"
       SMTP_FROM_NAME: "Urb TecTrack"
-      URBENO_EMAIL: "noreply@urbeno.in"
+      URBENO_EMAIL: "info@urbeno.in"
       # ── Optional tuning ───────────────────────────────────────────────────
       ENABLE_JOBS: "true"
       EMAIL_POLL_MS: "30000"

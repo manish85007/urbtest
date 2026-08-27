@@ -11,6 +11,7 @@ export function LegalConsentGate({ onAccepted }: LegalConsentGateProps) {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
 
   useEffect(() => {
     authApi
@@ -24,6 +25,7 @@ export function LegalConsentGate({ onAccepted }: LegalConsentGateProps) {
   }, [onAccepted]);
 
   async function acceptAll() {
+    if (!acknowledged) return;
     setBusy(true);
     setError('');
     try {
@@ -47,25 +49,47 @@ export function LegalConsentGate({ onAccepted }: LegalConsentGateProps) {
   return (
     <div className="login">
       <div className="login-box legal-consent">
-        <h1 className="h1">Accept policies to continue</h1>
+        <h1 className="h1">User acceptance required</h1>
         <p className="muted">
-          Under the Digital Personal Data Protection Act, 2023, please review and accept the current
-          policies before using Urb TecTrack.
+          Before you use Urb TecTrack, please read and accept our current policies. By accepting,
+          you confirm that you have read, understood and agree to be bound by the Terms of Use and
+          consent to the processing of your personal data as described in the Privacy &amp; Data
+          Notice, in accordance with the Digital Personal Data Protection Act, 2023 (India).
         </p>
         <ul className="list">
           {pending.map((p) => (
             <li key={p.key}>
-              <Link to={`/legal/${p.key}`} target="_blank" rel="noreferrer">
+              <Link to={`/legal/${p.key}`}>
                 {p.title}
               </Link>{' '}
-              <span className="dim">v{p.version}</span>
+              <span className="dim">version {p.version}</span>
             </li>
           ))}
         </ul>
+        <label className="legal-consent-check">
+          <input
+            type="checkbox"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+          />
+          <span>
+            I have read the policies linked above and agree to the Terms of Use and Privacy &amp;
+            Data Notice (electronic acceptance).
+          </span>
+        </label>
         {error ? <p className="error">{error}</p> : null}
-        <button type="button" className="btn primary" disabled={busy} onClick={() => void acceptAll()}>
-          I accept the policies above
+        <button
+          type="button"
+          className="btn primary"
+          disabled={busy || !acknowledged}
+          onClick={() => void acceptAll()}
+        >
+          Accept and continue
         </button>
+        <p className="dim legal-consent-foot">
+          Your acceptance is recorded with your account, policy version and timestamp for audit
+          purposes.
+        </p>
       </div>
     </div>
   );

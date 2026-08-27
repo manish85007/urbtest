@@ -38,7 +38,7 @@ describe('simple-pdf', () => {
         gst: '29AACCU6342E1ZB',
         cin: 'U72900KA2020PTC136643',
         phone: '1800-123-4433',
-        email: 'ops@urbeno.in',
+        email: 'info@urbeno.in',
         cpcb: 'CPCB/EPR/2022/KA/00817',
         kspcb: 'KSPCB/HWM/AUTH/2024-27/1142',
         docNo: 'F6-00124',

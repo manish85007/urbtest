@@ -5,6 +5,7 @@ import { auditLog } from './audit.js';
 import { deliverEmail } from './email-provider.js';
 
 const PORTAL_URL = process.env.PORTAL_URL ?? 'http://localhost:5173';
+const CONTACT_EMAIL = process.env.URBENO_EMAIL ?? 'info@urbeno.in';
 
 const STAFF_ALERT_TEMPLATES = new Set(['request_new_admin']);
 const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: string }> = {
@@ -180,7 +181,12 @@ export async function sendTransactionalEmail(
   const recipients = await resolveRecipients(templateKey, to);
   if (!recipients.length) return null;
 
-  const mergedVars = { portal_url: PORTAL_URL, ...vars };
+  const mergedVars = {
+    portal_url: PORTAL_URL,
+    contact_email: CONTACT_EMAIL,
+    support_email: CONTACT_EMAIL,
+    ...vars,
+  };
   const subject = mergeTemplate(template.subject, mergedVars);
   const body = mergeTemplate(template.body, mergedVars);
 
