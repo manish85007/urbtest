@@ -192,7 +192,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
         gatePhotoIds: [gate.id],
         materialPhotoIds: [inside.id],
       }),
-    ).rejects.toMatchObject({ message: expect.stringMatching(/Admin/i) });
+    ).rejects.toMatchObject({ message: expect.stringMatching(/permission|Admin/i), statusCode: 403 });
 
     await expect(
       updateMrn(admin, invoiceId, {
