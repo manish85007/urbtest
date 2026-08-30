@@ -263,9 +263,18 @@ export async function changePassword(actor: SessionUser, current: string, next: 
 
 export async function startMfaEnrol(actor: SessionUser) {
   const secret = newTotpSecret();
+  const uri = totpUri(actor.email, secret);
+  const QRCode = (await import('qrcode')).default;
+  const qrDataUrl = await QRCode.toDataURL(uri, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 240,
+    color: { dark: '#1a2e14', light: '#ffffff' },
+  });
   return {
     secret,
-    uri: totpUri(actor.email, secret),
+    uri,
+    qrDataUrl,
     required: mfaRequired(actor.role),
   };
 }

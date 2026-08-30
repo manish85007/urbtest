@@ -700,7 +700,10 @@ export const authApi = {
       passwordExpired: boolean;
       policyText: string;
     }>('/auth/mfa'),
-  mfaStart: () => api<{ secret: string; uri: string; required: boolean }>('/auth/mfa/start', { method: 'POST' }),
+  mfaStart: () =>
+    api<{ secret: string; uri: string; qrDataUrl: string; required: boolean }>('/auth/mfa/start', {
+      method: 'POST',
+    }),
   mfaConfirm: (secret: string, code: string) =>
     api<{ ok: boolean; enrolled: boolean }>('/auth/mfa/confirm', {
       method: 'POST',

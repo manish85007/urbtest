@@ -228,11 +228,13 @@ export function ProfilePage({ user }: ProfilePageProps) {
 
 function MfaCard() {
   const [status, setStatus] = useState<Awaited<ReturnType<typeof authApi.mfaStatus>> | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
+  const [enrol, setEnrol] = useState<{ secret: string; qrDataUrl: string } | null>(null);
   const [code, setCode] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function load() {
     setStatus(await authApi.mfaStatus());
@@ -240,6 +242,21 @@ function MfaCard() {
   useEffect(() => {
     load().catch(() => undefined);
   }, []);
+
+  function formatSecret(s: string) {
+    return s.replace(/(.{4})/g, '$1 ').trim();
+  }
+
+  async function copySecret() {
+    if (!enrol) return;
+    try {
+      await navigator.clipboard.writeText(enrol.secret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Could not copy — select the key and copy manually.');
+    }
+  }
 
   return (
     <div style={{ marginTop: '.5rem' }}>
@@ -254,35 +271,102 @@ function MfaCard() {
       ) : status?.passwordAgeDays != null ? (
         <p className="dim">Password age: {status.passwordAgeDays} days.</p>
       ) : null}
-      {secret ? (
+      {enrol ? (
         <div>
-          <p className="dim">Add this secret to your authenticator app, then enter the current code.</p>
-          <div className="mono" style={{ fontWeight: 700, margin: '.4rem 0' }}>
-            {secret}
-          </div>
-          <input
-            className="mono"
-            maxLength={6}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="000000"
-          />
-          <button
-            type="button"
-            className="btn bp bsm"
-            onClick={() =>
-              authApi
-                .mfaConfirm(secret, code)
-                .then(() => {
-                  setSecret(null);
-                  setMsg('✓ Two-factor enabled');
-                  return load();
-                })
-                .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
-            }
+          <p className="dim" style={{ marginBottom: '.5rem' }}>
+            Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
+          </p>
+          <div
+            style={{
+              display: 'inline-block',
+              padding: '.6rem',
+              background: '#fff',
+              border: '1px solid var(--bd)',
+              borderRadius: 10,
+              marginBottom: '.6rem',
+            }}
           >
-            Confirm
-          </button>
+            <img
+              src={enrol.qrDataUrl}
+              alt="QR code to enrol authenticator app"
+              width={240}
+              height={240}
+              style={{ display: 'block' }}
+            />
+          </div>
+          <details style={{ marginBottom: '.7rem' }} open={showSecret} onToggle={(e) => setShowSecret((e.target as HTMLDetailsElement).open)}>
+            <summary style={{ cursor: 'pointer', fontSize: '.84rem', color: 'var(--g2)' }}>
+              Can&apos;t scan? Enter the key manually
+            </summary>
+            <p className="dim" style={{ fontSize: '.78rem', margin: '.35rem 0' }}>
+              Add an account in your app → enter this key (spaces optional):
+            </p>
+            <div
+              className="mono"
+              style={{
+                fontWeight: 700,
+                fontSize: '.9rem',
+                letterSpacing: '.06em',
+                wordBreak: 'break-all',
+                padding: '.5rem .65rem',
+                background: 'var(--bg)',
+                border: '1px solid var(--bd)',
+                borderRadius: 7,
+                marginBottom: '.4rem',
+              }}
+            >
+              {formatSecret(enrol.secret)}
+            </div>
+            <button type="button" className="btn bs bsm" onClick={() => void copySecret()}>
+              {copied ? 'Copied' : 'Copy key'}
+            </button>
+          </details>
+          <div className="fg" style={{ marginBottom: '.5rem' }}>
+            <label htmlFor="mfa-confirm">Authenticator code</label>
+            <input
+              id="mfa-confirm"
+              className="mono"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              style={{ fontSize: '1.1rem', letterSpacing: '.2em', textAlign: 'center', maxWidth: 160 }}
+              autoComplete="one-time-code"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn bp bsm"
+              disabled={code.length !== 6}
+              onClick={() =>
+                authApi
+                  .mfaConfirm(enrol.secret, code)
+                  .then(() => {
+                    setEnrol(null);
+                    setCode('');
+                    setShowSecret(false);
+                    setMsg('✓ Two-factor enabled');
+                    return load();
+                  })
+                  .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
+              }
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              className="btn bs bsm"
+              onClick={() => {
+                setEnrol(null);
+                setCode('');
+                setShowSecret(false);
+                setError('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       ) : status?.enrolled ? (
         <div>
@@ -310,7 +394,11 @@ function MfaCard() {
           onClick={() =>
             authApi
               .mfaStart()
-              .then((r) => setSecret(r.secret))
+              .then((r) => {
+                setMsg('');
+                setError('');
+                setEnrol({ secret: r.secret, qrDataUrl: r.qrDataUrl });
+              })
               .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
           }
         >
