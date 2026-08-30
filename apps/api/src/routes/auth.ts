@@ -3,6 +3,7 @@ import { z, ZodError } from 'zod';
 import { signIn, signOut, changePassword, AuthError, startMfaEnrol, confirmMfaEnrol, disableMfa, mfaStatus } from '../services/auth.js';
 import { confirmPasswordReset, requestPasswordReset } from '../services/password-reset.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
+import { isSecureDeployment } from '../lib/http-headers.js';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -11,16 +12,13 @@ const loginSchema = z.object({
 });
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_MAX_PER_IP =
-  process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 30 : 1000;
+const LOGIN_MAX_PER_IP = isSecureDeployment() && process.env.E2E_TEST !== 'true' ? 10 : 1000;
 const ipLoginCounts = new Map<string, { count: number; resetAt: number }>();
 
 const RESET_IP_WINDOW_MS = 15 * 60 * 1000;
 const RESET_EMAIL_WINDOW_MS = 60 * 60 * 1000;
-const RESET_MAX_PER_IP =
-  process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 10 : 100;
-const RESET_MAX_PER_EMAIL =
-  process.env.NODE_ENV === 'production' && process.env.E2E_TEST !== 'true' ? 3 : 20;
+const RESET_MAX_PER_IP = isSecureDeployment() && process.env.E2E_TEST !== 'true' ? 10 : 100;
+const RESET_MAX_PER_EMAIL = isSecureDeployment() && process.env.E2E_TEST !== 'true' ? 3 : 20;
 const ipResetCounts = new Map<string, { count: number; resetAt: number }>();
 const emailResetCounts = new Map<string, { count: number; resetAt: number }>();
 

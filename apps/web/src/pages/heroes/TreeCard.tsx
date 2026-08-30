@@ -86,7 +86,7 @@ export function TreeCard({
       </div>
       {t.photoFileId ? (
         <div className="frow">
-          <a className="fthumb" href={filesApi.url(t.photoFileId)} target="_blank" rel="noreferrer">
+          <a className="fthumb" href={filesApi.url(t.photoFileId)} target="_blank" rel="noopener noreferrer">
             <img src={filesApi.url(t.photoFileId)} alt="Planting day" />
           </a>
         </div>
@@ -121,7 +121,7 @@ export function TreeCard({
               >
                 <div className="frow" style={{ marginBottom: '.2rem' }}>
                   {p.photoFileId ? (
-                    <a className="fthumb" href={filesApi.url(p.photoFileId)} target="_blank" rel="noreferrer">
+                    <a className="fthumb" href={filesApi.url(p.photoFileId)} target="_blank" rel="noopener noreferrer">
                       <img src={filesApi.url(p.photoFileId)} alt="" />
                     </a>
                   ) : (

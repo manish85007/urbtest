@@ -97,7 +97,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
           </div>
         </div>
         <div className="spacer" />
-        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noopener noreferrer">
           📄 Methodology
         </a>
         <button type="button" className="btn bp" onClick={() => setPlantOpen(true)}>
@@ -395,7 +395,7 @@ function HeroesAdmin() {
           </div>
         </div>
         <div className="spacer" />
-        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noopener noreferrer">
           📄 Methodology
         </a>
         <button type="button" className="btn bp" onClick={() => setPlantFor(null)}>

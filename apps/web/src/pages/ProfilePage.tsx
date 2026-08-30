@@ -195,7 +195,7 @@ export function ProfilePage({ user }: ProfilePageProps) {
                 <a
                   href={`https://wa.me/${support.wa || COMPANY.wa}`}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   style={{ color: 'var(--g)' }}
                 >
                   WhatsApp support

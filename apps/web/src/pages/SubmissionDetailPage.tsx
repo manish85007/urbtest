@@ -801,7 +801,7 @@ function RequestCard({
               className="btn bs bsm"
               href={filesApi.url(id)}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               style={{ fontWeight: 400 }}
             >
               📄 View BoM
@@ -1277,7 +1277,7 @@ function CertificatesCard({ sub }: { sub: SubmissionDetail }) {
                 </td>
                 <td>
                   {c.fileId ? (
-                    <a className="btn bp bsm" href={filesApi.url(c.fileId)} target="_blank" rel="noreferrer">
+                    <a className="btn bp bsm" href={filesApi.url(c.fileId)} target="_blank" rel="noopener noreferrer">
                       ⬇ Download
                     </a>
                   ) : (
@@ -1487,7 +1487,7 @@ function ComplianceCard({
                 </td>
                 <td>
                   {dc.href ? (
-                    <a className="btn bp bsm" href={dc.href} target="_blank" rel="noreferrer">
+                    <a className="btn bp bsm" href={dc.href} target="_blank" rel="noopener noreferrer">
                       ⬇ Download
                     </a>
                   ) : (

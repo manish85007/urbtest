@@ -476,7 +476,7 @@ export function InvoiceLifecyclePanel({
                                   className="btn bp bsm"
                                   href={filesApi.url(c.fileId)}
                                   target="_blank"
-                                  rel="noreferrer"
+                                  rel="noopener noreferrer"
                                 >
                                   ⬇ Download
                                 </a>
@@ -559,7 +559,7 @@ export function InvoiceLifecyclePanel({
                       className="btn bs bsm"
                       href={filesApi.url(c.fileId!)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       ⬇ {c.certNo}
                     </a>
@@ -584,7 +584,7 @@ export function InvoiceLifecyclePanel({
                       className="btn bs bsm"
                       href={filesApi.url(c.fileId!)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       ⬇ Download {c.certNo}
                     </a>
@@ -805,7 +805,7 @@ function MrnCard({
   const actions = (
     <>
       {m ? (
-        <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noreferrer">
+        <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/mrn.pdf`)} target="_blank" rel="noopener noreferrer">
           ⬇ Print MRN
         </a>
       ) : null}
@@ -1083,7 +1083,7 @@ function RecyclingCard({
               </button>
             ) : null}
             {(approved || isStaff) ? (
-              <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noreferrer">
+              <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noopener noreferrer">
                 ⬇ Form 6{approved ? '' : ' (preview)'}
               </a>
             ) : null}

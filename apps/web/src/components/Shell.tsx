@@ -90,7 +90,7 @@ export function Shell({ user, onLogout, children }: ShellProps) {
       </header>
       <main className="wrap">{children}</main>
       {user.role === 'client' ? (
-        <a className="wa-fab" href={COMPANY.waUrl} target="_blank" rel="noreferrer">
+        <a className="wa-fab" href={COMPANY.waUrl} target="_blank" rel="noopener noreferrer">
           💬 WhatsApp
         </a>
       ) : null}
@@ -104,7 +104,7 @@ export function Shell({ user, onLogout, children }: ShellProps) {
             </span>
           </div>
           <div className="foot-r">
-            <a href={COMPANY.waUrl} target="_blank" rel="noreferrer">
+            <a href={COMPANY.waUrl} target="_blank" rel="noopener noreferrer">
               WhatsApp
             </a>
             <Link to="/legal/terms">Terms of Use</Link>

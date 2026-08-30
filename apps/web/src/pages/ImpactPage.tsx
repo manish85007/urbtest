@@ -99,10 +99,10 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
           </div>
           <div className="spacer" />
           <PeriodPicker value={period} onChange={setPeriod} />
-          <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+          <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noopener noreferrer">
             📄 Methodology
           </a>
-          <a className="btn bs" href={filesApi.pdf(`/reports/impact.pdf?${qs}`)} target="_blank" rel="noreferrer">
+          <a className="btn bs" href={filesApi.pdf(`/reports/impact.pdf?${qs}`)} target="_blank" rel="noopener noreferrer">
             Portfolio PDF
           </a>
           <Link to="/heroes" className="btn bp">
@@ -177,7 +177,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
                               className="btn bs bsm"
                               href={filesApi.pdf(`/reports/impact.pdf?${qs}&clientId=${encodeURIComponent(clientId)}`)}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                             >
                               PDF
                             </a>
@@ -220,10 +220,10 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
         </div>
         <div className="spacer" />
         <PeriodPicker value={period} onChange={setPeriod} />
-        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+        <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noopener noreferrer">
           📄 How these numbers are built
         </a>
-        <a className="btn bs" href={filesApi.pdf(`/reports/impact.pdf?${qs}`)} target="_blank" rel="noreferrer">
+        <a className="btn bs" href={filesApi.pdf(`/reports/impact.pdf?${qs}`)} target="_blank" rel="noopener noreferrer">
           Impact PDF
         </a>
         <Link to="/heroes" className="btn bp">
@@ -290,7 +290,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
             soil, and benefits the wider neighbourhood over years — small closed loops that scale into public good
           </li>
         </ul>
-        <a className="btn bs bsm" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noreferrer">
+        <a className="btn bs bsm" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noopener noreferrer">
           📄 Open full methodology PDF
         </a>
       </div>

@@ -2,6 +2,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import sensible from '@fastify/sensible';
+import compress from '@fastify/compress';
+import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,10 +21,16 @@ import { complianceRoutes } from './routes/compliance.js';
 import { startScheduler } from './jobs/scheduler.js';
 import { prisma } from './lib/prisma.js';
 import { captureException } from './lib/sentry.js';
+import {
+  HTML_CACHE_CONTROL,
+  cacheControlForPath,
+  isSecureDeployment,
+} from './lib/http-headers.js';
 
 export async function buildApp() {
   const app = Fastify({
     logger: true,
+    trustProxy: true,
   });
 
   app.setErrorHandler((err: { statusCode?: number; message?: string }, _request, reply) => {
@@ -34,6 +42,12 @@ export async function buildApp() {
     return reply.status(code).send({ message: (err as { message?: string }).message ?? 'Internal server error' });
   });
 
+  await app.register(compress, {
+    global: true,
+    threshold: 256,
+    encodings: ['br', 'gzip'],
+  });
+
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
     credentials: true,
@@ -41,7 +55,36 @@ export async function buildApp() {
   await app.register(cookie);
   await app.register(sensible);
 
+  // General API rate limit — auth routes apply stricter per-route limits.
+  // Skipped in unit tests / Playwright e2e to avoid flaky suites.
+  if (process.env.E2E_TEST !== 'true' && process.env.NODE_ENV !== 'test') {
+    await app.register(rateLimit, {
+      global: true,
+      max: isSecureDeployment() ? 120 : 1000,
+      timeWindow: '1 minute',
+      allowList: (req) => req.url.split('?')[0] === '/health',
+      errorResponseBuilder: (_req, context) => ({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `Too many requests. Retry after ${Math.ceil(context.ttl / 1000)} seconds.`,
+      }),
+    });
+  }
+
   registerSecurityHeaders(app);
+
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const path = request.url.split('?')[0] || '/';
+      if (path === '/' || path.endsWith('.html')) {
+        reply.header('Cache-Control', HTML_CACHE_CONTROL);
+      } else if (path.startsWith('/assets/')) {
+        const cache = cacheControlForPath(path);
+        if (cache) reply.header('Cache-Control', cache);
+      }
+    }
+    return payload;
+  });
 
   app.addHook('preSerialization', async (_request, _reply, payload) => {
     if (payload === undefined || payload === null) return payload;
@@ -85,7 +128,8 @@ export async function buildApp() {
       wildcard: false,
     });
     app.setNotFoundHandler((request, reply) => {
-      if (request.method === 'GET') {
+      if (request.method === 'GET' || request.method === 'HEAD') {
+        reply.header('Cache-Control', HTML_CACHE_CONTROL);
         return reply.sendFile('index.html');
       }
       return reply.status(404).send({ message: 'Not found' });

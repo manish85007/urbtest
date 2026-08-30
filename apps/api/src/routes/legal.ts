@@ -8,6 +8,7 @@ import {
   listLegalDocuments,
 } from '../services/legal.js';
 import { listAudit } from '../services/audit.js';
+import { HSTS_HEADER, SECURITY_HEADERS, isSecureDeployment } from '../lib/http-headers.js';
 
 export async function legalRoutes(app: FastifyInstance) {
   // Use /legal-documents so paths do not collide with the SPA at /legal/:key.
@@ -76,28 +77,12 @@ export async function auditRoutes(app: FastifyInstance) {
 
 export function registerSecurityHeaders(app: FastifyInstance) {
   app.addHook('onSend', async (_request: FastifyRequest, reply: FastifyReply) => {
-    reply.header('X-Content-Type-Options', 'nosniff');
-    reply.header('X-Frame-Options', 'DENY');
-    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    reply.header(
-      'Content-Security-Policy',
-      [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",   // unsafe-inline needed for Vite-bundled SPA in same origin
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
-        "font-src 'self' data:",
-        "connect-src 'self'",
-        "frame-ancestors 'none'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-      ].join('; '),
-    );
-    // HSTS: only set when running over HTTPS (COOKIE_SECURE=true)
-    if (process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production') {
-      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      reply.header(name, value);
+    }
+    // HSTS only on HTTPS deployments (UAT/production with COOKIE_SECURE).
+    if (isSecureDeployment()) {
+      reply.header('Strict-Transport-Security', HSTS_HEADER);
     }
   });
 }

@@ -213,7 +213,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
             ⬇ Export CSV
           </button>
           {report?.rows.length ? (
-            <a className="btn bs" href={pdfHref} target="_blank" rel="noreferrer">
+            <a className="btn bs" href={pdfHref} target="_blank" rel="noopener noreferrer">
               ⬇ Export PDF
             </a>
           ) : (
@@ -257,7 +257,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
                           {ci === requestCol && typeof cell === 'string' && cell ? (
                             <Link to={`/requests/${cell}`}>{cell}</Link>
                           ) : ci === downloadCol && typeof cell === 'string' && cell ? (
-                            <a className="btn bp bsm" href={filesApi.url(cell)} target="_blank" rel="noreferrer">
+                            <a className="btn bp bsm" href={filesApi.url(cell)} target="_blank" rel="noopener noreferrer">
                               ⬇ Download
                             </a>
                           ) : ci === downloadCol ? (

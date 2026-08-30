@@ -15,7 +15,7 @@ export function FileThumb({
   const isImage = kind === 'image' || (kind !== 'doc' && (!name || IMAGE_RE.test(name)));
 
   return (
-    <a className="fthumb" href={url} target="_blank" rel="noreferrer">
+    <a className="fthumb" href={url} target="_blank" rel="noopener noreferrer">
       {isImage ? <img src={url} alt={name || 'Attachment'} /> : <span className="fthumb-d">📄</span>}
       {name ? <span className="fthumb-n">{name}</span> : null}
     </a>
