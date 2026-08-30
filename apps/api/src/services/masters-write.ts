@@ -1,4 +1,5 @@
 import { Prisma, UserRole } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { treesEarned } from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
@@ -6,6 +7,7 @@ import { auditLog } from './audit.js';
 import { applyPassword, assertPasswordPolicy, hashPassword } from './auth.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { sendTransactionalEmail } from './email.js';
+import { recordSecurityEvent } from './security-log.js';
 
 const RESERVED_CLIENT_PREFIX = /^(URB|ADM|SYS|TEST)/;
 
@@ -141,6 +143,66 @@ export async function createSite(actor: SessionUser, clientId: string, input: Si
 /** Same password as seeded demo accounts — used so testers can sign in immediately. */
 function tempPassword() {
   return 'demo';
+}
+
+/** Policy-compliant temporary password for admin-initiated resets (shown to admin; email optional). */
+export function generateAdminTempPassword(): string {
+  const chunk = randomBytes(5).toString('base64url').replace(/[^a-zA-Z0-9]/g, '');
+  return `Tmp${chunk}9A`;
+}
+
+/**
+ * Super Admin password reset for any user — supports cases where email OTP is unavailable.
+ * Returns the temporary password so the admin can share it securely out-of-band.
+ */
+export async function adminResetUserPassword(actor: SessionUser, userId: string) {
+  const existing = await prisma.user.findUnique({ where: { id: userId } });
+  if (!existing) throw new AppError('User not found.');
+  if (!existing.active) throw new AppError('Cannot reset password for a disabled account. Re-activate the user first.');
+
+  const tmp = generateAdminTempPassword();
+  await applyPassword(existing.id, existing.email, tmp);
+  await prisma.$transaction([
+    prisma.session.deleteMany({ where: { userId: existing.id } }),
+    prisma.user.update({
+      where: { id: existing.id },
+      data: { failedLoginCount: 0, lockedUntil: null },
+    }),
+  ]);
+
+  let emailSent = false;
+  try {
+    const queued = await sendTransactionalEmail('user_welcome', [existing.email], {
+      user_name: existing.name,
+      user_email: existing.email,
+      client_name: 'Urbeno',
+      temp_password: tmp,
+      admin_name: actor.name,
+    });
+    emailSent = !!queued;
+  } catch {
+    emailSent = false;
+  }
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'user.password.reset',
+    entity: 'user',
+    entityId: existing.email,
+    details: { emailSent },
+  });
+  await recordSecurityEvent('auth.password.admin_reset', existing.email, {
+    by: actor.email,
+    emailSent,
+  });
+
+  return {
+    ok: true as const,
+    email: existing.email,
+    name: existing.name,
+    tempPassword: tmp,
+    emailSent,
+  };
 }
 
 export async function createUser(

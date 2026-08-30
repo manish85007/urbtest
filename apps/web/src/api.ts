@@ -943,9 +943,15 @@ export const dataApi = {
       factoryIds?: string[];
       siteIds?: string[];
       active?: boolean;
+      password?: string;
       featureAccess?: Record<string, boolean> | null;
     },
   ) => api<UserRow>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  resetUserPassword: (id: string) =>
+    api<{ ok: true; email: string; name: string; tempPassword: string; emailSent: boolean }>(
+      `/users/${id}/reset-password`,
+      { method: 'POST', body: '{}' },
+    ),
   upsertFactory: (body: {
     id: string;
     name: string;

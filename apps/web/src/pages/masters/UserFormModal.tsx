@@ -54,6 +54,11 @@ export function UserFormModal({
   const [sites, setSites] = useState<SiteSummary[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetResult, setResetResult] = useState<{
+    tempPassword: string;
+    emailSent: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (role !== 'client' || !clientId) {
@@ -65,6 +70,25 @@ export function UserFormModal({
 
   function toggle(list: string[], id: string, on: boolean) {
     return on ? [...list, id] : list.filter((x) => x !== id);
+  }
+
+  async function resetPassword() {
+    if (!user) return;
+    const ok = window.confirm(
+      `Reset password for ${user.name} (${user.email})?\n\nA new temporary password will be generated. Share it with the user securely — useful when email delivery is unavailable.`,
+    );
+    if (!ok) return;
+    setError('');
+    setResetResult(null);
+    setResetBusy(true);
+    try {
+      const res = await dataApi.resetUserPassword(user.id);
+      setResetResult({ tempPassword: res.tempPassword, emailSent: res.emailSent });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password reset failed');
+    } finally {
+      setResetBusy(false);
+    }
   }
 
   async function save() {
@@ -249,13 +273,56 @@ export function UserFormModal({
       ) : null}
 
       {user ? (
-        <label>
-          Status
-          <select value={active ? '1' : '0'} onChange={(e) => setActive(e.target.value === '1')}>
-            <option value="1">Active</option>
-            <option value="0">Disabled</option>
-          </select>
-        </label>
+        <>
+          <label>
+            Status
+            <select value={active ? '1' : '0'} onChange={(e) => setActive(e.target.value === '1')}>
+              <option value="1">Active</option>
+              <option value="0">Disabled</option>
+            </select>
+          </label>
+          <div className="note-box" style={{ marginTop: '.75rem' }}>
+            <div style={{ fontWeight: 600, marginBottom: '.35rem' }}>Password reset</div>
+            <p className="dim" style={{ fontSize: '.82rem', margin: '0 0 .5rem' }}>
+              Generate a new temporary password for this user when they cannot receive email OTPs. Existing sessions
+              are signed out immediately.
+            </p>
+            <button
+              type="button"
+              className="btn"
+              disabled={resetBusy || busy}
+              onClick={() => void resetPassword()}
+            >
+              {resetBusy ? 'Resetting…' : 'Reset / regenerate password'}
+            </button>
+            {resetResult ? (
+              <div
+                className="note-box"
+                style={{ marginTop: '.6rem', background: 'var(--bl2)', color: 'var(--bl)' }}
+              >
+                <div>
+                  Temporary password:{' '}
+                  <b className="mono" style={{ userSelect: 'all' }}>
+                    {resetResult.tempPassword}
+                  </b>
+                </div>
+                <div style={{ fontSize: '.8rem', marginTop: '.25rem' }}>
+                  {resetResult.emailSent
+                    ? 'A copy was also emailed to the user (if mail delivery is working).'
+                    : 'Email was not confirmed — share this password with the user out-of-band.'}
+                </div>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ marginTop: '.45rem' }}
+                  onClick={() => void navigator.clipboard.writeText(resetResult.tempPassword)}
+                >
+                  Copy password
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : (
         <div className="note-box" style={{ background: 'var(--bl2)', color: 'var(--bl)' }}>
           A welcome email is sent automatically. The sign-in password is <b className="mono">demo</b>.

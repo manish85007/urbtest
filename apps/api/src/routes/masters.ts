@@ -21,6 +21,7 @@ import {
   updateUser,
   upsertCategory,
   upsertFactory,
+  adminResetUserPassword,
 } from '../services/masters-write.js';
 
 function handleErr(err: unknown, reply: { badRequest: (m: string) => unknown; status: (n: number) => { send: (b: unknown) => unknown } }) {
@@ -294,6 +295,15 @@ export async function mastersRoutes(app: FastifyInstance) {
         })
         .parse(request.body);
       return await updateUser(request.user!, userId, body);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.post('/users/:userId/reset-password', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { userId } = request.params as { userId: string };
+      return await adminResetUserPassword(request.user!, userId);
     } catch (err) {
       return handleErr(err, reply);
     }

@@ -29,7 +29,7 @@ Mark each case **Pass / Fail / N/A / Blocked**. Initials in the last column.
 | C0.1 | Open the web URL while signed out. | Login screen. Do **not** leave the pre-filled admin email — enter `ramesh@techcorp.in` and password. | ☐ | |
 | C0.2 | Sign in. If **Accept policies to continue** appears, open each policy link, then **I accept the policies above**. | Gate clears. Home heading **Welcome, Ramesh** (or first name). | ☐ | |
 | C0.3 | Read the left (or top) navigation. | Only: **Home**, **My Requests**, **Recycle Heroes**, **Sustainability**, **Reports**. No Masters, Audit, Capacity, Compliance. | ☐ | |
-| C0.4 | Open **Your profile** (avatar / name). | Role shows **Client User**. Organisation **TCPL**. Two-factor and change-password cards are present. | ☐ | |
+| C0.4 | Open **Your profile** (avatar / name). | Role shows **Client User**. Organisation **TCPL**. Change-password card is present. Two-factor is **not** shown for clients. | ☐ | |
 | C0.5 | Sign out, then sign in again. | Returns to Home without re-prompting policies (unless an admin published a new version). | ☐ | |
 
 ---

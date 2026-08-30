@@ -115,10 +115,12 @@ export function ProfilePage({ user }: ProfilePageProps) {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-ttl">Two-factor authentication</div>
-            <MfaCard />
-          </div>
+          {user.role === 'admin' || user.role === 'factory' ? (
+            <div className="card">
+              <div className="card-ttl">Two-factor authentication</div>
+              <MfaCard />
+            </div>
+          ) : null}
 
           <div className="card">
             <div className="card-ttl">Change password</div>

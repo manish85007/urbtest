@@ -4,7 +4,11 @@ This pack is the **user-acceptance test** for going live. Automated Playwright t
 
 | Document | Who executes it | Purpose |
 |----------|-----------------|---------|
-| [UAT-CLIENT.md](./UAT-CLIENT.md) | Client user (requestor) | Raise, track, close; tenancy; sustainability |
+| [CLIENT-UAT-PACK.md](./CLIENT-UAT-PACK.md) | **Client testers (share this)** | Standalone checklist + findings log + sign-off for UAT |
+| [CLIENT-UAT-EMAIL.md](./CLIENT-UAT-EMAIL.md) | Urbeno (send to clients) | Formal invitation email template |
+| [Urb-TecTrack-Client-UAT-Results.xlsx](./Urb-TecTrack-Client-UAT-Results.xlsx) | **Client testers (share this)** | Excel results workbook — no usernames/passwords |
+| [client-guide/Urb-TecTrack-Client-Access-Visual-Guide.pdf](./client-guide/Urb-TecTrack-Client-Access-Visual-Guide.pdf) | Client testers | Step-by-step screen walkthrough (PDF) |
+| [UAT-CLIENT.md](./UAT-CLIENT.md) | Client user (requestor) | Detailed internal client script (same scope) |
 | [UAT-FACTORY.md](./UAT-FACTORY.md) | Factory manager | MRN, Form 6, capacity; no client or compliance access |
 | [UAT-ADMIN.md](./UAT-ADMIN.md) | Urbeno administrator | Lifecycle ops, Masters, Audit, Compliance |
 | [UAT-CROSS-ROLE-LIFECYCLE.md](./UAT-CROSS-ROLE-LIFECYCLE.md) | All three, in sequence | One request through stages 1–9 |

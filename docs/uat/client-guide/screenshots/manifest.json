@@ -1,0 +1,77 @@
+{
+  "base": "https://uat.urbeno.in",
+  "steps": [
+    {
+      "id": "login",
+      "title": "Open the portal and sign in",
+      "notes": "Open the UAT portal URL provided by Urbeno. Enter the email and password issued to your organisation, then choose Sign In. On first use you may be asked to review and accept the Terms of Use and Privacy Policy before continuing.",
+      "file": "01-login.jpg"
+    },
+    {
+      "id": "home",
+      "title": "Home dashboard",
+      "notes": "After sign-in you land on Home. Review open and completed request counts, sustainability figures, and recent activity. Use the top navigation (Home, My Requests, Recycling Heroes, Sustainability, Reports) to move around the client portal.",
+      "file": "02-home.jpg"
+    },
+    {
+      "id": "new-request",
+      "title": "Raise a new collection request",
+      "notes": "Choose + New Request. Select your site, enter the pickup location, approximate quantity and weight, optional PO/reference and notes, and add line items or attach a Bill of Materials. Submit Request creates a new REQ- number at Stage 1 (awaiting Urbeno acknowledgement). Exact weights are captured later at weighment.",
+      "file": "03-new-request.jpg"
+    },
+    {
+      "id": "my-requests",
+      "title": "My Requests list",
+      "notes": "My Requests shows only your organisation\u2019s collections. Open any row to track stage progress. You will not see other companies\u2019 requests.",
+      "file": "04-my-requests.jpg"
+    },
+    {
+      "id": "request-detail",
+      "title": "Track a request through the lifecycle",
+      "notes": "Request detail shows stage progress, vehicle and invoice information when available, and certificate status. Client users do not create MRNs or Form 6 \u2014 those are factory and Urbeno actions. When the certificate is ready and payment is recorded, use Review & Close to complete Stage 9.",
+      "file": "05-request-detail.jpg"
+    },
+    {
+      "id": "heroes",
+      "title": "Recycling Heroes",
+      "notes": "Recycling Heroes shows planting and tonnage impact linked to responsible recycling. Explore the view for your organisation\u2019s contribution.",
+      "file": "06-heroes.jpg"
+    },
+    {
+      "id": "sustainability",
+      "title": "Sustainability impact",
+      "notes": "Sustainability summarises recycled weight, CO\u2082e avoided, and related impact for closed work. Open explanatory text or download the Impact PDF when offered.",
+      "file": "07-sustainability.jpg"
+    },
+    {
+      "id": "reports",
+      "title": "Reports and exports",
+      "notes": "Run Request Summary, Invoice Register, Certificate Log, Sustainability, and related client reports. Export CSV where available. Client users do not have an MRN Register \u2014 that report is for factory staff only.",
+      "file": "08-reports.jpg"
+    },
+    {
+      "id": "legal-terms",
+      "title": "Terms of Use",
+      "notes": "Terms of Use are available from the footer and from the first-sign-in acceptance gate. Read them carefully before accepting policies.",
+      "file": "09-legal-terms.jpg"
+    },
+    {
+      "id": "legal-privacy",
+      "title": "Privacy Policy",
+      "notes": "The Privacy Policy explains how personal and operational data are handled under applicable Indian law (including DPDPA). Support contact is listed on the page and in the portal footer.",
+      "file": "10-legal-privacy.jpg"
+    },
+    {
+      "id": "profile",
+      "title": "Your profile and password",
+      "notes": "Open your name or avatar \u2192 profile to confirm your role (Client User) and organisation. Use Change password to set a strong password (10+ characters with upper, lower, and a digit). Client accounts do not use two-factor authentication in this portal.",
+      "file": "11-profile.jpg"
+    },
+    {
+      "id": "signed-out",
+      "title": "Sign out",
+      "notes": "Choose Logout when you finish. You return to the sign-in screen. Policies are not re-prompted on the next visit unless Urbeno publishes an updated version.",
+      "file": "12-signed-out.jpg"
+    }
+  ]
+}
