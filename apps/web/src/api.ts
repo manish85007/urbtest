@@ -12,8 +12,15 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    const error = new Error(err.message ?? 'Request failed') as Error & { mfaRequired?: boolean; statusCode?: number };
+    const error = new Error(err.message ?? 'Request failed') as Error & {
+      mfaRequired?: boolean;
+      emailOtpRequired?: boolean;
+      demoCode?: string | null;
+      statusCode?: number;
+    };
     error.mfaRequired = !!err.mfaRequired;
+    error.emailOtpRequired = !!err.emailOtpRequired;
+    error.demoCode = err.demoCode;
     error.statusCode = err.statusCode ?? res.status;
     throw error;
   }
@@ -233,6 +240,7 @@ export interface CompanyProfile {
   brand: string;
   address: string;
   gst: string;
+  pan: string;
   cin: string;
   phone: string;
   email: string;
@@ -241,6 +249,19 @@ export interface CompanyProfile {
   kspcb: string;
   r2: string;
   logoFileId: string | null;
+}
+
+export interface GstLookupResult {
+  gstin: string;
+  validFormat: true;
+  pan: string | null;
+  lookedUp: boolean;
+  source: 'gst_portal' | 'custom' | 'format_only';
+  message?: string;
+  legalName?: string;
+  tradeName?: string | null;
+  status?: string;
+  address?: { line: string; city: string; state: string; pin: string } | null;
 }
 
 export interface LookupRow {
@@ -638,10 +659,10 @@ export interface ClientDashboardReport {
 export type DashboardReport = StaffDashboardReport | ClientDashboardReport;
 
 export const authApi = {
-  login: (email: string, password: string, mfaCode?: string) =>
+  login: (email: string, password: string, mfaCode?: string, emailOtp?: string) =>
     api<{ user: SessionUser }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, mfaCode }),
+      body: JSON.stringify({ email, password, mfaCode, emailOtp }),
     }),
   logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => api<{ user: SessionUser }>('/auth/me'),
@@ -808,6 +829,8 @@ export const dataApi = {
   company: () => api<CompanyProfile>('/settings/company'),
   saveCompany: (body: Partial<CompanyProfile>) =>
     api<CompanyProfile>('/settings/company', { method: 'PUT', body: JSON.stringify(body) }),
+  lookupGstin: (gstin: string) =>
+    api<GstLookupResult>(`/gstin/${encodeURIComponent(gstin.trim().toUpperCase())}`),
   createClient: (body: {
     id: string;
     name: string;

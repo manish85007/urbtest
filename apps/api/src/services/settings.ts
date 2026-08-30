@@ -146,6 +146,7 @@ export interface CompanyProfile {
   brand: string;
   address: string;
   gst: string;
+  pan: string;
   cin: string;
   phone: string;
   email: string;
@@ -160,7 +161,8 @@ export const DEFAULT_COMPANY: CompanyProfile = {
   name: process.env.URBENO_NAME ?? 'Urbeno Private Limited',
   brand: 'Recycling Heroes',
   address: process.env.URBENO_ADDRESS ?? 'Bengaluru, Karnataka, India',
-  gst: process.env.URBENO_GST ?? '29AABCU1234R1ZX',
+  gst: process.env.URBENO_GST ?? '29AABCU1234R1ZW',
+  pan: process.env.URBENO_PAN ?? 'AABCU1234R',
   cin: process.env.URBENO_CIN ?? '',
   phone: process.env.URBENO_PHONE ?? '1800-123-4567',
   email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
@@ -178,6 +180,7 @@ export function parseCompanyProfile(raw: unknown): CompanyProfile {
     brand: String(d.brand ?? DEFAULT_COMPANY.brand).trim(),
     address: String(d.address ?? DEFAULT_COMPANY.address).trim(),
     gst: String(d.gst ?? DEFAULT_COMPANY.gst).trim(),
+    pan: String(d.pan ?? DEFAULT_COMPANY.pan).trim(),
     cin: String(d.cin ?? DEFAULT_COMPANY.cin).trim(),
     phone: String(d.phone ?? DEFAULT_COMPANY.phone).trim(),
     email: String(d.email ?? DEFAULT_COMPANY.email).trim(),
@@ -205,8 +208,9 @@ export async function saveCompanyProfile(
     name: input.name !== undefined ? String(input.name).trim() : prev.name,
     brand: input.brand !== undefined ? String(input.brand).trim() : prev.brand,
     address: input.address !== undefined ? String(input.address).trim() : prev.address,
-    gst: input.gst !== undefined ? String(input.gst).trim() : prev.gst,
-    cin: input.cin !== undefined ? String(input.cin).trim() : prev.cin,
+    gst: input.gst !== undefined ? String(input.gst).trim().toUpperCase() : prev.gst,
+    pan: input.pan !== undefined ? String(input.pan).trim().toUpperCase() : prev.pan,
+    cin: input.cin !== undefined ? String(input.cin).trim().toUpperCase() : prev.cin,
     phone: input.phone !== undefined ? String(input.phone).trim() : prev.phone,
     email: input.email !== undefined ? String(input.email).trim() : prev.email,
     wa: input.wa !== undefined ? String(input.wa).trim() : prev.wa,
@@ -225,6 +229,13 @@ export async function saveCompanyProfile(
   if (!next.gst) throw new AppError('GSTIN is required for the letterhead.');
   if (!next.cin) throw new AppError('CIN is required for the letterhead.');
   if (!next.phone) throw new AppError('Phone number is required for the letterhead.');
+  if (!next.pan) throw new AppError('PAN is required for the company statutory profile.');
+  if (!next.cpcb) throw new AppError('CPCB EPR registration number is required.');
+  if (!next.kspcb) throw new AppError('State PCB authorisation number is required.');
+
+  const { gstinError } = await import('@urb-tectrack/shared');
+  const gstErr = gstinError(next.gst);
+  if (gstErr) throw new AppError(gstErr);
 
   if (next.logoFileId) {
     const { assertFilesExist } = await import('./file-service.js');

@@ -9,6 +9,7 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
   mfaCode: z.string().optional(),
+  emailOtp: z.string().optional(),
 });
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -75,7 +76,13 @@ export async function authRoutes(app: FastifyInstance) {
     try {
       checkLoginRateLimit(request.ip);
       const body = loginSchema.parse(request.body);
-      const { user, token } = await signIn(body.email, body.password, body.mfaCode, request.headers['user-agent']);
+      const { user, token } = await signIn(
+        body.email,
+        body.password,
+        body.mfaCode,
+        request.headers['user-agent'],
+        body.emailOtp,
+      );
       reply.setCookie(SESSION_COOKIE, token, {
         httpOnly: true,
         sameSite: 'lax',
@@ -98,7 +105,16 @@ export async function authRoutes(app: FastifyInstance) {
       }
       const message = err instanceof Error ? err.message : 'Login failed';
       const mfaRequired = err instanceof AuthError && err.mfaRequired;
-      return reply.status(400).send({ message, error: 'Bad Request', statusCode: 400, mfaRequired });
+      const emailOtpRequired = err instanceof AuthError && err.emailOtpRequired;
+      const demoCode = err instanceof AuthError ? err.demoCode : undefined;
+      return reply.status(400).send({
+        message,
+        error: 'Bad Request',
+        statusCode: 400,
+        mfaRequired,
+        emailOtpRequired,
+        ...(demoCode !== undefined ? { demoCode } : {}),
+      });
     }
   });
 

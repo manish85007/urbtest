@@ -113,6 +113,7 @@ export async function emailsRoutes(app: FastifyInstance) {
           brand: z.string().optional(),
           address: z.string().optional(),
           gst: z.string().optional(),
+          pan: z.string().optional(),
           cin: z.string().optional(),
           phone: z.string().optional(),
           email: z.string().optional(),

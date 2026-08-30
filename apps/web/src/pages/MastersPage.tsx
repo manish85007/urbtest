@@ -4,14 +4,16 @@ import { dataApi, emailsApi, type ClientSummary, type FactorySummary, type Looku
 import { CompletionDialog } from '../components/CompletionDialog';
 import { CategoriesTab } from './masters/CategoriesTab';
 import { ClientsTab } from './masters/ClientsTab';
+import { CompanyTab } from './masters/CompanyTab';
 import { EmailTab } from './masters/EmailTab';
 import { FactoriesTab } from './masters/FactoriesTab';
 import { LookupsTab } from './masters/LookupsTab';
 import { UsersTab } from './masters/UsersTab';
 
-type Tab = 'clients' | 'users' | 'factories' | 'cats' | 'lookups' | 'email';
+type Tab = 'company' | 'clients' | 'users' | 'factories' | 'cats' | 'lookups' | 'email';
 
 const TABS: Array<[Tab, string]> = [
+  ['company', 'Company & Letterhead'],
   ['clients', 'Clients & Sites'],
   ['users', 'Users'],
   ['factories', 'Factory Sites'],
@@ -107,7 +109,7 @@ export function MastersPage() {
         <div>
           <h1 className="h1">Master Data</h1>
           <div className="p-mu" style={{ margin: 0 }}>
-            Everything the platform references — clients, sites, users, factories, categories and lookups
+            Everything the platform references — Urbeno statutory profile, clients, sites, users, factories, categories and lookups
           </div>
         </div>
       </div>
@@ -122,7 +124,7 @@ export function MastersPage() {
               type="button"
               className={`inv-tab ${tab === id ? 'on' : ''}`}
               style={{ borderRadius: 7, borderBottom: '1px solid var(--bd)' }}
-              onClick={() => setParams(id === 'clients' ? {} : { tab: id })}
+              onClick={() => setParams(id === 'company' ? { tab: 'company' } : id === 'clients' ? {} : { tab: id })}
             >
               {label}
             </button>
@@ -130,6 +132,7 @@ export function MastersPage() {
         </div>
       </div>
 
+      {tab === 'company' ? <CompanyTab onChanged={(msg) => void onChanged(msg)} /> : null}
       {tab === 'clients' ? <ClientsTab clients={clients} payTerms={payTerms} onChanged={onChanged} /> : null}
       {tab === 'users' ? (
         <UsersTab users={users} clients={clients} factories={factories} onChanged={onChanged} />

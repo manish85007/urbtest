@@ -112,6 +112,13 @@
     "variables": ["user_name", "code", "expiry_minutes", "support_email", "portal_url"]
   },
   {
+    "key": "login_email_otp",
+    "name": "Periodic Login Email Verification",
+    "subject": "Your Urb TecTrack sign-in verification code",
+    "body": "Dear {{user_name}},\n\nEvery {{days}} days we confirm that your work email is still active and that you remain authorised to use Urb TecTrack.\n\nYour 6-digit verification code is: {{code}}\n\nIt expires in {{expiry_minutes}} minutes. Enter it on the sign-in screen to continue.\n\nIf you no longer work with this organisation, or you did not try to sign in, contact {{support_email}} so we can disable the account.\n\nSign in: {{portal_url}}\n\nUrb TecTrack · Urbeno Private Limited",
+    "variables": ["user_name", "code", "expiry_minutes", "days", "support_email", "portal_url"]
+  },
+  {
     "key": "user_welcome",
     "name": "New User Welcome",
     "subject": "Welcome to Urb TecTrack — your account is ready",

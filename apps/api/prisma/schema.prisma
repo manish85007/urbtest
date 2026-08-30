@@ -108,6 +108,7 @@ model User {
   mfaSecret    String?  @map("mfa_secret")
   mfaAt        DateTime? @map("mfa_at")
   lastLoginAt  DateTime? @map("last_login_at")
+  emailVerifiedAt DateTime? @map("email_verified_at")
   failedLoginCount Int  @default(0) @map("failed_login_count")
   lockedUntil  DateTime? @map("locked_until")
   active       Boolean  @default(true)

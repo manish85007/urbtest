@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi, dataApi, filesApi, type CompanyProfile, type SessionUser } from '../api';
-import { FileUpload } from '../components/FileUpload';
 import { COMPANY } from '../lib/company';
 import { roleLabel } from '../lib/roles';
 
@@ -152,13 +151,26 @@ export function ProfilePage({ user }: ProfilePageProps) {
           </div>
 
           {user.role === 'admin' ? (
-            <CompanyLetterheadForm
-              initial={company}
-              onSaved={(nextCo) => {
-                setCompany(nextCo);
-                setMsg('Urbeno letterhead saved — Form 6 and MRN will use these details.');
-              }}
-            />
+            <div className="card">
+              <div className="card-ttl">Urbeno letterhead</div>
+              <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0 .7rem' }}>
+                Statutory company details (GSTIN, PAN, CIN, CPCB / State PCB, logo) are maintained in{' '}
+                <Link to="/masters?tab=company">Masters → Company &amp; Letterhead</Link>. Values are stored in the
+                backend and print on Form 6 / MRN.
+              </p>
+              {company ? (
+                <div style={{ fontSize: '.84rem', lineHeight: 1.7 }}>
+                  <div>
+                    <b>{company.name}</b>
+                  </div>
+                  <div className="dim">{company.address}</div>
+                  <div>GST {company.gst}</div>
+                  {company.pan ? <div>PAN {company.pan}</div> : null}
+                  <div>CIN {company.cin}</div>
+                  {company.cpcb ? <div>CPCB {company.cpcb}</div> : null}
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
         <div>
@@ -234,8 +246,8 @@ function MfaCard() {
       {status?.required ? <span className="badge bg-am">Required for your role</span> : null}
       <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0' }}>
         {status?.enrolled
-          ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}.`
-          : 'Not enrolled. Super Admins and factory managers should set this up.'}
+          ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}. Codes come from an authenticator app (TOTP) — not SMS or email.`
+          : 'Not enrolled. Super Admins and factory managers should set this up with an authenticator app (Google Authenticator, Microsoft Authenticator, etc.).'}
       </p>
       {status?.passwordExpired ? (
         <p className="error">Your password is past the rotation period.</p>
@@ -307,124 +319,6 @@ function MfaCard() {
       )}
       {msg ? <p className="ok-msg">{msg}</p> : null}
       {error ? <p className="error">{error}</p> : null}
-    </div>
-  );
-}
-
-function CompanyLetterheadForm({
-  initial,
-  onSaved,
-}: {
-  initial: CompanyProfile | null;
-  onSaved: (co: CompanyProfile) => void;
-}) {
-  const [form, setForm] = useState<CompanyProfile>(
-    initial ?? {
-      name: COMPANY.name,
-      brand: COMPANY.brand,
-      address: '',
-      gst: '',
-      cin: '',
-      phone: COMPANY.phone,
-      email: COMPANY.email,
-      wa: COMPANY.wa,
-      cpcb: '',
-      kspcb: '',
-      r2: '',
-      logoFileId: null,
-    },
-  );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (initial) setForm(initial);
-  }, [initial]);
-
-  function patch<K extends keyof CompanyProfile>(key: K, value: CompanyProfile[K]) {
-    setForm((cur) => ({ ...cur, [key]: value }));
-  }
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      const saved = await dataApi.saveCompany(form);
-      onSaved(saved);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save letterhead.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="card">
-      <div className="card-ttl">Urbeno letterhead</div>
-      <p className="dim" style={{ fontSize: '.82rem', margin: '.35rem 0 .7rem' }}>
-        These details and the logo print on Form 6 and MRN documents.
-      </p>
-      <form className="sub-form" onSubmit={save} style={{ paddingTop: 0, border: 'none' }}>
-        <div className="fr2">
-          <div className="fg">
-            <label htmlFor="co-name">Legal name</label>
-            <input id="co-name" value={form.name} onChange={(e) => patch('name', e.target.value)} required />
-          </div>
-          <div className="fg">
-            <label htmlFor="co-brand">Brand</label>
-            <input id="co-brand" value={form.brand} onChange={(e) => patch('brand', e.target.value)} />
-          </div>
-        </div>
-        <div className="fg">
-          <label htmlFor="co-addr">Complete address</label>
-          <textarea
-            id="co-addr"
-            value={form.address}
-            onChange={(e) => patch('address', e.target.value)}
-            required
-            rows={3}
-            placeholder="Registered office / facility address as it should appear on the letterhead"
-          />
-        </div>
-        <div className="fr2">
-          <div className="fg">
-            <label htmlFor="co-gst">GSTIN</label>
-            <input id="co-gst" value={form.gst} onChange={(e) => patch('gst', e.target.value)} required />
-          </div>
-          <div className="fg">
-            <label htmlFor="co-cin">CIN</label>
-            <input id="co-cin" value={form.cin} onChange={(e) => patch('cin', e.target.value)} required />
-          </div>
-          <div className="fg">
-            <label htmlFor="co-phone">Phone</label>
-            <input id="co-phone" value={form.phone} onChange={(e) => patch('phone', e.target.value)} required />
-          </div>
-          <div className="fg">
-            <label htmlFor="co-email">Email</label>
-            <input id="co-email" type="email" value={form.email} onChange={(e) => patch('email', e.target.value)} />
-          </div>
-          <div className="fg">
-            <label htmlFor="co-wa">WhatsApp (digits)</label>
-            <input id="co-wa" value={form.wa} onChange={(e) => patch('wa', e.target.value)} placeholder="919902299007" />
-          </div>
-        </div>
-        <FileUpload
-          kind="logo"
-          label="Urbeno logo"
-          hint="JPEG preferred for Form 6 / MRN letterhead · max 2 MB"
-          accept="image/jpeg,image/png,image/svg+xml,image/webp"
-          value={form.logoFileId ? [form.logoFileId] : []}
-          onChange={(ids) => patch('logoFileId', ids[0] ?? null)}
-        />
-        {form.logoFileId ? (
-          <img className="logo-preview" src={filesApi.url(form.logoFileId)} alt="Urbeno logo preview" />
-        ) : null}
-        {error ? <p className="error">{error}</p> : null}
-        <button type="submit" className="btn bp" disabled={busy}>
-          Save letterhead
-        </button>
-      </form>
     </div>
   );
 }

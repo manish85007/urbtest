@@ -23,6 +23,7 @@ import {
   upsertFactory,
   adminResetUserPassword,
 } from '../services/masters-write.js';
+import { lookupGstin } from '../services/gst-lookup.js';
 
 function handleErr(err: unknown, reply: { badRequest: (m: string) => unknown; status: (n: number) => { send: (b: unknown) => unknown } }) {
   if (err instanceof ZodError) {
@@ -51,6 +52,15 @@ const siteBody = z.object({
 
 export async function mastersRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
+
+  app.get('/gstin/:gstin', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { gstin } = request.params as { gstin: string };
+      return await lookupGstin(gstin);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
 
   app.get('/clients', { preHandler: requireAuth }, async (request) => {
     const actor = request.user!;

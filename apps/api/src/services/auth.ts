@@ -14,6 +14,7 @@ import { auditLog } from './audit.js';
 import { recordSecurityEvent } from './security-log.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { toSessionUser } from '../lib/auth-context.js';
+import { emailOtpDue, issueLoginEmailOtp, verifyLoginEmailOtp } from './login-email-otp.js';
 
 const LOCK_ATTEMPTS = PW_POLICY.lockAfter;
 const LOCK_WINDOW_MS = PW_POLICY.lockWindowMins * 60 * 1000;
@@ -21,10 +22,17 @@ const SESSION_HOURS = 8;
 
 export class AuthError extends Error {
   mfaRequired = false;
-  constructor(message: string, opts?: { mfaRequired?: boolean }) {
+  emailOtpRequired = false;
+  demoCode?: string | null;
+  constructor(
+    message: string,
+    opts?: { mfaRequired?: boolean; emailOtpRequired?: boolean; demoCode?: string | null },
+  ) {
     super(message);
     this.name = 'AuthError';
     this.mfaRequired = !!opts?.mfaRequired;
+    this.emailOtpRequired = !!opts?.emailOtpRequired;
+    this.demoCode = opts?.demoCode;
   }
 }
 
@@ -78,6 +86,7 @@ export async function signIn(
   password: string,
   mfaCode?: string,
   userAgent?: string,
+  emailOtp?: string,
 ): Promise<{ user: SessionUser; token: string; passwordExpired: boolean }> {
   const normalized = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalized } });
@@ -153,6 +162,27 @@ export async function signIn(
     await recordSecurityEvent('mfa.verified', user.email, {}, 'info', userAgent);
   }
 
+  // Periodic email OTP — confirms the mailbox still works and the user remains reachable.
+  const needsEmailOtp = emailOtpDue(user.emailVerifiedAt);
+  if (needsEmailOtp) {
+    if (!emailOtp?.trim()) {
+      const issued = await issueLoginEmailOtp(user.email, user.name);
+      throw new AuthError(
+        'Enter the 6-digit code we just emailed you. This check runs every 90 days to confirm your work email still works.',
+        { emailOtpRequired: true, demoCode: issued.demoCode },
+      );
+    }
+    try {
+      await verifyLoginEmailOtp(user.email, emailOtp);
+    } catch (err) {
+      await recordSecurityEvent('auth.email_otp.failed', user.email, {}, 'warn', userAgent);
+      throw new AuthError(err instanceof Error ? err.message : 'Email verification failed.', {
+        emailOtpRequired: true,
+      });
+    }
+    await recordSecurityEvent('auth.email_otp.verified', user.email, {}, 'info', userAgent);
+  }
+
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
   const expired = pwExpired(user.passwordSetAt);
@@ -160,7 +190,12 @@ export async function signIn(
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
-      data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+      data: {
+        failedLoginCount: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        ...(needsEmailOtp ? { emailVerifiedAt: new Date() } : {}),
+      },
     }),
     prisma.session.create({ data: { userId: user.id, token, expiresAt } }),
   ]);

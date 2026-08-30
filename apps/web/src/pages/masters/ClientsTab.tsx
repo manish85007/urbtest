@@ -149,11 +149,46 @@ function NewClientModal({
   const [sites, setSites] = useState<SiteDraft[]>([emptySite()]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [gstBusy, setGstBusy] = useState<number | null>(null);
+  const [gstHints, setGstHints] = useState<Record<number, string>>({});
 
   const idErr = validClientCode(id, clients.map((c) => c.id));
 
   function patchSite(i: number, patch: Partial<SiteDraft>) {
     setSites((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  }
+
+  async function lookupSiteGst(i: number) {
+    const gstin = sites[i]?.gstin?.trim();
+    if (!gstin) return;
+    setGstBusy(i);
+    setGstHints((h) => ({ ...h, [i]: '' }));
+    try {
+      const r = await dataApi.lookupGstin(gstin);
+      const patch: Partial<SiteDraft> = { gstin: r.gstin };
+      if (r.address?.line) patch.address = r.address.line;
+      if (r.address?.city) patch.city = r.address.city;
+      if (r.address?.state) patch.state = r.address.state;
+      if (r.address?.pin) patch.pin = r.address.pin;
+      if (r.tradeName || r.legalName) {
+        patch.name = patch.name || (r.tradeName || r.legalName || '');
+      }
+      patchSite(i, patch);
+      if (!name.trim() && r.legalName) setName(r.legalName);
+      setGstHints((h) => ({
+        ...h,
+        [i]: r.lookedUp
+          ? `✓ ${r.status || 'Found'} — ${r.legalName || r.gstin}${r.tradeName ? ` (${r.tradeName})` : ''}`
+          : r.message || 'Format OK — address not auto-filled (portal lookup unavailable).',
+      }));
+    } catch (err) {
+      setGstHints((h) => ({
+        ...h,
+        [i]: err instanceof Error ? err.message : 'GST lookup failed',
+      }));
+    } finally {
+      setGstBusy(null);
+    }
   }
 
   async function save() {
@@ -297,7 +332,27 @@ function NewClientModal({
             </label>
             <label>
               GST *
-              <input value={s.gstin} style={{ textTransform: 'uppercase' }} onChange={(e) => patchSite(i, { gstin: e.target.value.toUpperCase() })} />
+              <div style={{ display: 'flex', gap: '.35rem', alignItems: 'stretch' }}>
+                <input
+                  value={s.gstin}
+                  style={{ textTransform: 'uppercase', flex: 1 }}
+                  onChange={(e) => patchSite(i, { gstin: e.target.value.toUpperCase() })}
+                />
+                <button
+                  type="button"
+                  className="btn bs bsm"
+                  disabled={!s.gstin || gstBusy === i}
+                  onClick={() => void lookupSiteGst(i)}
+                  title="Validate GSTIN and try to prefill address from GST portal"
+                >
+                  {gstBusy === i ? '…' : 'Verify'}
+                </button>
+              </div>
+              {gstHints[i] ? (
+                <div className="dim" style={{ fontSize: '.72rem', marginTop: '.2rem' }}>
+                  {gstHints[i]}
+                </div>
+              ) : null}
             </label>
             <label>
               PIN

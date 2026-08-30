@@ -1,6 +1,6 @@
 import { Prisma, UserRole } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
-import { treesEarned } from '@urb-tectrack/shared';
+import { gstinError, treesEarned } from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
@@ -40,6 +40,8 @@ function siteData(input: SiteInput) {
   if (!code || !name || !gstin || !address) {
     throw new AppError('Site code, name, GST and address are all required.');
   }
+  const gstErr = gstinError(gstin);
+  if (gstErr) throw new AppError(gstErr);
   return {
     code,
     name,
@@ -479,11 +481,13 @@ export async function updateSite(
 
   if (input.name !== undefined || input.address !== undefined || input.gstin !== undefined) {
     const name = (input.name ?? site.name).trim();
-    const gstin = (input.gstin ?? site.gstin ?? '').trim();
+    const gstin = (input.gstin ?? site.gstin ?? '').trim().toUpperCase();
     const address = (input.address ?? site.address ?? '').trim();
     if (!name || !gstin || !address) {
       throw new AppError('Site name, GST and address are all required.');
     }
+    const gstErr = gstinError(gstin);
+    if (gstErr) throw new AppError(gstErr);
   }
 
   const updated = await prisma.site.update({

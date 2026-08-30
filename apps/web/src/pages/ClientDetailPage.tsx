@@ -463,6 +463,32 @@ function SiteModal({
   const [contactEmail, setContactEmail] = useState(site?.contactEmail ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [gstBusy, setGstBusy] = useState(false);
+  const [gstHint, setGstHint] = useState('');
+
+  async function lookupGst() {
+    if (!gstin.trim()) return;
+    setGstBusy(true);
+    setGstHint('');
+    try {
+      const r = await dataApi.lookupGstin(gstin);
+      setGstin(r.gstin);
+      if (r.address?.line) setAddress(r.address.line);
+      if (r.address?.city) setCity(r.address.city);
+      if (r.address?.state) setState(r.address.state);
+      if (r.address?.pin) setPin(r.address.pin);
+      if (!name.trim() && (r.tradeName || r.legalName)) setName(r.tradeName || r.legalName || '');
+      setGstHint(
+        r.lookedUp
+          ? `✓ ${r.status || 'Found'} — ${r.legalName || r.gstin}`
+          : r.message || 'Format OK — enter address manually if not prefilled.',
+      );
+    } catch (err) {
+      setGstHint(err instanceof Error ? err.message : 'GST lookup failed');
+    } finally {
+      setGstBusy(false);
+    }
+  }
 
   async function save() {
     if (!code.trim() || !name.trim() || !gstin.trim() || !address.trim()) {
@@ -516,7 +542,23 @@ function SiteModal({
         </label>
         <label>
           GST Number *
-          <input className="mono" value={gstin} style={{ textTransform: 'uppercase' }} onChange={(e) => setGstin(e.target.value.toUpperCase())} />
+          <div style={{ display: 'flex', gap: '.35rem' }}>
+            <input
+              className="mono"
+              value={gstin}
+              style={{ textTransform: 'uppercase', flex: 1 }}
+              onChange={(e) => setGstin(e.target.value.toUpperCase())}
+            />
+            <button
+              type="button"
+              className="btn bs bsm"
+              disabled={!gstin.trim() || gstBusy}
+              onClick={() => void lookupGst()}
+            >
+              {gstBusy ? '…' : 'Verify'}
+            </button>
+          </div>
+          {gstHint ? <div className="dim" style={{ fontSize: '.72rem', marginTop: '.2rem' }}>{gstHint}</div> : null}
         </label>
         <label>
           PIN Code

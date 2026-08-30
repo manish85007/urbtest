@@ -20,18 +20,34 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [info, setInfo] = useState('');
   const [mfaCode, setMfaCode] = useState('');
   const [needMfa, setNeedMfa] = useState(false);
+  const [emailOtp, setEmailOtp] = useState('');
+  const [needEmailOtp, setNeedEmailOtp] = useState(false);
+  const [emailOtpDemo, setEmailOtpDemo] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const { user } = await authApi.login(email, password, needMfa ? mfaCode : undefined);
+      const { user } = await authApi.login(
+        email,
+        password,
+        needMfa ? mfaCode : undefined,
+        needEmailOtp ? emailOtp : undefined,
+      );
       onLogin(user);
     } catch (err) {
-      const e = err as Error & { mfaRequired?: boolean };
+      const e = err as Error & {
+        mfaRequired?: boolean;
+        emailOtpRequired?: boolean;
+        demoCode?: string | null;
+      };
       setError(e.message || 'Sign in failed');
       if (e.mfaRequired || /six-digit|authenticator/i.test(e.message)) setNeedMfa(true);
+      if (e.emailOtpRequired || /emailed you|email verification|90 days/i.test(e.message)) {
+        setNeedEmailOtp(true);
+        if (e.demoCode) setEmailOtpDemo(e.demoCode);
+      }
     } finally {
       setBusy(false);
     }
@@ -191,7 +207,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </div>
             {needMfa ? (
               <div className="fg">
-                <label htmlFor="li-mfa">Authenticator code</label>
+                <label htmlFor="li-mfa">Authenticator app code</label>
                 <input
                   id="li-mfa"
                   className="mono"
@@ -201,6 +217,44 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   placeholder="000000"
                   style={{ fontSize: '1.1rem', letterSpacing: '.2em', textAlign: 'center' }}
                 />
+                <p className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
+                  From Google Authenticator, Microsoft Authenticator, or similar (not SMS).
+                </p>
+              </div>
+            ) : null}
+            {needEmailOtp ? (
+              <div className="fg">
+                <label htmlFor="li-eotp">Email verification code</label>
+                {emailOtpDemo ? (
+                  <div
+                    style={{
+                      background: 'var(--am2)',
+                      color: 'var(--am)',
+                      padding: '.45rem .7rem',
+                      borderRadius: 7,
+                      fontSize: '.78rem',
+                      marginBottom: '.6rem',
+                    }}
+                  >
+                    <b>Local/dev only:</b> code{' '}
+                    <span className="mono" style={{ fontWeight: 800 }}>
+                      {emailOtpDemo}
+                    </span>
+                  </div>
+                ) : null}
+                <input
+                  id="li-eotp"
+                  className="mono"
+                  maxLength={6}
+                  value={emailOtp}
+                  onChange={(e) => setEmailOtp(e.target.value)}
+                  placeholder="000000"
+                  style={{ fontSize: '1.1rem', letterSpacing: '.2em', textAlign: 'center' }}
+                  required
+                />
+                <p className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
+                  Sent to your work email every 90 days to confirm the mailbox still works.
+                </p>
               </div>
             ) : null}
             {info ? <div style={{ color: 'var(--g2)', fontSize: '.8rem', marginBottom: '.5rem' }}>{info}</div> : null}
