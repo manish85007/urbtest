@@ -1,0 +1,100 @@
+{
+  "role": "admin",
+  "roleLabel": "Super Admin (Urbeno Operations)",
+  "audience": "Urbeno administrators who run the lifecycle, Masters, Audit, and Compliance",
+  "portal": "https://uat.urbeno.in",
+  "baseCaptured": "http://localhost:8080",
+  "steps": [
+    {
+      "id": "login",
+      "title": "Step 1 — Sign in as Super Admin",
+      "howTo": "1. Open the portal URL.\n2. Enter your Urbeno admin email from the account notification.\n3. Enter your password and click Sign In.\n4. Complete two-factor authentication if enrolled.\n5. Accept Terms and Privacy on first login if prompted.",
+      "tips": "Admin accounts can change masters data and reset user passwords. Protect the authenticator and never share the session.",
+      "file": "01-login.png"
+    },
+    {
+      "id": "dashboard",
+      "title": "Step 2 — Operations dashboard",
+      "howTo": "1. Confirm you see the Operations Dashboard.\n2. Review tiles such as New Requests, open work, and operational KPIs.\n3. Use full navigation: Dashboard, Requests, Recycling Heroes, Sustainability, Capacity, Masters, Reports, Audit, Compliance.\n4. Click New Requests (or equivalent) to start acknowledging Stage 1 work.",
+      "tips": "Admins see all organisations. Treat client data as confidential even inside Urbeno.",
+      "file": "02-dashboard.png"
+    },
+    {
+      "id": "requests",
+      "title": "Step 3 — Requests queue",
+      "howTo": "1. Open Requests.\n2. Filter or search for Stage 1 items awaiting acknowledgement.\n3. Open a request to Acknowledge, Request changes, Assign Vehicle, record Weighment, or Raise Invoice depending on stage.\n4. Keep unique suffixes on registration / invoice / e-way / certificate numbers during training re-runs.",
+      "tips": "Walk one request through stages 2–5 carefully before handing to factory for MRN / Form 6.",
+      "file": "03-requests.png"
+    },
+    {
+      "id": "request-detail",
+      "title": "Step 4 — Lifecycle actions on a request",
+      "howTo": "1. Open request detail and read the current stage.\n2. Stage 1: Acknowledge Request or Request changes (with a clear note to the client).\n3. Stage 3: Assign Vehicle (registration, driver, phone).\n4. Stage 4: Record weighment with slip photo + pickup photo; verify net = gross − tare.\n5. Stage 5: Raise Invoice — tax/total calculated, e-way bill required.\n6. Stage 8: Upload Certificate of Destruction after Form 6 is approved.\n7. Record Payment when funds arrive so the client can close.",
+      "tips": "Weighment without both photos must be refused. Do not type tax totals manually when the system calculates them.",
+      "file": "04-request-detail.png"
+    },
+    {
+      "id": "masters",
+      "title": "Step 5 — Masters data administration",
+      "howTo": "1. Open Masters.\n2. Use tabs for Users, Clients, Sites, Factories, Categories, Lookups, Email as available.\n3. To help a user who cannot receive email OTPs: Users → Edit user → Reset / regenerate password → copy the temporary password and share it securely out-of-band.\n4. Create users carefully — welcome emails include temporary passwords.",
+      "tips": "Never disable your own admin account. Prefer a throwaway user for password-lockout drills.",
+      "file": "05-masters.png"
+    },
+    {
+      "id": "masters-users",
+      "title": "Step 6 — Users and password reset",
+      "howTo": "1. Open the Users tab.\n2. Find the affected user and click Edit.\n3. Confirm role, organisation/factory scope, and Active status.\n4. Click Reset / regenerate password when email OTP is unavailable.\n5. Copy the temporary password shown and communicate it via a secure channel.\n6. Ask the user to sign in and change the password immediately.",
+      "tips": "Password reset signs the user out of all sessions and clears lockouts. Audit logs record the action.",
+      "file": "06-masters-users.png"
+    },
+    {
+      "id": "capacity",
+      "title": "Step 7 — Capacity oversight",
+      "howTo": "1. Open Capacity.\n2. Review utilisation across factories and categories.\n3. Support factory teams when an override is justified and documented.\n4. Use capacity views before approving unusual Form 6 volumes.",
+      "tips": "Overrides are audited. Prefer prevention (routing to another plant) over chronic overrides.",
+      "file": "07-capacity.png"
+    },
+    {
+      "id": "reports",
+      "title": "Step 8 — Operational reports",
+      "howTo": "1. Open Reports.\n2. Run Request Summary, Invoice Register, Sustainability, Heroes, and other admin reports.\n3. Export for client packs or internal reviews.\n4. Cross-check figures against a known closed REQ- during training.",
+      "tips": "When preparing client-facing exports, ensure tenancy filters are correct.",
+      "file": "08-reports.png"
+    },
+    {
+      "id": "audit",
+      "title": "Step 9 — Audit trail",
+      "howTo": "1. Open Audit.\n2. Filter by request id, actor, action, or date range.\n3. Confirm lifecycle events appear (ack, vehicle, weigh, invoice, MRN, recycle, certificate, payment, close).\n4. Use Audit during UAT sign-off to prove the chain of custody.",
+      "tips": "If an expected event is missing, investigate before production sign-off.",
+      "file": "09-audit.png"
+    },
+    {
+      "id": "compliance",
+      "title": "Step 10 — Compliance registers",
+      "howTo": "1. Open Compliance.\n2. Review privacy, DSR, incidents, access reviews, and control status as available.\n3. Confirm factory and client users cannot open this area.\n4. Keep evidence packs ready for audits.",
+      "tips": "Compliance is admin-only. A factory or client reaching this page is a Blocker.",
+      "file": "10-compliance.png"
+    },
+    {
+      "id": "heroes",
+      "title": "Step 11 — Recycling Heroes administration",
+      "howTo": "1. Open Recycling Heroes.\n2. Review plantings and tonnage.\n3. Record planting when authorised (photos, location, counts).\n4. Ensure client views remain appropriately scoped.",
+      "tips": "Planting records support sustainability storytelling — keep photo evidence.",
+      "file": "11-heroes.png"
+    },
+    {
+      "id": "profile",
+      "title": "Step 12 — Admin profile, MFA, and letterhead",
+      "howTo": "1. Open Profile.\n2. Confirm Role is Urbeno Admin / Super Admin.\n3. Enrol or manage Two-factor authentication.\n4. Update password per policy when required.\n5. Edit Urbeno letterhead / company details if shown — these flow into Form 6 and MRN PDFs.",
+      "tips": "Letterhead mistakes appear on legal PDFs. Double-check GST and address before saving.",
+      "file": "12-profile.png"
+    },
+    {
+      "id": "signed-out",
+      "title": "Step 13 — Sign out",
+      "howTo": "1. Click Logout.\n2. Confirm Sign In appears.\n3. Lock your workstation if stepping away mid-session instead of leaving the portal open.",
+      "tips": "Admin sessions can change production masters — treat them like production console access.",
+      "file": "13-signed-out.png"
+    }
+  ]
+}
