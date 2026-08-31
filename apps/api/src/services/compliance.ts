@@ -716,9 +716,12 @@ export async function controlStatus() {
     {
       ref: 'CC6.7 / A.8.13',
       nm: 'Backup and export',
-      state: 'warn',
-      detail: 'Manual export only — automated backup is a production hosting control',
-      act: 'Export regularly; automated in production',
+      state: process.env.BACKUP_AUTOMATED === 'true' ? 'ok' : 'warn',
+      detail:
+        process.env.BACKUP_AUTOMATED === 'true'
+          ? 'Automated database backups configured at the hosting layer'
+          : 'Manual export only — automated backup is a production hosting control',
+      act: process.env.BACKUP_AUTOMATED === 'true' ? null : 'Export regularly; automated in production',
     },
   ];
 }

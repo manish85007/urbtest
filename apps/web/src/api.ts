@@ -793,7 +793,7 @@ export const dataApi = {
     if (f.to) params.set('to', f.to);
     if (f.sort) params.set('sort', f.sort);
     const qs = params.toString();
-    return api<AuditLogPage>(`/audit${qs ? `?${qs}` : ''}`);
+    return api<AuditLogPage>(`/audit-log${qs ? `?${qs}` : ''}`);
   },
   capacity: (factoryId: string, period?: PeriodQuery) =>
     api<CapacityReport>(

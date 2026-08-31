@@ -93,7 +93,7 @@ async function main() {
   // Client can see own org via /clients (scoped); must not see audit/masters
   const clients = await api('GET', '/clients');
   assert('Clients list scoped', Array.isArray(clients.data) && clients.data.every((c) => c.id === clientId));
-  await api('GET', '/audit?limit=5', { expect: [403, 401] });
+  await api('GET', '/audit-log?limit=5', { expect: [403, 401] });
   await api('GET', '/users', { expect: [403, 401] });
   await api('GET', '/reports/register/mrn?period=fy', { expect: [400, 403] });
 

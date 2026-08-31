@@ -128,6 +128,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
           SMTP_FROM_EMAIL: 'noreply@urbeno.in',
           URBENO_EMAIL: 'info@urbeno.in',
           ENABLE_JOBS: 'true',
+          BACKUP_AUTOMATED: 'true',
           AWS_S3_BUCKET: uploads.bucketName,
           DATABASE_USER: 'tectrack',
           DATABASE_NAME: 'tectrack',

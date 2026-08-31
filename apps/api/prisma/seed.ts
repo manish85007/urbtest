@@ -556,14 +556,47 @@ async function main() {
     },
   });
 
-  for (const em of ['ramesh@techcorp.in', 'meera@infosoft.in'] as const) {
-    const u = await prisma.user.findUnique({ where: { email: em } });
-    const existingConsent = await prisma.consentRecord.findFirst({ where: { email: em } });
-    if (u && !existingConsent) {
+  const privacyVer = legalDocs.find((d) => d.key === 'privacy')?.version ?? '1.0';
+  const clientUsers = await prisma.user.findMany({ where: { active: true, role: 'client' } });
+  for (const u of clientUsers) {
+    const latest = await prisma.consentRecord.findFirst({
+      where: { email: u.email },
+      orderBy: { at: 'desc' },
+    });
+    if (!latest || latest.withdrawn || latest.version !== privacyVer) {
       await prisma.consentRecord.create({
-        data: { userId: u.id, email: u.email, version: '1.0', ip: 'seed' },
+        data: { userId: u.id, email: u.email, version: privacyVer, ip: 'seed' },
       });
     }
+  }
+
+  const existingReview = await prisma.accessReview.findUnique({ where: { ref: 'AR-001' } });
+  if (!existingReview) {
+    const activeUsers = await prisma.user.findMany({ where: { active: true }, orderBy: { email: 'asc' } });
+    await prisma.accessReview.create({
+      data: {
+        ref: 'AR-001',
+        startedBy: 'admin@urbeno.in',
+        status: 'closed',
+        closedAt: new Date('2026-08-15'),
+        closedBy: 'admin@urbeno.in',
+        lines: {
+          create: activeUsers.map((u) => ({
+            userId: u.id,
+            email: u.email,
+            name: u.name,
+            role: u.role,
+            clientId: u.clientId,
+            siteIds: u.siteIds,
+            factoryIds: u.factoryIds,
+            lastLoginAt: u.lastLoginAt,
+            decision: 'keep',
+            decidedAt: new Date('2026-08-15'),
+            decidedBy: 'admin@urbeno.in',
+          })),
+        },
+      },
+    });
   }
 
   const existingDsr = await prisma.dsrRequest.findUnique({ where: { ref: 'DSR-0001' } });

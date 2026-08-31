@@ -45,7 +45,8 @@ export async function legalRoutes(app: FastifyInstance) {
 export async function auditRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
-  app.get('/audit', { preHandler: requireAdmin }, async (request) => {
+  // `/audit-log` — not `/audit`, which is the SPA route (same-origin prod build uses no /api prefix).
+  app.get('/audit-log', { preHandler: requireAdmin }, async (request) => {
     const q = request.query as {
       limit?: string;
       page?: string;
