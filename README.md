@@ -20,8 +20,9 @@ apps/
 packages/
   shared/       Business rules ported from prototype (no rewrite)
 docs/
-  ADR-001.md    Architecture decision record
-  prototype/    Reference HTML prototype copy
+  ADR-001.md         Architecture decision record
+  NEXT-VERSION.md    Parked upgrades for a later release (e.g. optional client SSO)
+  prototype/         Reference HTML prototype copy
 ```
 
 ## Quick start
