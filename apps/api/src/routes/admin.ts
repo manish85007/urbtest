@@ -40,7 +40,6 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // Create announcement + optionally send email blast
   app.post('/admin/announcements', { preHandler: requireAdmin }, async (req, reply) => {
-    const session = (req as any).session;
     const { message, startsAt, endsAt, sendEmail } = req.body as {
       message: string;
       startsAt: string;
@@ -56,7 +55,7 @@ export async function adminRoutes(app: FastifyInstance) {
         message: message.trim(),
         startsAt: new Date(startsAt),
         endsAt: new Date(endsAt),
-        createdBy: session.userId,
+        createdBy: req.user!.id,
       },
     });
 
