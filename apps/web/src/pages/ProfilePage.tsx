@@ -95,10 +95,6 @@ export function ProfilePage({ user }: ProfilePageProps) {
                 <div className="tile-l">Email</div>
                 <div className="tile-v">{user.email}</div>
               </div>
-              <div className="tile">
-                <div className="tile-l">Role</div>
-                <div className="tile-v">{ROLE_LABEL[user.role]}</div>
-              </div>
               {user.clientId ? (
                 <div className="tile">
                   <div className="tile-l">Organisation</div>
@@ -175,8 +171,8 @@ export function ProfilePage({ user }: ProfilePageProps) {
         </div>
         <div>
           <div className="card">
-            <div className="card-ttl">{support.name}</div>
-            {support.logoFileId ? (
+            <div className="card-ttl">Contact</div>
+            {user.role !== 'admin' && support.logoFileId ? (
               <img
                 className="logo-preview"
                 src={filesApi.url(support.logoFileId)}
@@ -184,12 +180,14 @@ export function ProfilePage({ user }: ProfilePageProps) {
                 style={{ maxHeight: 56, margin: '.4rem 0 .6rem' }}
               />
             ) : null}
-            <p className="dim" style={{ fontSize: '.85rem', margin: '.5rem 0' }}>
-              {support.address || 'Letterhead address is set by Urbeno admin on this page.'}
-            </p>
+            {user.role !== 'admin' && support.address ? (
+              <p className="dim" style={{ fontSize: '.85rem', margin: '.5rem 0' }}>
+                {support.address}
+              </p>
+            ) : null}
             <div style={{ fontSize: '.84rem', lineHeight: 1.7 }}>
-              {support.gst ? <div>GST {support.gst}</div> : null}
-              {support.cin ? <div>CIN {support.cin}</div> : null}
+              {user.role !== 'admin' && support.gst ? <div>GST {support.gst}</div> : null}
+              {user.role !== 'admin' && support.cin ? <div>CIN {support.cin}</div> : null}
               <div>
                 📞{' '}
                 <a href={`tel:${phoneTel(support.phone)}`} style={{ color: 'var(--g)' }}>
@@ -202,23 +200,24 @@ export function ProfilePage({ user }: ProfilePageProps) {
                   {support.email}
                 </a>
               </div>
-              <div>
-                💬{' '}
-                <a
-                  href={`https://wa.me/${support.wa || COMPANY.wa}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--g)' }}
-                >
-                  WhatsApp support
-                </a>
-              </div>
             </div>
-            <div style={{ marginTop: '.8rem', display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
-              <Link to="/legal/terms">Terms of Use</Link>
-              <Link to="/legal/privacy">Privacy &amp; Data</Link>
-              <Link to="/legal/support">Support</Link>
-            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-ttl">ISO certifications</div>
+            <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0 .65rem' }}>
+              Audited and issued by TÜV Rheinland. Full certificate pack on the Urbeno site.
+            </p>
+            <ul style={{ margin: '0 0 .75rem 1.1rem', fontSize: '.84rem', lineHeight: 1.7 }}>
+              {COMPANY.isoCertificates.map((c) => (
+                <li key={c.code}>
+                  <b>{c.code}</b> — {c.name}
+                </li>
+              ))}
+            </ul>
+            <a href={COMPANY.complianceUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--g)' }}>
+              View certificates on urbeno.in →
+            </a>
           </div>
         </div>
       </div>

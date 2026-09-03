@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authApi, filesApi, type SessionUser } from '../api';
 import { navItems } from '../lib/nav';
@@ -8,6 +8,10 @@ import { LogoIcon } from './BrandMark';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
 import { COMPANY } from '../lib/company';
+
+const NARROW_MQ = '(max-width: 820px)';
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 interface ShellProps {
   user: SessionUser;
@@ -29,8 +33,96 @@ export function Shell({ user, onLogout, children }: ShellProps) {
   const loc = useLocation();
   const items = navItems(user.role);
   const [navOpen, setNavOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(NARROW_MQ).matches,
+  );
+  const sideRef = useRef<HTMLElement>(null);
+  const burgerRef = useRef<HTMLButtonElement>(null);
   const showClientLogo =
     user.role === 'client' && user.clientShowPortalLogo && !!user.clientLogoFileId;
+
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_MQ);
+    const sync = () => setIsNarrow(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setNavCollapsed(window.localStorage.getItem('shell-nav-collapsed') === 'true');
+  }, []);
+
+  // Close mobile drawer on route change or when resizing to desktop
+  useEffect(() => {
+    setNavOpen(false);
+  }, [loc.pathname]);
+
+  useEffect(() => {
+    if (!isNarrow) setNavOpen(false);
+  }, [isNarrow]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isNarrow) return;
+    window.localStorage.setItem('shell-nav-collapsed', String(navCollapsed));
+  }, [isNarrow, navCollapsed]);
+
+  // Keep closed mobile drawer out of the a11y / tab tree
+  useEffect(() => {
+    const el = sideRef.current;
+    if (!el) return;
+    const sideInert = isNarrow && !navOpen;
+    if (sideInert) el.setAttribute('inert', '');
+    else el.removeAttribute('inert');
+    el.toggleAttribute('aria-hidden', sideInert);
+  }, [isNarrow, navOpen]);
+
+  // Scroll lock, Escape, focus trap while mobile drawer is open
+  useEffect(() => {
+    if (!navOpen || !isNarrow) return;
+
+    const aside = sideRef.current;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusables = () =>
+      aside
+        ? Array.from(aside.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+            (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1,
+          )
+        : [];
+
+    focusables()[0]?.focus();
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setNavOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab' || !aside) return;
+      const list = focusables();
+      if (list.length === 0) return;
+      const head = list[0]!;
+      const tail = list[list.length - 1]!;
+      if (e.shiftKey && document.activeElement === head) {
+        e.preventDefault();
+        tail.focus();
+      } else if (!e.shiftKey && document.activeElement === tail) {
+        e.preventDefault();
+        head.focus();
+      }
+    }
+
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+      burgerRef.current?.focus();
+    };
+  }, [navOpen, isNarrow]);
 
   async function logout() {
     try {
@@ -45,14 +137,22 @@ export function Shell({ user, onLogout, children }: ShellProps) {
     return loc.pathname === item.to || loc.pathname.startsWith(`${item.to}/`);
   }
 
+  const activeLabel = items.find((i) => isActive(i))?.label ?? 'Urb TecTrack';
+
   return (
-    <div className="app">
-      <header className="top">
-        <div className="top-in">
-          <button type="button" className="burger" aria-label="Menu" onClick={() => setNavOpen((v) => !v)}>
-            ☰
-          </button>
-          <Link to="/" className="brand" onClick={() => setNavOpen(false)}>
+    <div className={`app app-shell ${navOpen ? 'nav-open' : ''} ${navCollapsed && !isNarrow ? 'nav-collapsed' : ''}`}>
+      {navOpen ? (
+        <button
+          type="button"
+          className="side-backdrop"
+          aria-label="Close menu"
+          onClick={() => setNavOpen(false)}
+        />
+      ) : null}
+
+      <aside ref={sideRef} id="shell-side-nav" className="side" aria-label="Main navigation">
+        <div className="side-head">
+          <Link to="/" className="side-brand" onClick={() => setNavOpen(false)} title={navCollapsed && !isNarrow ? 'Urb TecTrack' : undefined}>
             <div className="brand-i">
               {showClientLogo ? (
                 <img
@@ -64,67 +164,126 @@ export function Shell({ user, onLogout, children }: ShellProps) {
                 <LogoIcon />
               )}
             </div>
-            <div>
+            <div className="side-brand-txt">
               <div className="brand-t">
                 Urb TecTrack<span style={{ fontSize: '.62em', verticalAlign: 'super' }}>™</span>
               </div>
               <div className="brand-s">{brandSub(user)}</div>
             </div>
           </Link>
-          <GlobalSearch />
-          <div className="spacer" />
-          <nav className={`nav ${navOpen ? 'open' : ''}`}>
-            {items.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={isActive(item) ? 'on' : ''}
-                onClick={() => setNavOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <NotificationBell />
+          {!isNarrow ? (
+            <button
+              type="button"
+              className="side-toggle"
+              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-pressed={navCollapsed}
+              onClick={() => setNavCollapsed((v) => !v)}
+              title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {navCollapsed ? '»' : '«'}
+            </button>
+          ) : null}
+        </div>
+
+        <nav className="side-nav">
+          {items.map((item) => {
+            const active = isActive(item);
+            return (
+              <div key={item.to} className="side-nav-block">
+                {item.section ? <div className="side-sec">{item.section}</div> : null}
+                <Link
+                  to={item.to}
+                  className={active ? 'on' : ''}
+                  aria-current={active ? 'page' : undefined}
+                  aria-label={navCollapsed && !isNarrow ? item.label : undefined}
+                  title={navCollapsed && !isNarrow ? item.label : undefined}
+                  onClick={() => setNavOpen(false)}
+                >
+                  <span className="side-ic" aria-hidden>
+                    {item.icon}
+                  </span>
+                  <span className="side-lb">{item.label}</span>
+                </Link>
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className="side-foot">
           <Link
             to="/profile"
-            className={`uchip ${loc.pathname === '/profile' ? 'on' : ''}`}
-            title="Your profile and password"
+            className="side-profile"
+            aria-label={navCollapsed && !isNarrow ? 'Profile' : undefined}
+            title={navCollapsed && !isNarrow ? `${user.name} · ${brandSub(user)}` : undefined}
+            onClick={() => setNavOpen(false)}
           >
             <div className="uav">{initials(user.name)}</div>
-            <span>{user.name.split(' ')[0]}</span>
+            <div className="side-profile-txt">
+              <div className="side-profile-n">{user.name.split(' ')[0]}</div>
+              <div className="side-profile-r">{brandSub(user)}</div>
+            </div>
           </Link>
-          <button type="button" className="btn bs bsm" onClick={logout}>
-            Logout
-          </button>
         </div>
-      </header>
-      <main className="wrap">{children}</main>
-      {user.role === 'client' ? (
-        <a className="wa-fab" href={COMPANY.waUrl} target="_blank" rel="noopener noreferrer">
-          💬 WhatsApp
-        </a>
-      ) : null}
-      <footer className="foot">
-        <div className="foot-in">
-          <div className="foot-l">
-            <b>Urb TecTrack™</b> · Urbeno Private Limited · Recycling Heroes™
-            <br />
-            <span className="dim">
-              CPCB registered · KSPCB authorised · ISO 9001:2015 &amp; ISO 14001:2015
-            </span>
+      </aside>
+
+      <div className="shell-main">
+        <header className="top">
+          <div className="top-in">
+            <button
+              ref={burgerRef}
+              type="button"
+              className="burger"
+              aria-label="Menu"
+              aria-expanded={navOpen}
+              aria-controls="shell-side-nav"
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              ☰
+            </button>
+            <div className="top-title desktop-hide-sm">{activeLabel}</div>
+            <GlobalSearch />
+            <div className="spacer" />
+            <NotificationBell />
+            <Link
+              to="/profile"
+              className={`uchip ${loc.pathname === '/profile' ? 'on' : ''}`}
+              title="Your profile and password"
+            >
+              <div className="uav">{initials(user.name)}</div>
+              <span>{user.name.split(' ')[0]}</span>
+            </Link>
+            <button type="button" className="btn bs bsm" onClick={logout}>
+              Logout
+            </button>
           </div>
-          <div className="foot-r">
-            <a href={COMPANY.waUrl} target="_blank" rel="noopener noreferrer">
-              WhatsApp
-            </a>
-            <Link to="/legal/terms">Terms of Use</Link>
-            <Link to="/legal/privacy">Privacy &amp; Data</Link>
-            <Link to="/legal/compliance">Compliance Notice</Link>
-            <Link to="/legal/support">Support</Link>
+        </header>
+
+        <main className="wrap">{children}</main>
+
+        <footer className="foot">
+          <div className="foot-in">
+            <div className="foot-l">
+              <b>Urb TecTrack™</b> · Urbeno Private Limited · Recycling Heroes™
+              <br />
+              <span className="dim">
+                CPCB registered · KSPCB authorised ·{' '}
+                <a href={COMPANY.complianceUrl} target="_blank" rel="noopener noreferrer">
+                  ISO 9001:2015 · ISO 14001:2015 · ISO 45001:2018 · ISO/IEC 27001:2022
+                </a>
+              </span>
+            </div>
+            <div className="foot-r">
+              <a href={COMPANY.waUrl} target="_blank" rel="noopener noreferrer">
+                WhatsApp
+              </a>
+              <Link to="/legal/terms">Terms of Use</Link>
+              <Link to="/legal/privacy">Privacy &amp; Data</Link>
+              <Link to="/legal/compliance">Compliance Notice</Link>
+              <Link to="/legal/support">Support</Link>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }

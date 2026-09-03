@@ -87,11 +87,6 @@ function ClientDashboard({
 
       {/* Quick links to portal tabs */}
       <div className="client-quick-grid">
-        <Link to="/requests?status=open" className="client-quick-tile">
-          <span className="client-quick-tile-ico">📋</span>
-          <span className="client-quick-tile-l">My Requests</span>
-          <span className="client-quick-tile-s">{report.counts.open} open · view all</span>
-        </Link>
         <Link to="/impact" className="client-quick-tile">
           <span className="client-quick-tile-ico">🌱</span>
           <span className="client-quick-tile-l">Sustainability</span>
