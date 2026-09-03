@@ -1601,3 +1601,20 @@ export const complianceApi = {
     ),
 };
 
+export interface AnnouncementRow {
+  id: string;
+  message: string;
+  startsAt: string;
+  endsAt: string;
+  emailSent?: boolean;
+  createdAt?: string;
+}
+
+export const announcementsApi = {
+  active: () => api<AnnouncementRow[]>('/announcements/active'),
+  list: () => api<AnnouncementRow[]>('/admin/announcements'),
+  create: (body: { message: string; startsAt: string; endsAt: string; sendEmail?: boolean }) =>
+    api<AnnouncementRow>('/admin/announcements', { method: 'POST', body: JSON.stringify(body) }),
+  remove: (id: string) => api<{ ok: boolean }>(`/admin/announcements/${id}`, { method: 'DELETE' }),
+};
+

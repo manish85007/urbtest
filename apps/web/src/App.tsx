@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { authApi, type SessionUser } from './api';
+import { LogoIcon } from './components/BrandMark';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { RequestsListPage } from './pages/RequestsListPage';
@@ -60,7 +61,12 @@ export function App() {
   if (loading) {
     return (
       <div className="page-root">
-        <div className="center">Loading Urb TecTrack…</div>
+        <div className="center">
+          <div className="urb-spin-wrap">
+            <LogoIcon className="urb-spin" />
+            <p>Loading Urb TecTrack…</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -79,7 +85,12 @@ export function App() {
   if (checkingLegal) {
     return (
       <div className="page-root">
-        <div className="center">Checking policies…</div>
+        <div className="center">
+          <div className="urb-spin-wrap">
+            <LogoIcon className="urb-spin" />
+            <p>Checking policies…</p>
+          </div>
+        </div>
       </div>
     );
   }

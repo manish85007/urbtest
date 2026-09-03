@@ -9,8 +9,9 @@ import { EmailTab } from './masters/EmailTab';
 import { FactoriesTab } from './masters/FactoriesTab';
 import { LookupsTab } from './masters/LookupsTab';
 import { UsersTab } from './masters/UsersTab';
+import { AnnouncementsTab } from './masters/AnnouncementsTab';
 
-type Tab = 'company' | 'clients' | 'users' | 'factories' | 'cats' | 'lookups' | 'email';
+type Tab = 'company' | 'clients' | 'users' | 'factories' | 'cats' | 'lookups' | 'email' | 'announcements';
 
 const TABS: Array<[Tab, string]> = [
   ['company', 'Company & Letterhead'],
@@ -20,6 +21,7 @@ const TABS: Array<[Tab, string]> = [
   ['cats', 'Category Master'],
   ['lookups', 'Lookup Lists'],
   ['email', 'Email & Templates'],
+  ['announcements', '📢 Announcements'],
 ];
 
 export function MastersPage() {
@@ -141,6 +143,7 @@ export function MastersPage() {
       {tab === 'cats' ? <CategoriesTab factories={factories} onChanged={onChanged} /> : null}
       {tab === 'lookups' ? <LookupsTab lookups={lookups} onChanged={onChanged} /> : null}
       {tab === 'email' ? <EmailTab templates={templates} outbox={outbox} onChanged={onChanged} /> : null}
+      {tab === 'announcements' ? <AnnouncementsTab /> : null}
     </div>
   );
 }

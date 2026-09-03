@@ -441,6 +441,33 @@ input[type=date],input[type=time],input[type=datetime-local]{color-scheme:light;
 /* ── React compatibility aliases (prototype class names remain canonical) ── */
 a { color: inherit; text-decoration: none; }
 .center { flex: 1; width: 100%; min-height: 100%; min-height: 100dvh; display: grid; place-items: center; color: var(--mu); }
+
+/* LOADING SPINNER */
+.urb-spin-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
+.urb-spin-wrap p{color:var(--mu);font-size:.88rem;letter-spacing:.04em}
+@keyframes urb-spin{to{transform:rotate(360deg)}}
+.urb-spin{animation:urb-spin 1.1s linear infinite;display:block;transform-origin:center}
+
+/* ANNOUNCEMENT BANNER */
+.ann-bar{
+  background:linear-gradient(90deg,#1f3a12,#3B6D11,#1f3a12);
+  color:#e8f0e0;font-size:.82rem;font-weight:500;
+  overflow:hidden;position:relative;height:2rem;
+  display:flex;align-items:center;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  flex-shrink:0;
+}
+.ann-bar-inner{
+  display:flex;align-items:center;gap:3rem;
+  white-space:nowrap;
+  animation:ann-scroll 28s linear infinite;
+}
+.ann-bar-inner:hover{animation-play-state:paused}
+@keyframes ann-scroll{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-50%)}
+}
+.ann-bar-item::before{content:'📢  ';margin-right:.25rem}
 .standalone-page { flex: 1; width: 100%; min-height: 100%; min-height: 100dvh; padding: clamp(1rem,2vw,1.5rem); }
 .login-box { background: #fff; border: 1px solid var(--bd); border-radius: 16px; padding: 2rem; max-width: 400px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,.06); }
 .muted, .p-mu { color: var(--mu); font-size: .85rem; margin: .2rem 0 .8rem; }

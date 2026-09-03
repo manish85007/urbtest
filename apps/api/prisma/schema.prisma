@@ -832,3 +832,16 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+model Announcement {
+  id          String    @id @default(cuid())
+  message     String
+  startsAt    DateTime  @map("starts_at")
+  endsAt      DateTime  @map("ends_at")
+  emailSent   Boolean   @default(false) @map("email_sent")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([startsAt, endsAt])
+  @@map("announcements")
+}

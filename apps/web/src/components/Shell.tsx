@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { authApi, filesApi, type SessionUser } from '../api';
+import { authApi, filesApi, announcementsApi, type SessionUser, type AnnouncementRow } from '../api';
 import { navItems } from '../lib/nav';
 import { portalSubtitle } from '../lib/roles';
 import { LogoIcon } from './BrandMark';
@@ -34,6 +34,7 @@ export function Shell({ user, onLogout, children }: ShellProps) {
   const items = navItems(user.role);
   const [navOpen, setNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
+  const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(NARROW_MQ).matches,
   );
@@ -68,6 +69,14 @@ export function Shell({ user, onLogout, children }: ShellProps) {
     if (typeof window === 'undefined' || isNarrow) return;
     window.localStorage.setItem('shell-nav-collapsed', String(navCollapsed));
   }, [isNarrow, navCollapsed]);
+
+  // Poll active announcements every 5 minutes
+  useEffect(() => {
+    const load = () => announcementsApi.active().then(setAnnouncements).catch(() => {});
+    load();
+    const t = setInterval(load, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Keep closed mobile drawer out of the a11y / tab tree
   useEffect(() => {
@@ -227,6 +236,15 @@ export function Shell({ user, onLogout, children }: ShellProps) {
       </aside>
 
       <div className="shell-main">
+        {announcements.length > 0 && (
+          <div className="ann-bar" role="marquee" aria-label="Announcements">
+            <div className="ann-bar-inner">
+              {[...announcements, ...announcements].map((a, i) => (
+                <span key={`${a.id}-${i}`} className="ann-bar-item">{a.message}</span>
+              ))}
+            </div>
+          </div>
+        )}
         <header className="top">
           <div className="top-in">
             <button
