@@ -2,14 +2,22 @@ import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import { signIn, signOut, changePassword, AuthError, startMfaEnrol, confirmMfaEnrol, disableMfa, mfaStatus } from '../services/auth.js';
 import { confirmPasswordReset, requestPasswordReset } from '../services/password-reset.js';
+import { assertCaptcha, getCaptchaConfig, issueChallenge } from '../services/captcha.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
 import { isSecureDeployment } from '../lib/http-headers.js';
+
+const captchaFields = {
+  turnstileToken: z.string().optional(),
+  challengeToken: z.string().optional(),
+  challengeAnswer: z.string().optional(),
+};
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
   mfaCode: z.string().optional(),
   emailOtp: z.string().optional(),
+  ...captchaFields,
 });
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -72,10 +80,46 @@ function checkResetRateLimit(ip: string, email: string) {
 export async function authRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
+  app.get('/auth/captcha', async () => {
+    const cfg = getCaptchaConfig();
+    if (cfg.provider === 'challenge') {
+      const issued = issueChallenge();
+      return {
+        provider: cfg.provider,
+        required: cfg.required,
+        challengeToken: issued.token,
+        question: issued.question,
+      };
+    }
+    return {
+      provider: cfg.provider,
+      required: cfg.required,
+      ...(cfg.siteKey ? { siteKey: cfg.siteKey } : {}),
+    };
+  });
+
   app.post('/auth/login', async (request, reply) => {
     try {
       checkLoginRateLimit(request.ip);
       const body = loginSchema.parse(request.body);
+      // Skip captcha on MFA / email-OTP continuation (already passed on first step).
+      const continuing = !!body.mfaCode?.trim() || !!body.emailOtp?.trim();
+      if (!continuing) {
+        const captchaErr = await assertCaptcha({
+          turnstileToken: body.turnstileToken,
+          challengeToken: body.challengeToken,
+          challengeAnswer: body.challengeAnswer,
+          remoteIp: request.ip,
+        });
+        if (captchaErr) {
+          return reply.status(400).send({
+            message: captchaErr,
+            error: 'Bad Request',
+            statusCode: 400,
+            captchaRequired: true,
+          });
+        }
+      }
       const { user, token } = await signIn(
         body.email,
         body.password,
@@ -154,8 +198,27 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/reset/request', async (request, reply) => {
     try {
-      const body = z.object({ email: z.string().email() }).parse(request.body);
+      const body = z
+        .object({
+          email: z.string().email(),
+          ...captchaFields,
+        })
+        .parse(request.body);
       checkResetRateLimit(request.ip, body.email);
+      const captchaErr = await assertCaptcha({
+        turnstileToken: body.turnstileToken,
+        challengeToken: body.challengeToken,
+        challengeAnswer: body.challengeAnswer,
+        remoteIp: request.ip,
+      });
+      if (captchaErr) {
+        return reply.status(400).send({
+          message: captchaErr,
+          error: 'Bad Request',
+          statusCode: 400,
+          captchaRequired: true,
+        });
+      }
       return await requestPasswordReset(body.email);
     } catch (err) {
       if (err instanceof ZodError) {

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { authApi, type SessionUser } from '../api';
 import { LogoPrimary } from '../components/BrandMark';
+import { LoginCaptcha, type CaptchaPayload } from '../components/LoginCaptcha';
 
 interface LoginPageProps {
   onLogin: (user: SessionUser) => void;
@@ -25,9 +26,28 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [emailOtp, setEmailOtp] = useState('');
   const [needEmailOtp, setNeedEmailOtp] = useState(false);
   const [emailOtpDemo, setEmailOtpDemo] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState<CaptchaPayload | null>(null);
+  const [captchaReady, setCaptchaReady] = useState(false);
+  const [captchaKey, setCaptchaKey] = useState(0);
+
+  const onCaptchaChange = useCallback((payload: CaptchaPayload | null, ready: boolean) => {
+    setCaptcha(payload);
+    setCaptchaReady(ready);
+  }, []);
+
+  function refreshCaptcha() {
+    setCaptchaKey((k) => k + 1);
+    setCaptcha(null);
+    setCaptchaReady(false);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const continuing = needMfa || needEmailOtp;
+    if (!continuing && !captchaReady) {
+      setError('Complete the security check before signing in.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -36,6 +56,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         password,
         needMfa ? mfaCode : undefined,
         needEmailOtp ? emailOtp : undefined,
+        continuing ? undefined : captcha ?? undefined,
       );
       onLogin(user);
     } catch (err) {
@@ -46,6 +67,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         demoCode?: string | null;
       };
       setError(e.message || 'Sign in failed');
+      if (!needMfa && !needEmailOtp) refreshCaptcha();
       if (e.mfaRequired || /six-digit|authenticator|emailed you/i.test(e.message)) {
         setNeedMfa(true);
         if (e.mfaMethod === 'email' || /emailed you/i.test(e.message)) {
@@ -56,7 +78,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         }
       }
       if (e.emailOtpRequired || /emailed you|email verification|90 days/i.test(e.message)) {
-        // Distinguish MFA email vs 90-day: MFA already set needMfa
         if (!e.mfaRequired) {
           setNeedEmailOtp(true);
           if (e.demoCode) setEmailOtpDemo(e.demoCode);
@@ -72,14 +93,20 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
+    if (!captchaReady) {
+      setError('Complete the security check before continuing.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      const r = await authApi.requestReset(email);
+      const r = await authApi.requestReset(email, captcha ?? undefined);
       setDemoCode(r.demoCode ?? null);
       setResetStep('code');
+      refreshCaptcha();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send code');
+      refreshCaptcha();
     } finally {
       setBusy(false);
     }
@@ -99,6 +126,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       setResetStep('email');
       setPassword('');
       setInfo('Password updated — sign in with your new password');
+      refreshCaptcha();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reset failed');
     } finally {
@@ -130,12 +158,25 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 <label>Email</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
+              <LoginCaptcha refreshKey={captchaKey} onChange={onCaptchaChange} />
               {error ? <div style={{ color: 'var(--rd)', fontSize: '.8rem', marginBottom: '.5rem' }}>{error}</div> : null}
-              <button className="btn bp" style={{ width: '100%', justifyContent: 'center' }} type="submit" disabled={busy}>
+              <button
+                className="btn bp"
+                style={{ width: '100%', justifyContent: 'center' }}
+                type="submit"
+                disabled={busy || !captchaReady}
+              >
                 Send email OTP
               </button>
               <div className="forgot">
-                <a onClick={() => setReset(false)}>← Back to sign in</a>
+                <a
+                  onClick={() => {
+                    setReset(false);
+                    refreshCaptcha();
+                  }}
+                >
+                  ← Back to sign in
+                </a>
               </div>
             </form>
           ) : (
@@ -191,6 +232,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   onClick={() => {
                     setReset(false);
                     setResetStep('email');
+                    refreshCaptcha();
                   }}
                 >
                   ← Back to sign in
@@ -222,6 +264,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 autoComplete="current-password"
               />
             </div>
+            {!needMfa && !needEmailOtp ? (
+              <LoginCaptcha refreshKey={captchaKey} onChange={onCaptchaChange} />
+            ) : null}
             {needMfa ? (
               <div className="fg">
                 <label htmlFor="li-mfa">
@@ -299,15 +344,26 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             {error ? (
               <div style={{ color: 'var(--rd)', fontSize: '.8rem', marginBottom: '.5rem' }}>{error}</div>
             ) : null}
-            <button className="btn bp" style={{ width: '100%', justifyContent: 'center' }} type="submit" disabled={busy}>
+            <button
+              className="btn bp"
+              style={{ width: '100%', justifyContent: 'center' }}
+              type="submit"
+              disabled={busy || (!needMfa && !needEmailOtp && !captchaReady)}
+            >
               {busy ? 'Signing in…' : 'Sign In'}
             </button>
             <div className="forgot">
-              <a onClick={() => setReset(true)}>Forgot password?</a>
+              <a
+                onClick={() => {
+                  setReset(true);
+                  refreshCaptcha();
+                }}
+              >
+                Forgot password?
+              </a>
             </div>
           </form>
         )}
-
       </div>
     </div>
   );

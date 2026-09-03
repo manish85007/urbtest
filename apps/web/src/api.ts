@@ -666,10 +666,28 @@ export interface ClientDashboardReport {
 export type DashboardReport = StaffDashboardReport | ClientDashboardReport;
 
 export const authApi = {
-  login: (email: string, password: string, mfaCode?: string, emailOtp?: string) =>
+  captcha: () =>
+    api<{
+      provider: 'turnstile' | 'challenge' | 'none';
+      required: boolean;
+      siteKey?: string;
+      challengeToken?: string;
+      question?: string;
+    }>('/auth/captcha'),
+  login: (
+    email: string,
+    password: string,
+    mfaCode?: string,
+    emailOtp?: string,
+    captcha?: {
+      turnstileToken?: string;
+      challengeToken?: string;
+      challengeAnswer?: string;
+    },
+  ) =>
     api<{ user: SessionUser }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, mfaCode, emailOtp }),
+      body: JSON.stringify({ email, password, mfaCode, emailOtp, ...captcha }),
     }),
   logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => api<{ user: SessionUser }>('/auth/me'),
@@ -688,10 +706,17 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
-  requestReset: (email: string) =>
+  requestReset: (
+    email: string,
+    captcha?: {
+      turnstileToken?: string;
+      challengeToken?: string;
+      challengeAnswer?: string;
+    },
+  ) =>
     api<{ sent: true; demoCode?: string | null }>('/auth/reset/request', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, ...captcha }),
     }),
   confirmReset: (email: string, code: string, newPassword: string) =>
     api<{ ok: boolean }>('/auth/reset', {
