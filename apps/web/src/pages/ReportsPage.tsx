@@ -136,6 +136,20 @@ export function ReportsPage({ user }: ReportsPageProps) {
   const shown = report?.rows.slice(0, DISPLAY_CAP) ?? [];
   const requestCol = report?.head.findIndex((h) => h === 'Request') ?? -1;
   const downloadCol = report?.head.findIndex((h) => h === 'Download') ?? -1;
+  const canBulkDocs =
+    (type === 'cod' || type === 'form6') &&
+    (isClient || user.role === 'admin' || user.role === 'operations');
+
+  const bulkZipHref = canBulkDocs
+    ? filesApi.pdf(
+        `/reports/documents.zip${qs({
+          type,
+          ...period,
+          clientId: scope.clientId,
+          siteId: scope.siteId,
+        })}`,
+      )
+    : null;
 
   return (
     <div>
@@ -221,6 +235,17 @@ export function ReportsPage({ user }: ReportsPageProps) {
               ⬇ Export PDF
             </button>
           )}
+          {canBulkDocs ? (
+            report?.rows.length && bulkZipHref ? (
+              <a className="btn bs" href={bulkZipHref} target="_blank" rel="noopener noreferrer">
+                ⬇ Download all {type === 'cod' ? 'CoD' : 'Form 6'} PDFs
+              </a>
+            ) : (
+              <button type="button" className="btn bs" disabled>
+                ⬇ Download all {type === 'cod' ? 'CoD' : 'Form 6'} PDFs
+              </button>
+            )
+          ) : null}
         </div>
       </div>
 

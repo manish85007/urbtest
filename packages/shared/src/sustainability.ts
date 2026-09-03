@@ -1,4 +1,4 @@
-/** Sustainability factors — ported from prototype SUS (EPA WARM v16 / R2v3 / USFS). */
+/** Sustainability factors — ported from prototype SUS (EPA WARM v16 / USFS / UNEP). */
 export const SUSTAINABILITY = {
   co2PerKg: 1.44,
   landfillRatio: 0.92,
@@ -13,7 +13,7 @@ export const SUSTAINABILITY = {
   heroMilestone: 10,
   cite: {
     co2: 'US EPA WARM model v16 (2023), mixed-electronics pathway',
-    landfill: 'R2v3 downstream recovery tracking, industry average',
+    landfill: 'Authorised recycler downstream recovery tracking, industry average',
     tree: 'US Forest Service, urban tree CO2 sequestration',
     water: 'UNEP Global E-waste Monitor 2024, virgin baseline',
     energy: 'UNEP Global E-waste Monitor 2024, virgin baseline',

@@ -40,6 +40,8 @@ model Client {
   phone     String?
   email     String?
   logoFileId String? @map("logo_file_id")
+  /** When true and logoFileId is set, show the logo in the client portal header. */
+  showPortalLogo Boolean @default(false) @map("show_portal_logo")
   active    Boolean  @default(true)
   payTermsDays Int   @default(30) @map("pay_terms_days")
   createdAt DateTime @default(now()) @map("created_at")
@@ -106,6 +108,8 @@ model User {
   passwordSetAt DateTime? @map("password_set_at")
   mustReset    Boolean  @default(false) @map("must_reset")
   mfaSecret    String?  @map("mfa_secret")
+  /** 'totp' | 'email' — null means not enrolled. */
+  mfaMethod    String?  @map("mfa_method")
   mfaAt        DateTime? @map("mfa_at")
   lastLoginAt  DateTime? @map("last_login_at")
   emailVerifiedAt DateTime? @map("email_verified_at")

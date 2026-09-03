@@ -23,10 +23,12 @@ export function emailOtpDue(emailVerifiedAt: Date | null | undefined): boolean {
   return ageMs >= EMAIL_VERIFY_DAYS * 24 * 60 * 60 * 1000;
 }
 
-/** Issue a login email OTP (reuses password_resets rows tagged by details in audit). */
-export async function issueLoginEmailOtp(
+type OtpKind = 'login' | 'mfa';
+
+async function issueEmailOtp(
   emailRaw: string,
   userName: string,
+  kind: OtpKind,
 ): Promise<{ demoCode?: string | null }> {
   const email = emailRaw.trim().toLowerCase();
   const code = sixDigitCode();
@@ -44,7 +46,8 @@ export async function issueLoginEmailOtp(
     },
   });
 
-  await sendTransactionalEmail('login_email_otp', [email], {
+  const template = kind === 'mfa' ? 'mfa_email_otp' : 'login_email_otp';
+  await sendTransactionalEmail(template, [email], {
     user_name: userName,
     code,
     expiry_minutes: OTP_MINS,
@@ -55,13 +58,33 @@ export async function issueLoginEmailOtp(
 
   await auditLog({
     actorEmail: email,
-    action: 'auth.email_otp.request',
+    action: kind === 'mfa' ? 'auth.mfa_email_otp.request' : 'auth.email_otp.request',
     entity: 'user',
     entityId: email,
   });
-  await recordSecurityEvent('auth.email_otp.sent', email, { days: EMAIL_VERIFY_DAYS });
+  await recordSecurityEvent(
+    kind === 'mfa' ? 'auth.mfa_email_otp.sent' : 'auth.email_otp.sent',
+    email,
+    kind === 'mfa' ? {} : { days: EMAIL_VERIFY_DAYS },
+  );
 
   return allowDemoCode() ? { demoCode: code } : {};
+}
+
+/** Issue a login email OTP (90-day mailbox check). */
+export async function issueLoginEmailOtp(
+  emailRaw: string,
+  userName: string,
+): Promise<{ demoCode?: string | null }> {
+  return issueEmailOtp(emailRaw, userName, 'login');
+}
+
+/** Issue a two-factor email OTP (every sign-in when MFA method is email). */
+export async function issueMfaEmailOtp(
+  emailRaw: string,
+  userName: string,
+): Promise<{ demoCode?: string | null }> {
+  return issueEmailOtp(emailRaw, userName, 'mfa');
 }
 
 export async function verifyLoginEmailOtp(emailRaw: string, code: string): Promise<void> {
@@ -79,3 +102,5 @@ export async function verifyLoginEmailOtp(emailRaw: string, code: string): Promi
   if (!ok) throw new Error('That email code is not correct. Check the message and try again.');
   await prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: new Date() } });
 }
+
+export const verifyMfaEmailOtp = verifyLoginEmailOtp;

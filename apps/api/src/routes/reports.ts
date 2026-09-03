@@ -14,6 +14,7 @@ import {
 } from '../services/reporting-service.js';
 import { recordTreePlanting, recordTreeProgress, removeTreePlanting, removeTreeProgress } from '../services/tree-planting.js';
 import { form6Pdf, impactPdf, methodologyPdf, mrnPdf, registerPdf } from '../services/pdf.js';
+import { documentsZip } from '../services/document-pack.js';
 import { contentDisposition } from '../lib/http-headers.js';
 import { isAppError } from '../lib/errors.js';
 
@@ -180,6 +181,28 @@ export async function reportsRoutes(app: FastifyInstance) {
       const { filename, buffer } = await form6Pdf(request.user!, id);
       return reply
         .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', contentDisposition('attachment', filename))
+        .send(buffer);
+    } catch (err) {
+      return handleErr(err, reply);
+    }
+  });
+
+  app.get('/reports/documents.zip', { preHandler: requireAuth }, async (request, reply) => {
+    try {
+      const q = request.query as Record<string, unknown>;
+      const type = q.type === 'form6' ? 'form6' : q.type === 'cod' ? 'cod' : null;
+      if (!type) return reply.badRequest('type must be cod or form6.');
+      const clientId = typeof q.clientId === 'string' && q.clientId ? q.clientId : undefined;
+      const siteId = typeof q.siteId === 'string' && q.siteId ? q.siteId : undefined;
+      const { filename, buffer } = await documentsZip(
+        request.user!,
+        type,
+        periodFromQuery(q),
+        { clientId, siteId },
+      );
+      return reply
+        .header('Content-Type', 'application/zip')
         .header('Content-Disposition', contentDisposition('attachment', filename))
         .send(buffer);
     } catch (err) {

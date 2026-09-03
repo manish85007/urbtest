@@ -146,6 +146,7 @@ function NewClientModal({
   const [email, setEmail] = useState('');
   const [termId, setTermId] = useState(payTerms.find((t) => t.id === 'PT30')?.id ?? payTerms[0]?.id ?? '');
   const [logoIds, setLogoIds] = useState<string[]>([]);
+  const [showPortalLogo, setShowPortalLogo] = useState(false);
   const [sites, setSites] = useState<SiteDraft[]>([emptySite()]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -219,6 +220,7 @@ function NewClientModal({
         email,
         payTermsDays: term?.days ?? 30,
         logoFileId: logoIds[0] ?? null,
+        showPortalLogo: showPortalLogo && !!logoIds[0],
         sites: complete.map((s) => ({
           code: s.code,
           name: s.name,
@@ -299,12 +301,21 @@ function NewClientModal({
         </label>
       </div>
       <div className="section-hd" style={{ marginTop: '.4rem' }}>
-        Client Logo <span className="hint">shown in their portal header · PNG/JPG/SVG</span>
+        Client Logo <span className="hint">optional · PNG/JPG/SVG</span>
       </div>
       {logoIds[0] ? (
         <img className="logo-preview" src={filesApi.url(logoIds[0])} alt="Logo" />
       ) : null}
       <FileUpload kind="logo" label="Upload logo" accept="image/*" value={logoIds} onChange={setLogoIds} />
+      <label className="legal-consent-check" style={{ marginTop: '.45rem' }}>
+        <input
+          type="checkbox"
+          checked={showPortalLogo}
+          onChange={(e) => setShowPortalLogo(e.target.checked)}
+          disabled={!logoIds[0]}
+        />
+        <span>Show logo on client portal header</span>
+      </label>
       <div className="section-hd" style={{ marginTop: '.7rem' }}>
         Sites <span className="hint">each site needs its own GST and address</span>
       </div>

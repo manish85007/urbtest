@@ -249,7 +249,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
         <div className="stat">
           <div className="stat-l">Landfill diverted</div>
           <div className="stat-v">{impact.landfill.toFixed(0)}</div>
-          <div className="stat-t">kg · R2v3 recovery {SUSTAINABILITY.landfillRatio * 100}%</div>
+          <div className="stat-t">kg · authorised recovery {SUSTAINABILITY.landfillRatio * 100}%</div>
         </div>
         <div className="stat">
           <div className="stat-l">Water saved</div>
@@ -283,7 +283,7 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
             {SUSTAINABILITY.nurtureYears} years toward self-reliance
           </li>
           <li>CO₂e avoided: {SUSTAINABILITY.co2PerKg} kg per kg e-waste — EPA WARM v16, mixed electronics</li>
-          <li>Landfill diversion: {SUSTAINABILITY.landfillRatio} — R2v3 downstream recovery average</li>
+          <li>Landfill diversion: {SUSTAINABILITY.landfillRatio} — authorised recycler downstream recovery average</li>
           <li>Water / energy: {SUSTAINABILITY.waterPerKg} kL and {SUSTAINABILITY.energyPerKg} kWh per kg</li>
           <li>
             One organisation’s tonne keeps toxins out of soil and water; the sapling it unlocks cools air, holds

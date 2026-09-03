@@ -617,9 +617,9 @@ function fmtDate(d: Date | string | null | undefined) {
 export async function controlStatus() {
   const chain = await verifyChain();
   const staff = await prisma.user.findMany({
-    where: { active: true, role: { in: ['admin', 'factory'] } },
+    where: { active: true, role: { in: ['admin', 'operations', 'factory'] } },
   });
-  const mfaOn = staff.filter((u) => u.mfaSecret).length;
+  const mfaOn = staff.filter((u) => u.mfaMethod === 'email' || !!u.mfaSecret).length;
   const users = await prisma.user.findMany({ where: { active: true } });
   const stale = users.filter((u) => pwExpired(u.passwordSetAt));
   const version = await privacyVersion();

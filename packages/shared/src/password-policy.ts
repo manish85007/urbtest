@@ -12,7 +12,8 @@ export const PW_POLICY = {
   lockWindowMins: 15,
 } as const;
 
-export const MFA_ROLES = ['admin', 'factory'] as const;
+/** Staff roles that must use a second factor (authenticator or email OTP). */
+export const MFA_ROLES = ['admin', 'operations', 'factory'] as const;
 
 export function pwCheck(pw: string, em?: string | null): string[] {
   const p = PW_POLICY;

@@ -146,10 +146,6 @@ export function CompanyTab({ onChanged }: Props) {
             <label htmlFor="co-kspcb">State PCB authorisation *</label>
             <input id="co-kspcb" value={form.kspcb} onChange={(e) => patch('kspcb', e.target.value)} required />
           </div>
-          <div className="fg">
-            <label htmlFor="co-r2">R2 / other certification</label>
-            <input id="co-r2" value={form.r2} onChange={(e) => patch('r2', e.target.value)} />
-          </div>
         </div>
         <FileUpload
           kind="logo"

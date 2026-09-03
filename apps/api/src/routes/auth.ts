@@ -105,6 +105,7 @@ export async function authRoutes(app: FastifyInstance) {
       }
       const message = err instanceof Error ? err.message : 'Login failed';
       const mfaRequired = err instanceof AuthError && err.mfaRequired;
+      const mfaMethod = err instanceof AuthError ? err.mfaMethod : null;
       const emailOtpRequired = err instanceof AuthError && err.emailOtpRequired;
       const demoCode = err instanceof AuthError ? err.demoCode : undefined;
       return reply.status(400).send({
@@ -112,6 +113,7 @@ export async function authRoutes(app: FastifyInstance) {
         error: 'Bad Request',
         statusCode: 400,
         mfaRequired,
+        ...(mfaMethod ? { mfaMethod } : {}),
         emailOtpRequired,
         ...(demoCode !== undefined ? { demoCode } : {}),
       });
@@ -187,12 +189,31 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get('/auth/mfa', { preHandler: requireAuth }, async (request) => mfaStatus(request.user!));
 
-  app.post('/auth/mfa/start', { preHandler: requireAuth }, async (request) => startMfaEnrol(request.user!));
+  app.post('/auth/mfa/start', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z
+      .object({ method: z.enum(['totp', 'email']).optional() })
+      .parse(request.body ?? {});
+    try {
+      return await startMfaEnrol(request.user!, body.method ?? 'totp');
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Could not start enrolment');
+    }
+  });
 
   app.post('/auth/mfa/confirm', { preHandler: requireAuth }, async (request, reply) => {
-    const body = z.object({ secret: z.string().min(8), code: z.string().min(6) }).parse(request.body);
+    const body = z
+      .object({
+        method: z.enum(['totp', 'email']).optional(),
+        secret: z.string().optional(),
+        code: z.string().min(6),
+      })
+      .parse(request.body);
     try {
-      return await confirmMfaEnrol(request.user!, body.secret, body.code);
+      return await confirmMfaEnrol(request.user!, {
+        method: body.method ?? 'totp',
+        secret: body.secret,
+        code: body.code,
+      });
     } catch (err) {
       return reply.badRequest(err instanceof Error ? err.message : 'Enrolment failed');
     }

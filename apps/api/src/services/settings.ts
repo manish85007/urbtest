@@ -169,7 +169,7 @@ export const DEFAULT_COMPANY: CompanyProfile = {
   wa: process.env.URBENO_WA ?? '919902299007',
   cpcb: process.env.URBENO_CPCB ?? 'CPCB/EPR/2022/KA/00817',
   kspcb: process.env.URBENO_KSPCB ?? 'KSPCB/HWM/AUTH/2024-27/1142',
-  r2: process.env.URBENO_R2 ?? 'R2V3-2024-IN-0341',
+  r2: process.env.URBENO_R2 ?? '',
   logoFileId: null,
 };
 

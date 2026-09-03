@@ -231,7 +231,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ['Facility', factory?.name || co.name, 'Facility Code', recy.factoryId],
           ['CPCB / EPR', factory?.cpcbEpr || co.cpcb, 'KSPCB Consent', factory?.kspcbConsent || co.kspcb],
           ['GST', factory?.gstin || co.gst, 'CIN', co.cin || '—'],
-          ['Phone', co.phone, 'R2v3', co.r2],
+          ['Phone', co.phone, 'Email', co.email],
         ],
       },
       {

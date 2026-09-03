@@ -14,11 +14,13 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     const error = new Error(err.message ?? 'Request failed') as Error & {
       mfaRequired?: boolean;
+      mfaMethod?: 'totp' | 'email' | null;
       emailOtpRequired?: boolean;
       demoCode?: string | null;
       statusCode?: number;
     };
     error.mfaRequired = !!err.mfaRequired;
+    error.mfaMethod = err.mfaMethod ?? null;
     error.emailOtpRequired = !!err.emailOtpRequired;
     error.demoCode = err.demoCode;
     error.statusCode = err.statusCode ?? res.status;
@@ -36,6 +38,9 @@ export interface SessionUser {
   factoryIds?: string[];
   siteIds?: string[];
   featureAccess?: Record<string, boolean> | null;
+  clientName?: string | null;
+  clientLogoFileId?: string | null;
+  clientShowPortalLogo?: boolean;
 }
 
 export type RegisterType =
@@ -189,6 +194,7 @@ export interface ClientSummary {
   active?: boolean;
   payTermsDays?: number;
   logoFileId?: string | null;
+  showPortalLogo?: boolean;
   siteActive?: number;
   siteInactive?: number;
   requestCount?: number;
@@ -301,6 +307,7 @@ export interface ClientDetail {
   email: string | null;
   payTermsDays: number;
   logoFileId: string | null;
+  showPortalLogo?: boolean;
   active: boolean;
   sites: SiteSummary[];
   users: UserRow[];
@@ -695,19 +702,28 @@ export const authApi = {
     api<{
       required: boolean;
       enrolled: boolean;
+      method: 'totp' | 'email' | null;
       enrolledAt: string | null;
       passwordAgeDays: number | null;
       passwordExpired: boolean;
       policyText: string;
     }>('/auth/mfa'),
-  mfaStart: () =>
-    api<{ secret: string; uri: string; qrDataUrl: string; required: boolean }>('/auth/mfa/start', {
+  mfaStart: (method: 'totp' | 'email' = 'totp') =>
+    api<{
+      method: 'totp' | 'email';
+      secret?: string;
+      uri?: string;
+      qrDataUrl?: string;
+      required: boolean;
+      demoCode?: string | null;
+    }>('/auth/mfa/start', {
       method: 'POST',
+      body: JSON.stringify({ method }),
     }),
-  mfaConfirm: (secret: string, code: string) =>
-    api<{ ok: boolean; enrolled: boolean }>('/auth/mfa/confirm', {
+  mfaConfirm: (opts: { method?: 'totp' | 'email'; secret?: string; code: string }) =>
+    api<{ ok: boolean; enrolled: boolean; method?: string }>('/auth/mfa/confirm', {
       method: 'POST',
-      body: JSON.stringify({ secret, code }),
+      body: JSON.stringify(opts),
     }),
   mfaDisable: (reason: string) =>
     api<{ ok: boolean; enrolled: boolean }>('/auth/mfa/disable', {
@@ -843,6 +859,7 @@ export const dataApi = {
     email?: string;
     payTermsDays?: number;
     logoFileId?: string | null;
+    showPortalLogo?: boolean;
     sites: Array<{
       code: string;
       name: string;
@@ -942,6 +959,7 @@ export const dataApi = {
       email?: string;
       payTermsDays?: number;
       logoFileId?: string | null;
+      showPortalLogo?: boolean;
       active?: boolean;
     },
   ) => api<unknown>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

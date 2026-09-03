@@ -20,6 +20,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [info, setInfo] = useState('');
   const [mfaCode, setMfaCode] = useState('');
   const [needMfa, setNeedMfa] = useState(false);
+  const [mfaMethod, setMfaMethod] = useState<'totp' | 'email' | null>(null);
+  const [mfaDemo, setMfaDemo] = useState<string | null>(null);
   const [emailOtp, setEmailOtp] = useState('');
   const [needEmailOtp, setNeedEmailOtp] = useState(false);
   const [emailOtpDemo, setEmailOtpDemo] = useState<string | null>(null);
@@ -39,14 +41,29 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     } catch (err) {
       const e = err as Error & {
         mfaRequired?: boolean;
+        mfaMethod?: 'totp' | 'email' | null;
         emailOtpRequired?: boolean;
         demoCode?: string | null;
       };
       setError(e.message || 'Sign in failed');
-      if (e.mfaRequired || /six-digit|authenticator/i.test(e.message)) setNeedMfa(true);
+      if (e.mfaRequired || /six-digit|authenticator|emailed you/i.test(e.message)) {
+        setNeedMfa(true);
+        if (e.mfaMethod === 'email' || /emailed you/i.test(e.message)) {
+          setMfaMethod('email');
+          if (e.demoCode) setMfaDemo(e.demoCode);
+        } else {
+          setMfaMethod(e.mfaMethod === 'totp' ? 'totp' : 'totp');
+        }
+      }
       if (e.emailOtpRequired || /emailed you|email verification|90 days/i.test(e.message)) {
-        setNeedEmailOtp(true);
-        if (e.demoCode) setEmailOtpDemo(e.demoCode);
+        // Distinguish MFA email vs 90-day: MFA already set needMfa
+        if (!e.mfaRequired) {
+          setNeedEmailOtp(true);
+          if (e.demoCode) setEmailOtpDemo(e.demoCode);
+        } else if (e.mfaMethod !== 'email') {
+          setNeedEmailOtp(true);
+          if (e.demoCode) setEmailOtpDemo(e.demoCode);
+        }
       }
     } finally {
       setBusy(false);
@@ -207,7 +224,26 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </div>
             {needMfa ? (
               <div className="fg">
-                <label htmlFor="li-mfa">Authenticator app code</label>
+                <label htmlFor="li-mfa">
+                  {mfaMethod === 'email' ? 'Email two-factor code' : 'Authenticator app code'}
+                </label>
+                {mfaMethod === 'email' && mfaDemo ? (
+                  <div
+                    style={{
+                      background: 'var(--am2)',
+                      color: 'var(--am)',
+                      padding: '.45rem .7rem',
+                      borderRadius: 7,
+                      fontSize: '.78rem',
+                      marginBottom: '.45rem',
+                    }}
+                  >
+                    <b>Demo:</b>{' '}
+                    <span className="mono" style={{ fontWeight: 800 }}>
+                      {mfaDemo}
+                    </span>
+                  </div>
+                ) : null}
                 <input
                   id="li-mfa"
                   className="mono"
@@ -218,7 +254,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   style={{ fontSize: '1.1rem', letterSpacing: '.2em', textAlign: 'center' }}
                 />
                 <p className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
-                  From Google Authenticator, Microsoft Authenticator, or similar (not SMS).
+                  {mfaMethod === 'email'
+                    ? 'Check your inbox for the 6-digit sign-in code.'
+                    : 'From Google Authenticator, Microsoft Authenticator, or similar.'}
                 </p>
               </div>
             ) : null}

@@ -95,6 +95,7 @@ export async function mastersRoutes(app: FastifyInstance) {
           email: z.preprocess(emptyToUndef, z.string().email().optional()),
           payTermsDays: z.number().int().min(0).optional(),
           logoFileId: z.string().nullable().optional(),
+          showPortalLogo: z.boolean().optional(),
           sites: z.array(siteBody).min(1),
         })
         .parse(request.body);
@@ -257,6 +258,7 @@ export async function mastersRoutes(app: FastifyInstance) {
           email: z.preprocess(emptyToUndef, z.string().email().optional()),
           payTermsDays: z.number().int().min(0).optional(),
           logoFileId: z.string().nullable().optional(),
+          showPortalLogo: z.boolean().optional(),
           active: z.boolean().optional(),
         })
         .parse(request.body);

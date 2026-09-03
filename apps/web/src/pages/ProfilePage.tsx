@@ -228,7 +228,13 @@ export function ProfilePage({ user }: ProfilePageProps) {
 
 function MfaCard() {
   const [status, setStatus] = useState<Awaited<ReturnType<typeof authApi.mfaStatus>> | null>(null);
-  const [enrol, setEnrol] = useState<{ secret: string; qrDataUrl: string } | null>(null);
+  const [enrol, setEnrol] = useState<{
+    method: 'totp' | 'email';
+    secret?: string;
+    qrDataUrl?: string;
+    demoCode?: string | null;
+  } | null>(null);
+  const [pickMethod, setPickMethod] = useState(false);
   const [code, setCode] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState('');
@@ -248,7 +254,7 @@ function MfaCard() {
   }
 
   async function copySecret() {
-    if (!enrol) return;
+    if (!enrol?.secret) return;
     try {
       await navigator.clipboard.writeText(enrol.secret);
       setCopied(true);
@@ -258,20 +264,43 @@ function MfaCard() {
     }
   }
 
+  async function start(method: 'totp' | 'email') {
+    setMsg('');
+    setError('');
+    setPickMethod(false);
+    try {
+      const r = await authApi.mfaStart(method);
+      setEnrol({
+        method: r.method,
+        secret: r.secret,
+        qrDataUrl: r.qrDataUrl,
+        demoCode: r.demoCode,
+      });
+      setCode('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    }
+  }
+
+  const methodLabel =
+    status?.method === 'email' ? 'email OTP' : status?.method === 'totp' ? 'authenticator app' : null;
+
   return (
     <div style={{ marginTop: '.5rem' }}>
       {status?.required ? <span className="badge bg-am">Required for your role</span> : null}
       <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0' }}>
         {status?.enrolled
-          ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}. Codes come from an authenticator app (TOTP) — not SMS or email.`
-          : 'Not enrolled. Super Admins and factory managers should set this up with an authenticator app (Google Authenticator, Microsoft Authenticator, etc.).'}
+          ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}${
+              methodLabel ? ` via ${methodLabel}` : ''
+            }.`
+          : 'Not enrolled. Super Admins, Ops, and factory managers should set up two-factor — authenticator app or email OTP.'}
       </p>
       {status?.passwordExpired ? (
         <p className="error">Your password is past the rotation period.</p>
       ) : status?.passwordAgeDays != null ? (
         <p className="dim">Password age: {status.passwordAgeDays} days.</p>
       ) : null}
-      {enrol ? (
+      {enrol?.method === 'totp' && enrol.qrDataUrl && enrol.secret ? (
         <div>
           <p className="dim" style={{ marginBottom: '.5rem' }}>
             Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
@@ -294,7 +323,11 @@ function MfaCard() {
               style={{ display: 'block' }}
             />
           </div>
-          <details style={{ marginBottom: '.7rem' }} open={showSecret} onToggle={(e) => setShowSecret((e.target as HTMLDetailsElement).open)}>
+          <details
+            style={{ marginBottom: '.7rem' }}
+            open={showSecret}
+            onToggle={(e) => setShowSecret((e.target as HTMLDetailsElement).open)}
+          >
             <summary style={{ cursor: 'pointer', fontSize: '.84rem', color: 'var(--g2)' }}>
               Can&apos;t scan? Enter the key manually
             </summary>
@@ -341,12 +374,12 @@ function MfaCard() {
               disabled={code.length !== 6}
               onClick={() =>
                 authApi
-                  .mfaConfirm(enrol.secret, code)
+                  .mfaConfirm({ method: 'totp', secret: enrol.secret, code })
                   .then(() => {
                     setEnrol(null);
                     setCode('');
                     setShowSecret(false);
-                    setMsg('✓ Two-factor enabled');
+                    setMsg('✓ Two-factor enabled (authenticator)');
                     return load();
                   })
                   .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
@@ -361,6 +394,61 @@ function MfaCard() {
                 setEnrol(null);
                 setCode('');
                 setShowSecret(false);
+                setError('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : enrol?.method === 'email' ? (
+        <div>
+          <p className="dim" style={{ marginBottom: '.5rem' }}>
+            We emailed a 6-digit code to your account address. Enter it below to enable email two-factor.
+          </p>
+          {enrol.demoCode ? (
+            <p className="dim" style={{ fontSize: '.78rem' }}>
+              Demo code: <span className="mono">{enrol.demoCode}</span>
+            </p>
+          ) : null}
+          <div className="fg" style={{ marginBottom: '.5rem' }}>
+            <label htmlFor="mfa-email-confirm">Email code</label>
+            <input
+              id="mfa-email-confirm"
+              className="mono"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              style={{ fontSize: '1.1rem', letterSpacing: '.2em', textAlign: 'center', maxWidth: 160 }}
+              autoComplete="one-time-code"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn bp bsm"
+              disabled={code.length !== 6}
+              onClick={() =>
+                authApi
+                  .mfaConfirm({ method: 'email', code })
+                  .then(() => {
+                    setEnrol(null);
+                    setCode('');
+                    setMsg('✓ Two-factor enabled (email)');
+                    return load();
+                  })
+                  .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
+              }
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              className="btn bs bsm"
+              onClick={() => {
+                setEnrol(null);
+                setCode('');
                 setError('');
               }}
             >
@@ -387,21 +475,20 @@ function MfaCard() {
             Remove
           </button>
         </div>
+      ) : pickMethod ? (
+        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+          <button type="button" className="btn bp bsm" onClick={() => void start('totp')}>
+            Authenticator app
+          </button>
+          <button type="button" className="btn bs bsm" onClick={() => void start('email')}>
+            Email OTP
+          </button>
+          <button type="button" className="btn bs bsm" onClick={() => setPickMethod(false)}>
+            Cancel
+          </button>
+        </div>
       ) : (
-        <button
-          type="button"
-          className="btn bp bsm"
-          onClick={() =>
-            authApi
-              .mfaStart()
-              .then((r) => {
-                setMsg('');
-                setError('');
-                setEnrol({ secret: r.secret, qrDataUrl: r.qrDataUrl });
-              })
-              .catch((e) => setError(e instanceof Error ? e.message : 'Failed'))
-          }
-        >
+        <button type="button" className="btn bp bsm" onClick={() => setPickMethod(true)}>
           Set up two-factor
         </button>
       )}

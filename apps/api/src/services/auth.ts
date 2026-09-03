@@ -13,24 +13,33 @@ import { newTotpSecret, totpCode, totpUri, verifyTotp } from '../lib/totp.js';
 import { auditLog } from './audit.js';
 import { recordSecurityEvent } from './security-log.js';
 import type { SessionUser } from '../lib/auth-context.js';
-import { toSessionUser } from '../lib/auth-context.js';
-import { emailOtpDue, issueLoginEmailOtp, verifyLoginEmailOtp } from './login-email-otp.js';
+import { enrichSessionUser } from '../lib/auth-context.js';
+import { emailOtpDue, issueLoginEmailOtp, issueMfaEmailOtp, verifyLoginEmailOtp, verifyMfaEmailOtp } from './login-email-otp.js';
 
 const LOCK_ATTEMPTS = PW_POLICY.lockAfter;
 const LOCK_WINDOW_MS = PW_POLICY.lockWindowMins * 60 * 1000;
 const SESSION_HOURS = 8;
 
+export type MfaMethod = 'totp' | 'email';
+
 export class AuthError extends Error {
   mfaRequired = false;
+  mfaMethod: MfaMethod | null = null;
   emailOtpRequired = false;
   demoCode?: string | null;
   constructor(
     message: string,
-    opts?: { mfaRequired?: boolean; emailOtpRequired?: boolean; demoCode?: string | null },
+    opts?: {
+      mfaRequired?: boolean;
+      mfaMethod?: MfaMethod | null;
+      emailOtpRequired?: boolean;
+      demoCode?: string | null;
+    },
   ) {
     super(message);
     this.name = 'AuthError';
     this.mfaRequired = !!opts?.mfaRequired;
+    this.mfaMethod = opts?.mfaMethod ?? null;
     this.emailOtpRequired = !!opts?.emailOtpRequired;
     this.demoCode = opts?.demoCode;
   }
@@ -149,17 +158,47 @@ export async function signIn(
     throw new AuthError('Incorrect email or password.');
   }
 
-  if (user.mfaSecret) {
+  const mfaMethod: MfaMethod | null =
+    user.mfaMethod === 'email'
+      ? 'email'
+      : user.mfaSecret
+        ? 'totp'
+        : null;
+
+  if (mfaMethod === 'totp' && user.mfaSecret) {
     if (!mfaCode?.trim()) {
-      throw new AuthError('Enter the six-digit code from your authenticator.', { mfaRequired: true });
-    }
-    if (!verifyTotp(user.mfaSecret, mfaCode)) {
-      await recordSecurityEvent('mfa.failed', user.email, {}, 'warn', userAgent);
-      throw new AuthError('That code is not right. It changes every 30 seconds — try the current one.', {
+      throw new AuthError('Enter the six-digit code from your authenticator.', {
         mfaRequired: true,
+        mfaMethod: 'totp',
       });
     }
-    await recordSecurityEvent('mfa.verified', user.email, {}, 'info', userAgent);
+    if (!verifyTotp(user.mfaSecret, mfaCode)) {
+      await recordSecurityEvent('mfa.failed', user.email, { method: 'totp' }, 'warn', userAgent);
+      throw new AuthError('That code is not right. It changes every 30 seconds — try the current one.', {
+        mfaRequired: true,
+        mfaMethod: 'totp',
+      });
+    }
+    await recordSecurityEvent('mfa.verified', user.email, { method: 'totp' }, 'info', userAgent);
+  } else if (mfaMethod === 'email') {
+    if (!mfaCode?.trim()) {
+      const issued = await issueMfaEmailOtp(user.email, user.name);
+      throw new AuthError('Enter the six-digit code we just emailed you.', {
+        mfaRequired: true,
+        mfaMethod: 'email',
+        demoCode: issued.demoCode,
+      });
+    }
+    try {
+      await verifyMfaEmailOtp(user.email, mfaCode);
+    } catch (err) {
+      await recordSecurityEvent('mfa.failed', user.email, { method: 'email' }, 'warn', userAgent);
+      throw new AuthError(err instanceof Error ? err.message : 'Email two-factor failed.', {
+        mfaRequired: true,
+        mfaMethod: 'email',
+      });
+    }
+    await recordSecurityEvent('mfa.verified', user.email, { method: 'email' }, 'info', userAgent);
   }
 
   // Periodic email OTP — confirms the mailbox still works and the user remains reachable.
@@ -212,7 +251,7 @@ export async function signIn(
     await recordSecurityEvent('auth.password.expired', user.email, {}, 'warn', userAgent);
   }
 
-  return { user: toSessionUser(user), token, passwordExpired: expired };
+  return { user: await enrichSessionUser(user), token, passwordExpired: expired };
 }
 
 export async function signOut(token: string, actor?: SessionUser) {
@@ -236,7 +275,7 @@ export async function getSessionUser(token: string | undefined): Promise<Session
     include: { user: true },
   });
   if (!session || session.expiresAt < new Date() || !session.user.active) return null;
-  return toSessionUser(session.user);
+  return enrichSessionUser(session.user);
 }
 
 export async function changePassword(actor: SessionUser, current: string, next: string) {
@@ -261,7 +300,15 @@ export async function changePassword(actor: SessionUser, current: string, next: 
   return { ok: true };
 }
 
-export async function startMfaEnrol(actor: SessionUser) {
+export async function startMfaEnrol(actor: SessionUser, method: MfaMethod = 'totp') {
+  if (method === 'email') {
+    const issued = await issueMfaEmailOtp(actor.email, actor.name);
+    return {
+      method: 'email' as const,
+      required: mfaRequired(actor.role),
+      demoCode: issued.demoCode ?? null,
+    };
+  }
   const secret = newTotpSecret();
   const uri = totpUri(actor.email, secret);
   const QRCode = (await import('qrcode')).default;
@@ -272,6 +319,7 @@ export async function startMfaEnrol(actor: SessionUser) {
     color: { dark: '#1a2e14', light: '#ffffff' },
   });
   return {
+    method: 'totp' as const,
     secret,
     uri,
     qrDataUrl,
@@ -279,25 +327,45 @@ export async function startMfaEnrol(actor: SessionUser) {
   };
 }
 
-export async function confirmMfaEnrol(actor: SessionUser, secret: string, code: string) {
+export async function confirmMfaEnrol(
+  actor: SessionUser,
+  opts: { method?: MfaMethod; secret?: string; code: string },
+) {
+  const method = opts.method ?? 'totp';
   const user = await prisma.user.findUnique({ where: { id: actor.id } });
   if (!user) throw new AppError('User not found');
-  if (!verifyTotp(secret, code)) {
-    throw new AppError('That code is not right. It changes every 30 seconds — try the current one.');
+
+  if (method === 'email') {
+    try {
+      await verifyMfaEmailOtp(user.email, opts.code);
+    } catch (err) {
+      throw new AppError(err instanceof Error ? err.message : 'Email verification failed.');
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mfaSecret: null, mfaMethod: 'email', mfaAt: new Date() },
+    });
+  } else {
+    if (!opts.secret) throw new AppError('Authenticator secret is required.');
+    if (!verifyTotp(opts.secret, opts.code)) {
+      throw new AppError('That code is not right. It changes every 30 seconds — try the current one.');
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mfaSecret: opts.secret, mfaMethod: 'totp', mfaAt: new Date() },
+    });
   }
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { mfaSecret: secret, mfaAt: new Date() },
-  });
+
   await auditLog({
     actorEmail: actor.email,
     actorId: actor.id,
     action: 'mfa.enrol',
     entity: 'user',
     entityId: actor.email,
+    details: { method },
   });
-  await recordSecurityEvent('mfa.enrolled', actor.email, {});
-  return { ok: true, enrolled: true };
+  await recordSecurityEvent('mfa.enrolled', actor.email, { method });
+  return { ok: true, enrolled: true, method };
 }
 
 export async function disableMfa(actor: SessionUser, reason: string) {
@@ -306,7 +374,7 @@ export async function disableMfa(actor: SessionUser, reason: string) {
   if (!user) throw new AppError('User not found');
   await prisma.user.update({
     where: { id: user.id },
-    data: { mfaSecret: null, mfaAt: null },
+    data: { mfaSecret: null, mfaMethod: null, mfaAt: null },
   });
   await auditLog({
     actorEmail: actor.email,
@@ -320,11 +388,18 @@ export async function disableMfa(actor: SessionUser, reason: string) {
   return { ok: true, enrolled: false };
 }
 
+function isMfaEnrolled(user: { mfaSecret: string | null; mfaMethod: string | null }): boolean {
+  return user.mfaMethod === 'email' || !!user.mfaSecret;
+}
+
 export async function mfaStatus(actor: SessionUser) {
   const user = await prisma.user.findUnique({ where: { id: actor.id } });
+  const method: MfaMethod | null =
+    user?.mfaMethod === 'email' ? 'email' : user?.mfaSecret ? 'totp' : null;
   return {
     required: mfaRequired(actor.role),
-    enrolled: !!user?.mfaSecret,
+    enrolled: user ? isMfaEnrolled(user) : false,
+    method,
     enrolledAt: user?.mfaAt?.toISOString() ?? null,
     passwordAgeDays: user?.passwordSetAt
       ? Math.floor((Date.now() - user.passwordSetAt.getTime()) / 86400000)

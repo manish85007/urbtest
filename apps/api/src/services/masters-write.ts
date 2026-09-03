@@ -67,6 +67,7 @@ export async function createClient(
     email?: string;
     payTermsDays?: number;
     logoFileId?: string | null;
+    showPortalLogo?: boolean;
     sites?: SiteInput[];
   },
 ) {
@@ -94,6 +95,7 @@ export async function createClient(
         email: input.email?.trim().toLowerCase() || null,
         payTermsDays: input.payTermsDays ?? 30,
         logoFileId: input.logoFileId ?? null,
+        showPortalLogo: input.showPortalLogo === true,
         createdBy: actor.email,
         sites: { create: sites.map(siteData) },
       },
@@ -314,6 +316,7 @@ export async function listClientsForMasters(includeInactive = false) {
     active: c.active,
     payTermsDays: c.payTermsDays,
     logoFileId: c.logoFileId,
+    showPortalLogo: c.showPortalLogo,
     siteActive: c.sites.filter((s) => s.active).length,
     siteInactive: c.sites.filter((s) => !s.active).length,
     requestCount: c._count.submissions,
@@ -430,6 +433,7 @@ export async function updateClient(
     email?: string;
     payTermsDays?: number;
     logoFileId?: string | null;
+    showPortalLogo?: boolean;
     active?: boolean;
   },
 ) {
@@ -446,6 +450,7 @@ export async function updateClient(
       email: input.email !== undefined ? input.email.trim().toLowerCase() || null : undefined,
       payTermsDays: input.payTermsDays,
       logoFileId: input.logoFileId !== undefined ? input.logoFileId : undefined,
+      showPortalLogo: input.showPortalLogo !== undefined ? input.showPortalLogo : undefined,
       active: input.active,
     },
   });

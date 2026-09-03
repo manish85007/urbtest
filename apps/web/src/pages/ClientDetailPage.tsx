@@ -272,7 +272,12 @@ export function ClientDetailPage() {
               <div className="tile-l">Portal Logo</div>
               <div style={{ marginTop: '.3rem' }}>
                 {client.logoFileId ? (
-                  <img className="logo-preview" src={filesApi.url(client.logoFileId)} alt="" />
+                  <>
+                    <img className="logo-preview" src={filesApi.url(client.logoFileId)} alt="" />
+                    <div className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
+                      Header display: {client.showPortalLogo ? 'On' : 'Off'}
+                    </div>
+                  </>
                 ) : (
                   <span className="dim" style={{ fontSize: '.78rem' }}>
                     not set
@@ -354,6 +359,7 @@ function EditClientModal({
   const [termDays, setTermDays] = useState(String(client.payTermsDays));
   const [active, setActive] = useState(client.active);
   const [logoIds, setLogoIds] = useState<string[]>(client.logoFileId ? [client.logoFileId] : []);
+  const [showPortalLogo, setShowPortalLogo] = useState(!!client.showPortalLogo);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -372,6 +378,7 @@ function EditClientModal({
         email,
         payTermsDays: Number(termDays) || 0,
         logoFileId: logoIds[0] ?? null,
+        showPortalLogo,
         active,
       });
       onSaved('Client updated.');
@@ -434,8 +441,20 @@ function EditClientModal({
         </label>
       </div>
       <div className="section-hd">Portal Logo</div>
+      <p className="dim" style={{ fontSize: '.78rem', margin: '0 0 .45rem' }}>
+        Optional. When enabled, the logo appears in the client portal header.
+      </p>
       {logoIds[0] ? <img className="logo-preview" src={filesApi.url(logoIds[0])} alt="" /> : null}
       <FileUpload kind="logo" label="Upload logo" accept="image/*" value={logoIds} onChange={setLogoIds} />
+      <label className="legal-consent-check" style={{ marginTop: '.55rem' }}>
+        <input
+          type="checkbox"
+          checked={showPortalLogo}
+          onChange={(e) => setShowPortalLogo(e.target.checked)}
+          disabled={!logoIds[0]}
+        />
+        <span>Show logo on client portal header</span>
+      </label>
     </Modal>
   );
 }

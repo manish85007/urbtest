@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { authApi, type SessionUser } from '../api';
+import { authApi, filesApi, type SessionUser } from '../api';
 import { navItems } from '../lib/nav';
 import { portalSubtitle } from '../lib/roles';
 import { LogoIcon } from './BrandMark';
@@ -16,6 +16,7 @@ interface ShellProps {
 }
 
 function brandSub(user: SessionUser) {
+  if (user.role === 'client' && user.clientName) return user.clientName;
   return portalSubtitle(user.role, user.factoryIds ?? []);
 }
 
@@ -28,6 +29,8 @@ export function Shell({ user, onLogout, children }: ShellProps) {
   const loc = useLocation();
   const items = navItems(user.role);
   const [navOpen, setNavOpen] = useState(false);
+  const showClientLogo =
+    user.role === 'client' && user.clientShowPortalLogo && !!user.clientLogoFileId;
 
   async function logout() {
     try {
@@ -51,7 +54,15 @@ export function Shell({ user, onLogout, children }: ShellProps) {
           </button>
           <Link to="/" className="brand" onClick={() => setNavOpen(false)}>
             <div className="brand-i">
-              <LogoIcon />
+              {showClientLogo ? (
+                <img
+                  src={filesApi.url(user.clientLogoFileId!)}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }}
+                />
+              ) : (
+                <LogoIcon />
+              )}
             </div>
             <div>
               <div className="brand-t">
@@ -100,7 +111,7 @@ export function Shell({ user, onLogout, children }: ShellProps) {
             <b>Urb TecTrack™</b> · Urbeno Private Limited · Recycling Heroes™
             <br />
             <span className="dim">
-              R2v3 certified · CPCB registered · KSPCB authorised · ISO 9001:2015 &amp; ISO 14001:2015
+              CPCB registered · KSPCB authorised · ISO 9001:2015 &amp; ISO 14001:2015
             </span>
           </div>
           <div className="foot-r">

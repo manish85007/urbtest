@@ -1,5 +1,6 @@
 import type { User, UserRole } from '@prisma/client';
 import { hasPermission, isStaffRole } from '@urb-tectrack/shared';
+import { prisma } from './prisma.js';
 
 export interface SessionUser {
   id: string;
@@ -10,6 +11,10 @@ export interface SessionUser {
   factoryIds: string[];
   siteIds: string[];
   featureAccess: Record<string, boolean> | null;
+  /** Client portal branding (role === 'client' only). */
+  clientName?: string | null;
+  clientLogoFileId?: string | null;
+  clientShowPortalLogo?: boolean;
 }
 
 export function toSessionUser(user: User): SessionUser {
@@ -22,6 +27,23 @@ export function toSessionUser(user: User): SessionUser {
     factoryIds: user.factoryIds,
     siteIds: user.siteIds,
     featureAccess: (user.featureAccess as Record<string, boolean> | null) ?? null,
+  };
+}
+
+/** Attach client logo / name for portal header when the user is a client. */
+export async function enrichSessionUser(user: User): Promise<SessionUser> {
+  const base = toSessionUser(user);
+  if (user.role !== 'client' || !user.clientId) return base;
+  const client = await prisma.client.findUnique({
+    where: { id: user.clientId },
+    select: { name: true, logoFileId: true, showPortalLogo: true },
+  });
+  if (!client) return base;
+  return {
+    ...base,
+    clientName: client.name,
+    clientLogoFileId: client.logoFileId,
+    clientShowPortalLogo: client.showPortalLogo,
   };
 }
 

@@ -119,6 +119,13 @@
     "variables": ["user_name", "code", "expiry_minutes", "days", "support_email", "portal_url"]
   },
   {
+    "key": "mfa_email_otp",
+    "name": "Two-Factor Email OTP",
+    "subject": "Your Urb TecTrack two-factor code",
+    "body": "Dear {{user_name}},\n\nYour Urb TecTrack account uses email as a second factor.\n\nYour 6-digit sign-in code is: {{code}}\n\nIt expires in {{expiry_minutes}} minutes. Enter it on the sign-in screen to continue.\n\nIf you did not try to sign in, contact {{support_email}} immediately.\n\nSign in: {{portal_url}}\n\nUrb TecTrack · Urbeno Private Limited",
+    "variables": ["user_name", "code", "expiry_minutes", "support_email", "portal_url"]
+  },
+  {
     "key": "user_welcome",
     "name": "New User Welcome",
     "subject": "Welcome to Urb TecTrack — your account is ready",
