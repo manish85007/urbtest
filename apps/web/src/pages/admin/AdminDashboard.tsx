@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatINR } from '@urb-tectrack/shared';
 import { type SessionUser, type StaffDashboardReport } from '../../api';
@@ -22,12 +22,20 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
   const canCreateRequest = userCan(user, 'createRequestAsStaff');
   const isSuperAdmin = user.role === 'admin';
   const nav = useNavigate();
+  const actionCenterRef = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<ActionPanel>(() => {
     if (report.newRequests.length) return 'ack';
     if (report.overdue.length) return 'overdue';
     if (report.slaAtRisk.length) return 'sla';
     return 'active';
   });
+
+  function openQueuesPanel() {
+    setPanel('queues');
+    requestAnimationFrame(() => {
+      actionCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   const fy = report.stats.fyLabel || 'FY';
   const cap = report.stats.capacity;
@@ -153,7 +161,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
       </div>
 
       <div className="admin-chart-grid">
-        <div className="card admin-chart-card">
+        <Link to="/requests" className="card admin-chart-card admin-cap-card">
           <h3>Request pipeline</h3>
           <div className="admin-chart-row">
             <DonutChart slices={reqSlices.length ? reqSlices : [{ value: 1, color: '#e5e7eb', label: 'Empty' }]} size={160} centerLabel="requests" />
@@ -165,14 +173,24 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                   <span className="admin-legend-v">{s.value}</span>
                 </div>
               ))}
+              <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
+                Tap to view all requests →
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="card admin-chart-card">
+        <button
+          type="button"
+          className="card admin-chart-card admin-cap-card admin-chart-btn"
+          onClick={openQueuesPanel}
+        >
           <h3>Work queues</h3>
           <BarChart bars={queueBars} maxVal={queueMax} />
-        </div>
+          <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem', textAlign: 'left' }}>
+            Tap to open work queues →
+          </div>
+        </button>
 
         <Link to="/capacity" className="card admin-chart-card admin-cap-card">
           <h3>Facility capacity</h3>
@@ -191,7 +209,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
         </Link>
       </div>
 
-      <div className="admin-action-center">
+      <div className="admin-action-center" ref={actionCenterRef}>
         <div className="admin-panel-chips">
           {panels.map((p) => (
             <button

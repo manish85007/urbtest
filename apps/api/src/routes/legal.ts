@@ -85,5 +85,7 @@ export function registerSecurityHeaders(app: FastifyInstance) {
     if (isSecureDeployment()) {
       reply.header('Strict-Transport-Security', HSTS_HEADER);
     }
+    // Hide Node/Fastify identity; Cloud Run's GFE may still inject "Google Frontend".
+    reply.removeHeader('Server');
   });
 }

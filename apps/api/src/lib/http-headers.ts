@@ -44,8 +44,8 @@ export const SECURITY_HEADERS: Record<string, string> = {
 
 export const HSTS_HEADER = 'max-age=63072000; includeSubDomains; preload';
 
-/** Cache-Control for SPA HTML shell — always revalidate after deploy. */
-export const HTML_CACHE_CONTROL = 'no-cache';
+/** Cache-Control for SPA HTML shell — never store; always revalidate after deploy. */
+export const HTML_CACHE_CONTROL = 'no-cache, no-store, must-revalidate';
 
 /** Cache-Control for content-hashed build assets. */
 export const ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable';

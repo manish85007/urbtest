@@ -74,10 +74,15 @@ export async function buildApp() {
   registerSecurityHeaders(app);
 
   app.addHook('onSend', async (request, reply, payload) => {
+    // Do not advertise the app server stack (Cloud Run GFE may still set its own).
+    reply.removeHeader('Server');
+
     if (request.method === 'GET' || request.method === 'HEAD') {
       const path = request.url.split('?')[0] || '/';
       if (path === '/' || path.endsWith('.html')) {
         reply.header('Cache-Control', HTML_CACHE_CONTROL);
+        reply.header('Pragma', 'no-cache');
+        reply.header('Expires', '0');
       } else if (path.startsWith('/assets/')) {
         const cache = cacheControlForPath(path);
         if (cache) reply.header('Cache-Control', cache);
@@ -126,10 +131,26 @@ export async function buildApp() {
     await app.register(fastifyStatic, {
       root: resolve(webDist),
       wildcard: false,
+      // Avoid @fastify/send default `public, max-age=0` on HTML — we set headers below.
+      cacheControl: false,
+      setHeaders(reply, filePath) {
+        const cache = cacheControlForPath(filePath);
+        if (cache) {
+          reply.header('Cache-Control', cache);
+          if (cache.includes('no-store')) {
+            reply.header('Pragma', 'no-cache');
+            reply.header('Expires', '0');
+          }
+        }
+        reply.removeHeader('Server');
+      },
     });
     app.setNotFoundHandler((request, reply) => {
       if (request.method === 'GET' || request.method === 'HEAD') {
+        reply.removeHeader('Server');
         reply.header('Cache-Control', HTML_CACHE_CONTROL);
+        reply.header('Pragma', 'no-cache');
+        reply.header('Expires', '0');
         return reply.sendFile('index.html');
       }
       return reply.status(404).send({ message: 'Not found' });

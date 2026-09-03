@@ -19,8 +19,10 @@ describe('contentDisposition', () => {
 });
 
 describe('cacheControlForPath', () => {
-  it('marks HTML as no-cache', () => {
+  it('marks HTML as no-store / must-revalidate', () => {
     expect(cacheControlForPath('/app/apps/web/dist/index.html')).toBe(HTML_CACHE_CONTROL);
+    expect(HTML_CACHE_CONTROL).toContain('no-store');
+    expect(HTML_CACHE_CONTROL).toContain('must-revalidate');
   });
 
   it('marks hashed assets as immutable', () => {

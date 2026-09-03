@@ -1225,6 +1225,19 @@ button.heroes-metric-card:hover {
 
 .admin-cap-card { text-decoration: none; color: inherit; }
 .admin-cap-card:hover { transform: translateY(-2px); }
+button.admin-chart-btn {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--bd);
+  background: var(--cd);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.admin-chart-btn:focus-visible {
+  outline: 2px solid var(--g);
+  outline-offset: 2px;
+}
 .admin-cap-wrap {
   display: flex;
   align-items: center;
