@@ -28,17 +28,17 @@ Related: [Client welcome email template](../CLIENT-WELCOME-EMAIL.md)
 | 8 CoD | Super Admin | Historical certificate date |
 | 9 Close | Client User | After CoD + payment |
 
-## Screenshot PDFs (Version 1)
+## Screenshot PDFs (Version 1 — detailed)
 
-Step-by-step screenshot packs live under **`docs/uat/training/`**:
+Step-by-step screenshot packs live under **`docs/uat/training/`**. Each step has how-to text + a full-page screenshot. Prefer the **complete lifecycle** Super Admin PDF for classroom demos of every form.
 
-| Pack | PDF |
-|------|-----|
-| Client User | `docs/uat/training/client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf` |
-| Factory Manager | `docs/uat/training/factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf` |
-| Operations Manager | `docs/uat/training/operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf` |
-| Super Admin (day-to-day) | `docs/uat/training/admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf` |
-| Super Admin (complete lifecycle) | `docs/uat/training/lifecycle-admin/Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf` |
+| Pack | PDF | Typical steps |
+|------|-----|---------------|
+| Client User | `docs/uat/training/client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf` | ~14 |
+| Factory Manager | `docs/uat/training/factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf` | ~11 |
+| Operations Manager | `docs/uat/training/operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf` | ~14 |
+| Super Admin (day-to-day) | `docs/uat/training/admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf` | ~20 |
+| Super Admin (complete lifecycle) | `docs/uat/training/lifecycle-admin/Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf` | **~29** |
 
 Rebuild:
 

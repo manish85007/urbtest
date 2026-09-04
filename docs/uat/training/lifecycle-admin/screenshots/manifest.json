@@ -1,130 +1,214 @@
 {
   "role": "lifecycle-admin",
-  "roleLabel": "Super Admin",
-  "audience": "Urbeno Super Admins learning the complete e-waste lifecycle from acknowledgement through closure, plus Masters and reports",
+  "roleLabel": "Super Admin — Complete Lifecycle",
+  "audience": "Urbeno Super Admins learning every lifecycle form from staff request / acknowledgement through client closure, plus Masters, Audit, and Compliance",
   "portal": "https://tectrack.urbeno.in",
   "version": "1",
-  "documentControl": "Version 1 — Production",
+  "documentControl": "Version 1 — Production (detailed)",
   "baseCaptured": "http://localhost:8080",
   "steps": [
     {
       "id": "login",
       "title": "Step 1 — Sign in as Super Admin",
-      "howTo": "1. Open https://tectrack.urbeno.in in Chrome, Edge, or Safari.\n2. Enter your @urbeno.in Super Admin email from the account notification.\n3. Enter your password and click Sign In.\n4. Complete two-factor authentication if enrolled.\n5. Accept Terms of Use and Privacy Policy on first login if prompted.\n6. Change a temporary password immediately when the must-reset gate appears.",
-      "tips": "Super Admin can change Masters, reset passwords, and backdate historical lifecycle dates from 2026-04-01. Protect MFA and never leave the session unlocked on a shared machine.",
+      "howTo": "1. Open https://tectrack.urbeno.in.\n2. Enter your @urbeno.in Super Admin email.\n3. Enter your password and click Sign In.\n4. Complete MFA if enrolled; accept policies on first login.\n5. Change a temporary password immediately when prompted.",
+      "tips": "Super Admin can backdate historical lifecycle dates from 2026-04-01. Protect MFA.",
       "file": "01-login.png"
     },
     {
       "id": "dashboard",
-      "title": "Step 2 — Operations dashboard overview",
-      "howTo": "1. Confirm you land on the Operations Dashboard (admin variant).\n2. Review tiles: New Requests / awaiting acknowledgement, open work, and operational KPIs.\n3. Note full navigation: Dashboard, Requests, Recycling Heroes, Sustainability, Capacity, Masters, Reports, Audit, Compliance.\n4. Use the New Requests (or Stage 1) shortcut to jump into acknowledgement work.\n5. Remember the hand-off map: Ops often does ack → vehicle → weigh; Factory does MRN → Form 6; you cover billing, CoD, Masters, Audit, Compliance, and backdating.",
-      "tips": "You see every organisation. Treat client data as confidential even inside Urbeno. If Compliance or Masters is missing from the menu, you are not on a Super Admin session.",
+      "title": "Step 2 — Super Admin dashboard",
+      "howTo": "1. Confirm Super Admin Dashboard with KPIs and work queues.\n2. Review navigation: Dashboard, Requests, Heroes, Sustainability, Capacity, Masters, Reports, Audit, Compliance.\n3. Use Acknowledge / New Requests tiles to jump into Stage 1 work.\n4. Hand-off map: Ops often does ack → vehicle → weigh; Factory does MRN → Form 6; you cover invoice, CoD, Masters, Audit, Compliance, and historical backdating.",
+      "tips": "You see every organisation. Treat client data as confidential.",
       "file": "02-dashboard.png"
     },
     {
-      "id": "requests",
-      "title": "Step 3 — Requests queue across stages",
-      "howTo": "1. Open Requests from the top navigation.\n2. Scan stage badges (1–9) and invoice mini-badges on each row.\n3. Filter or search for Stage 1 items awaiting acknowledgement, or jump to a known REQ- id.\n4. Prefer seeded demos for training walkthroughs (e.g. stage-1, vehicles, invoiced, closed samples) so you do not invent live client data.\n5. Open a row to reach request detail — all lifecycle actions live there.",
-      "tips": "Keep unique suffixes on registration / invoice / e-way / certificate numbers during re-runs. Walk one request carefully before bulk practice.",
-      "file": "03-requests.png"
+      "id": "staff-new-request",
+      "title": "Step 3 — Staff-created / historically backdated request",
+      "howTo": "1. Open Requests → + New Request.\n2. Choose Client and Site (Super Admin only sees the client dropdown).\n3. Enter pickup location, optional PO, approx qty/weight, notes, and line items.\n4. Set Pick-up request date. Super Admin may use dates from 2026-04-01 for FY catch-up.\n5. Click Submit Request and note the new REQ- number.",
+      "tips": "Operations and Client users cannot open the Super Admin historical window. Document why a historical request was raised in notes.",
+      "file": "03-staff-new-request.png"
     },
     {
-      "id": "stage1-detail",
-      "title": "Step 4 — Open a Stage 1 / new request",
-      "howTo": "1. Open a Stage 1 request (awaiting acknowledgement).\n2. Read site, location, approx qty/weight, notes, and raised-by details.\n3. Decide: Acknowledge, Request changes (with a clear note), or Reject when the UI offers it.\n4. Do not invent missing client site details — send Request changes instead.\n5. After acknowledgement the request moves to Vehicles & Weighment.",
-      "tips": "Clients raise Stage 1. Operations Managers and Super Admins acknowledge. Factory cannot acknowledge.",
-      "file": "04-stage1-detail.png"
+      "id": "request-created",
+      "title": "Step 4 — Request created (Stage 1)",
+      "howTo": "1. Confirm the heading shows REQ-00102 (or your new REQ-).\n2. Read site, approx weight, request date, and Bill of Materials / line items.\n3. Stage 1 actions: Acknowledge Request, Request changes, or Reject.\n4. Share the REQ- with Operations / Factory as the job advances.",
+      "tips": "Clients raise Stage 1 normally; staff create is for Super Admin catch-up or on-behalf work.",
+      "file": "04-request-created.png"
     },
     {
       "id": "acknowledge",
-      "title": "Step 4b — Acknowledge Request",
-      "howTo": "1. Click Acknowledge Request (or Acknowledge on the dashboard queue).\n2. Review the summary in the modal (site, weight, units, request date).\n3. Confirm acknowledgement — an email is sent using the Request Acknowledgement template.\n4. Expected outcome: stage advances toward Vehicles & Weighment.",
-      "tips": "If the button is missing, the request is already past Stage 1 — open another Stage 1 demo or continue with Assign Vehicle on an acknowledged request.",
+      "title": "Step 5 — Acknowledge Request modal",
+      "howTo": "1. Click Acknowledge Request.\n2. Review client, site, approx weight/units, and requestor in the modal.\n3. Confirm — acknowledgement email uses the Request Acknowledgement template.\n4. Expected outcome: stage advances to Vehicles & Weighment.",
+      "tips": "Use Request changes with a clear note when client data is incomplete — do not invent site details.",
       "file": "05-acknowledge.png"
     },
     {
       "id": "assign-vehicle",
-      "title": "Step 5 — Assign Vehicle (with Super Admin backdate)",
-      "howTo": "1. On an acknowledged request, click Assign Vehicle (or + Add Vehicle).\n2. Enter registration, vehicle type, logistics partner, driver name, and phone.\n3. Set Expected pickup date and time (or a quick time slot).\n4. Super Admin only: historical expected pickup dates from 2026-04-01 are allowed when the backdate hint is shown — use this for FY catch-up uploads, not day-to-day ops.\n5. Add team members if required, then save.\n6. Operations Managers can also assign vehicles but cannot use the Super Admin historical backdate window.",
-      "tips": "Never invent a registration plate for a live pickup. The form hint confirms the historical upload window from 2026-04-01.",
+      "title": "Step 6 — Assign Vehicle (historical expected pickup)",
+      "howTo": "1. Click Assign Vehicle (or + Add Vehicle).\n2. Enter registration (letters/numbers only), type, logistics partner, driver, phone.\n3. Set Expected pickup date & time — Super Admin historical window from 2026-04-01.\n4. Add team members if required.\n5. Click Assign vehicle.",
+      "tips": "Operations cannot backdate expected pickup. Never invent a live registration plate.",
       "file": "06-assign-vehicle.png"
     },
     {
-      "id": "weighment-context",
-      "title": "Step 6 — Weighment context on request detail",
-      "howTo": "1. Open a request that already has vehicles.\n2. Review existing weighment rows (slip #, gross / tare / net, photos).\n3. When training live: use Record Weighment on an unweighed vehicle.\n4. Super Admin historical weighment dates: from 2026-04-01 when the backdate hint appears.\n5. After all vehicles are weighed, Acknowledge loading complete, then Raise Invoice.",
-      "tips": "Seeded invoiced demos may already be weighed — that is fine for showing completed evidence. Practice Record Weighment on a fresh vehicle when available.",
-      "file": "07-weighment-context.png"
+      "id": "vehicle-assigned",
+      "title": "Step 7 — Vehicle listed on request",
+      "howTo": "1. Confirm the vehicle row appears under Vehicles & Weighment.\n2. Check registration, driver, and expected pickup date.\n3. Add more vehicles if the pickup needs them — each carries its own weighment.\n4. Next: Record Weighment on each vehicle.",
+      "tips": "Weighment is per vehicle. Do not raise an invoice until every vehicle is weighed and loading is acknowledged.",
+      "file": "07-vehicle-assigned.png"
     },
     {
-      "id": "invoice-panel",
-      "title": "Step 7 — Invoice panel on an invoiced request",
-      "howTo": "1. Open a request that already has an invoice (Stage 5+).\n2. Review invoice number, taxable / tax / total, billing weight, and e-way details.\n3. From here Factory can Create MRN; you can Record Payment and later Upload Certificate.\n4. Use Add Invoice only when splitting a pickup into another bill.",
-      "tips": "Seeded REQ demos often already show a raised invoice — use them to teach the post-invoice path without inventing numbers.",
-      "file": "08-invoice-panel.png"
+      "id": "weighment-form",
+      "title": "Step 8 — Record Weighment form",
+      "howTo": "1. Click Record Weighment / Weigh on the vehicle row.\n2. Enter slip number, gross kg, and tare kg — confirm net = gross − tare.\n3. Set Weighment date (Super Admin may historical-backdate from 2026-04-01; Ops is today only).\n4. Attach weighment slip photo(s) and pickup photo(s) — both required.\n5. Click Record weighment.",
+      "tips": "Refuse weighment without both photo sets. Do not invent weights.",
+      "file": "08-weighment-form.png"
     },
     {
-      "id": "mrn-note",
-      "title": "Step 9 — MRN hand-off note (factory-owned)",
-      "howTo": "1. After invoice exists, Factory creates the MRN (goods receipt).\n2. Super Admin can perform MRN when covering for Factory, but training should emphasise the hand-off.\n3. Open an invoiced request and confirm the MRN card / status area.\n4. Clients never see MRN numbers — verify that boundary in Client training.\n5. After MRN, Factory proceeds to Process & Issue / Submit Form 6.",
-      "tips": "Missing Create MRN on this seed is OK — document the Factory hand-off and continue with a closed sample for CoD / close context.",
-      "file": "09-mrn-note.png"
+      "id": "loading-complete",
+      "title": "Step 9 — Acknowledge loading complete",
+      "howTo": "1. After every vehicle is weighed, click Acknowledge loading complete.\n2. Confirm the action — this unlocks Raise Invoice for Super Admin.\n3. Do not leave consignments stuck awaiting loading acknowledgement.",
+      "tips": "Missing this step blocks billing even when weighment evidence is complete.",
+      "file": "09-loading-complete.png"
     },
     {
-      "id": "form6",
-      "title": "Step 10 — Form 6 / recycling",
-      "howTo": "1. After MRN exists, open Recycling / Form 6 controls on the invoice.\n2. Factory enters category split so totals equal billing weight exactly, then submits for review (or issues per design).\n3. Super Admin Approves & releases Form 6 (or returns it to Factory with a reason).\n4. Download Form 6 PDF when available for the audit pack.\n5. Capacity warnings near 80% / blocks at 100% TPA must be respected — document overrides.",
-      "tips": "Category split must equal billing weight. Clients can download approved Form 6; they never see MRN.",
-      "file": "10-form6.png"
+      "id": "raise-invoice",
+      "title": "Step 10 — Raise Invoice form",
+      "howTo": "1. Click Raise Invoice (or Add Invoice for a split).\n2. Enter invoice number, invoice date, taxable amount, and tax rate — totals calculate automatically.\n3. Enter e-way bill number and date; attach PDFs when required.\n4. Confirm billing weight (defaults from vehicle net); add a deviation note if it differs.\n5. Super Admin may historical-backdate invoice / e-way dates from 2026-04-01 (not future).\n6. Click Create invoice.",
+      "tips": "Do not type tax totals manually. Keep invoice numbers unique within the request.",
+      "file": "10-raise-invoice.png"
     },
     {
-      "id": "certificate",
-      "title": "Step 11 — Certificate of Destruction upload",
-      "howTo": "1. After Form 6 is approved, click Upload Certificate on the Certificate of Destruction card.\n2. Enter a unique certificate number and certificate date.\n3. Attach the signed CoD PDF.\n4. Super Admin may historical-backdate CoD dates from 2026-04-01 when the hint is shown.\n5. Upload & email certificate (or equivalent). Duplicate certificate numbers must be refused.\n6. After CoD + payment, the Client User performs Review & Close — not Super Admin on the normal path.",
-      "tips": "Never reuse certificate numbers. Payment can remain open on client terms without blocking CoD, but close requires both.",
-      "file": "11-certificate.png"
+      "id": "invoice-created",
+      "title": "Step 11 — Invoice on the request panel",
+      "howTo": "1. Review invoice number, taxable / tax / total, billing weight, and e-way details.\n2. Factory can now Create MRN; you can Record Payment and later Upload Certificate.\n3. Use Add Invoice only when splitting one pickup into another bill.",
+      "tips": "After invoices exist, coordinate so Factory is ready at the gate.",
+      "file": "11-invoice-created.png"
     },
     {
-      "id": "close-context",
-      "title": "Step 12 — Closure hand-off to the client",
-      "howTo": "1. Confirm CoD is on file and payment status on the invoice panel.\n2. Tell trainees: Client User opens the request → Review & Close → Acknowledge closure.\n3. Client Read Only can view / download Form 6 and CoD but cannot raise or close.\n4. Super Admin verifies Audit shows certificate, payment, and close events.",
-      "tips": "Missing Review & Close for Super Admin is expected — capture the invoice end-state and document the client hand-off.",
-      "file": "12-close-context.png"
+      "id": "create-mrn",
+      "title": "Step 12 — Create MRN (goods receipt)",
+      "howTo": "1. On an invoiced request, click Create MRN (Factory normally owns this; Super Admin may cover).\n2. Confirm factory, receiving date, material lines (weight must match billing weight), and condition.\n3. Fill Security Officer and attach gate + material photos.\n4. Click Record goods receipt (MRN).\n5. Clients must never see the MRN number.",
+      "tips": "One MRN per invoice. Do not invent categories at the gate — categories belong on Form 6.",
+      "file": "12-create-mrn.png"
+    },
+    {
+      "id": "form6-form",
+      "title": "Step 13 — Process Form 6 / recycling",
+      "howTo": "1. Click Process & Submit Form 6 for Review (Factory) or Process & Issue Form 6 (admin cover).\n2. Set Processing Date; enter category split so totals equal billing weight exactly.\n3. Select vehicles on this Form 6 and complete recovery fields.\n4. Watch Capacity (80% warn / 100% block).\n5. Submit for admin review or Issue when permitted.",
+      "tips": "Category split must equal billing weight. Clients download approved Form 6 only — never MRN.",
+      "file": "13-form6-form.png"
+    },
+    {
+      "id": "approve-form6",
+      "title": "Step 14 — Approve & release Form 6",
+      "howTo": "1. When Factory submitted Form 6 for review, open the Admin review card.\n2. Click Approve & release Form 6 (or return to factory with a reason).\n3. Client is notified when Form 6 is released; CoD upload unlocks after approval.",
+      "tips": "Do not upload CoD before Form 6 is approved.",
+      "file": "14-approve-form6.png"
+    },
+    {
+      "id": "upload-certificate",
+      "title": "Step 15 — Upload Certificate of Destruction",
+      "howTo": "1. After Form 6 is approved, click Upload Certificate.\n2. Enter a unique certificate number and certificate date.\n3. Attach the signed CoD PDF.\n4. Super Admin may historical-backdate CoD dates from 2026-04-01.\n5. Upload & email certificate.",
+      "tips": "Never reuse certificate numbers across the system.",
+      "file": "15-upload-certificate.png"
+    },
+    {
+      "id": "record-payment",
+      "title": "Step 16 — Record Payment",
+      "howTo": "1. Click + Record Payment on the invoice panel.\n2. Enter UTR / reference, amount, mode, and payment date.\n3. Capture TDS if applicable.\n4. Super Admin may historical-backdate payment dates from 2026-04-01.\n5. Save — client still cannot close until CoD + payment are both complete.",
+      "tips": "Record real bank references only. Payment does not block Form 6 / CoD, but close requires both.",
+      "file": "16-record-payment.png"
+    },
+    {
+      "id": "ready-to-close",
+      "title": "Step 17 — Ready for client Review & Close",
+      "howTo": "1. Confirm CoD and payment appear on the invoice panel.\n2. Hand off to the Client User: Review & Close → Acknowledge closure.\n3. Client Read Only can download Form 6 / CoD but cannot close.\n4. Verify Audit later for certificate, payment, and close events.",
+      "tips": "Super Admin does not normally close for the client — leave Stage 9 to the Client User.",
+      "file": "17-ready-to-close.png"
+    },
+    {
+      "id": "client-review-close",
+      "title": "Step 18 — Client Review & Close (hand-off demo)",
+      "howTo": "1. Client opens the request when CoD + payment are complete.\n2. Clicks Review & Close and acknowledges closure.\n3. Stage moves to Closed (Stage 9).\n4. Shown here so Super Admin trainers can teach the hand-off end-to-end.",
+      "tips": "This is a Client User action on the normal path.",
+      "file": "18-client-review-close.png"
+    },
+    {
+      "id": "requests-queue",
+      "title": "Step 19 — Requests queue across stages",
+      "howTo": "1. Open Requests.\n2. Scan stage badges and invoice mini-badges.\n3. Filter or search for work by stage or REQ- id.\n4. Prefer seeded or training REQ- ids for classroom demos.",
+      "tips": "Walk one request carefully before bulk practice.",
+      "file": "19-requests-queue.png"
+    },
+    {
+      "id": "capacity",
+      "title": "Step 20 — Capacity oversight",
+      "howTo": "1. Open Capacity.\n2. Review utilisation across factories and categories.\n3. Support Factory when an override is justified and documented.\n4. Prefer routing to another plant over chronic overrides.",
+      "tips": "Overrides are audited.",
+      "file": "20-capacity.png"
+    },
+    {
+      "id": "heroes",
+      "title": "Step 21 — Recycling Heroes",
+      "howTo": "1. Open Recycling Heroes.\n2. Review organisation tonnage and planting milestones.\n3. Record planting when authorised (photos, location, counts).",
+      "tips": "Keep photo evidence for CSR storytelling.",
+      "file": "21-heroes.png"
+    },
+    {
+      "id": "sustainability",
+      "title": "Step 22 — Sustainability",
+      "howTo": "1. Open Sustainability.\n2. Review recycled weight and impact figures.\n3. Use methodology notes when preparing client packs.",
+      "tips": "In-progress pickups should not inflate closed impact.",
+      "file": "22-sustainability.png"
     },
     {
       "id": "reports",
-      "title": "Step 13 — Operational and compliance reports",
-      "howTo": "1. Open Reports.\n2. Run Request Summary, Complete Request Summary, Invoice Register, Sustainability, Heroes, Serials, Form 6 Log, Certificate Log as needed.\n3. Set FY / period filters and export CSV or PDF.\n4. Cross-check figures against a known closed REQ- during training.\n5. When preparing client-facing exports, ensure tenancy filters are correct — Factory MRN data must not leak to clients.",
-      "tips": "Exports may contain multi-client data. Store them securely and share only what the recipient is entitled to see.",
-      "file": "13-reports.png"
+      "title": "Step 23 — Reports and exports",
+      "howTo": "1. Open Reports.\n2. Run Request Summary, Invoice Register, Form 6 Log, Certificate Log, Sustainability, Heroes, Serials as needed.\n3. Set FY / period filters and export CSV or PDF.\n4. Ensure tenancy filters are correct for client-facing packs.",
+      "tips": "Exports may contain multi-client data — store securely.",
+      "file": "23-reports.png"
     },
     {
       "id": "masters",
-      "title": "Step 14 — Masters administration",
-      "howTo": "1. Open Masters.\n2. Use tabs: Users, Clients, Sites, Factories, Categories, Lookups, Email, Company as available.\n3. Prefer deactivating referenced sites instead of deleting them.\n4. Letterhead / company profile feeds Form 6 and MRN PDFs — verify GST and address before save.",
-      "tips": "Never disable your own Super Admin account. Prefer throwaway users for password-lockout drills.",
-      "file": "14-masters.png"
+      "title": "Step 24 — Masters administration",
+      "howTo": "1. Open Masters.\n2. Use tabs: Users, Clients, Sites, Factories, Categories, Lookups, Email, Company.\n3. Prefer deactivating referenced sites instead of deleting them.\n4. Letterhead feeds Form 6 and MRN PDFs — verify GST and address.",
+      "tips": "Never disable your own Super Admin account.",
+      "file": "24-masters.png"
     },
     {
       "id": "masters-users",
-      "title": "Step 14b — Users: client_readonly and auditor roles",
-      "howTo": "1. Open the Users tab.\n2. Create or edit users carefully — welcome emails include temporary passwords (share out-of-band only).\n3. Role Client Read Only: can view requests and download Form 6 / Certificate of Destruction; cannot raise or close requests.\n4. Role Auditor: Urbeno @urbeno.in read-only across clients — reports / audit-style visibility without mutating lifecycle.\n5. Other roles: Super Admin, Operations Manager, Factory Manager, Client User.\n6. Password reset: Edit user → Reset / regenerate → communicate temporary password securely; user must change it on next login.",
-      "tips": "Staff and auditor emails must be @urbeno.in. Password reset signs the user out of all sessions and is audited.",
-      "file": "15-masters-users.png"
+      "title": "Step 25 — Users (roles including client_readonly / auditor)",
+      "howTo": "1. Open the Users tab.\n2. Create/edit users carefully — welcome emails include temporary passwords.\n3. Roles: Super Admin, Operations, Factory, Client User, Client Read Only, Auditor.\n4. Client Read Only: view + Form 6/CoD download; cannot raise or close.\n5. Auditor: @urbeno.in read-only across clients.\n6. Password reset: Edit → Reset → share temporary password out-of-band.",
+      "tips": "Staff and auditor emails must be @urbeno.in. Resets are audited.",
+      "file": "25-masters-users.png"
+    },
+    {
+      "id": "audit",
+      "title": "Step 26 — Audit trail",
+      "howTo": "1. Open Audit.\n2. Filter by request id, actor, action, or date range.\n3. Confirm lifecycle events: ack, vehicle, weigh, invoice, MRN, Form 6, certificate, payment, close.",
+      "tips": "If an expected event is missing, investigate before production sign-off.",
+      "file": "26-audit.png"
+    },
+    {
+      "id": "compliance",
+      "title": "Step 27 — Compliance registers",
+      "howTo": "1. Open Compliance.\n2. Review privacy, DSR, incidents, access reviews, and control status.\n3. Confirm factory and client users cannot open this area.",
+      "tips": "Compliance is Super Admin only — a factory/client reaching it is a Blocker.",
+      "file": "27-compliance.png"
     },
     {
       "id": "profile",
-      "title": "Step 15 — Profile, MFA, and letterhead",
-      "howTo": "1. Open Profile.\n2. Confirm Role is Urbeno Admin / Super Admin.\n3. Enrol or manage Two-factor authentication (mandatory for privileged staff).\n4. Update password per policy when required (length + complexity).\n5. Edit Urbeno letterhead / company details if shown — these print on Form 6 and MRN.",
-      "tips": "Letterhead mistakes appear on legal PDFs. Keep a break-glass second Super Admin for MFA recovery.",
-      "file": "16-profile.png"
+      "title": "Step 28 — Profile, MFA, and letterhead",
+      "howTo": "1. Open Profile.\n2. Confirm Role is Super Admin.\n3. Enrol or manage Two-factor authentication.\n4. Update password per policy when required.\n5. Edit Urbeno letterhead / company details if shown.",
+      "tips": "Letterhead mistakes appear on legal PDFs.",
+      "file": "28-profile.png"
     },
     {
       "id": "signed-out",
-      "title": "Step 15b — Sign out",
-      "howTo": "1. Click Logout / Sign out.\n2. Confirm the Sign In screen appears.\n3. Lock the workstation if stepping away mid-session instead of leaving the portal open.",
-      "tips": "Admin sessions can change production masters — treat them like production console access.",
-      "file": "17-signed-out.png"
+      "title": "Step 29 — Sign out",
+      "howTo": "1. Click Logout / Sign out.\n2. Confirm the Sign In screen appears.\n3. Lock the workstation if stepping away mid-session.",
+      "tips": "Admin sessions can change production masters — treat them like console access.",
+      "file": "29-signed-out.png"
     }
   ]
 }

@@ -234,3 +234,46 @@ export async function withBrowser(fn) {
 export function writeManifest(outDir, data) {
   fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(data, null, 2));
 }
+
+/** Shared e2e fixtures for weighment / MRN / CoD uploads during training captures. */
+export function fixturePaths() {
+  const fixtures = path.join(root, 'apps/web/e2e/fixtures');
+  return {
+    photo: path.join(fixtures, 'sample.jpg'),
+    pdf: path.join(fixtures, 'sample.pdf'),
+  };
+}
+
+export async function logout(page, base) {
+  // Training captures often leave a modal open — dismiss before Logout.
+  for (let i = 0; i < 3; i++) {
+    const modal = page.locator('.modal-bg, .modal').first();
+    if (!(await modal.isVisible({ timeout: 400 }).catch(() => false))) break;
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(300);
+  }
+  const btn = page.getByRole('button', { name: /log\s*out|sign\s*out/i }).first();
+  if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await btn.click({ force: true });
+    await page.waitForTimeout(900);
+    return;
+  }
+  await page.goto(base + '/', { waitUntil: 'networkidle' }).catch(() => {});
+}
+
+export async function fillPhone(page, labelOrLocator, digits) {
+  const field =
+    typeof labelOrLocator === 'string'
+      ? page.getByLabel(new RegExp(labelOrLocator, 'i')).first()
+      : labelOrLocator;
+  if (await field.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await field.fill(digits);
+    return;
+  }
+  const phone = page.locator('input[inputmode="tel"], input[type="tel"]').first();
+  if (await phone.isVisible().catch(() => false)) await phone.fill(digits);
+}
+
+export async function waitToast(page, text, timeout = 15000) {
+  await page.getByText(text).first().waitFor({ state: 'visible', timeout }).catch(() => {});
+}

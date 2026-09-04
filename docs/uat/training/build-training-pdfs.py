@@ -178,16 +178,13 @@ def add_step(pdf: TrainingPDF, index: int, step: dict, shots: Path):
 
     tips = step.get("tips") or ""
     if tips:
-        y0 = pdf.get_y()
         pdf.set_fill_color(*TIP_BG)
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(*INK)
-        # Estimate tip box height roughly
         pdf.multi_cell(pdf.epw, 4.4, safe("Tip: " + tips), fill=True)
         pdf.ln(3)
 
     img = shots / step["file"]
-    # Prefer jpg if present
     jpg = img.with_suffix(".jpg")
     path = jpg if jpg.exists() else img
     if not path.exists():
@@ -195,11 +192,17 @@ def add_step(pdf: TrainingPDF, index: int, step: dict, shots: Path):
         pdf.cell(0, 8, f"(Screenshot missing: {step['file']})")
         return
 
+    # If little room remains for the screenshot, continue on a fresh page
     max_w = pdf.epw
     max_h = pdf.h - pdf.get_y() - 18
-    if max_h < 40:
+    if max_h < 70:
         pdf.add_page()
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(*MUTED)
+        pdf.cell(0, 5, safe(f"(Screenshot for: {title})"), new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
         max_h = pdf.h - pdf.get_y() - 18
+
     w, h = fit_image(path, max_w, max_h)
     x = pdf.l_margin + (max_w - w) / 2
     pdf.image(str(path), x=x, y=pdf.get_y(), w=w, h=h)

@@ -1,46 +1,41 @@
 # Urb TecTrack — Role-wise end-user training guides
 
-Visual training packs with **elaborated steps**, **tips**, and **full-page screenshots** for each signed-in role.  
+Visual training packs with **elaborated steps**, **tips**, and a **screenshot for every step**.  
 **No usernames or passwords** are printed — credentials are issued separately by the system.
 
-**Document control:** Version 1 · Production portal **https://tectrack.urbeno.in**
+**Document control:** Version 1 · Production portal **https://tectrack.urbeno.in**  
+Guides are intentionally long (multi-page) so classroom and self-paced training can follow the **complete lifecycle**.
 
-| Guide | Audience | Capture script | PDF |
-|-------|----------|----------------|-----|
-| Client User | Waste generator / requestor | `capture-client.mjs` | [Urb-TecTrack-Client-User-Training-Guide-v1.pdf](./client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf) |
-| Factory Manager | Facility MRN / Form 6 | `capture-factory.mjs` | [Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf](./factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf) |
-| Operations Manager | Acknowledge / vehicles / weighment / reports | `capture-operations.mjs` | [Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf](./operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf) |
-| Super Admin | Full lifecycle, Masters, Audit, Compliance | `capture-admin.mjs` | [Urb-TecTrack-Admin-Training-Guide-v1.pdf](./admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf) |
-| Super Admin — complete lifecycle | Classroom walkthrough (ack → vehicle backdate → invoice → Form 6 → CoD → Masters) | `capture-lifecycle-admin.mjs` | [Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf](./lifecycle-admin/Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf) |
+| Guide | Audience | Steps (approx.) | PDF |
+|-------|----------|-----------------|-----|
+| Client User | Waste generator / requestor | ~14 | [Urb-TecTrack-Client-User-Training-Guide-v1.pdf](./client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf) |
+| Factory Manager | Facility MRN / Form 6 | ~11 | [Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf](./factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf) |
+| Operations Manager | Acknowledge / vehicles / weighment | ~14 | [Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf](./operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf) |
+| Super Admin (day-to-day) | Masters, Audit, Compliance + lifecycle controls | ~20 | [Urb-TecTrack-Admin-Training-Guide-v1.pdf](./admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf) |
+| **Super Admin — complete lifecycle** | End-to-end mock walkthrough (every form) | **~29** | [Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf](./lifecycle-admin/Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf) |
 
-**Lifecycle pack** covers acknowledge → Assign Vehicle (with Super Admin historical backdate from **2026-04-01**) → weighment context → invoice → MRN hand-off → Form 6 → CoD → client close hand-off → reports → Masters (including **client_readonly** / **auditor**) → profile. The four day-to-day role PDFs remain the primary guides.
+### What the lifecycle guide covers (screenshot per step)
 
-Detailed markdown manuals (Version 1) also live under [`docs/production/training/`](../../production/training/).
+Staff new request (historical backdate) → Stage 1 detail → Acknowledge → Assign Vehicle (backdate) → vehicle listed → Weighment form → Loading complete → Raise Invoice → invoice panel → Create MRN → Form 6 → Approve Form 6 → Upload CoD → Record Payment → client Review & Close → Requests / Capacity / Heroes / Sustainability / Reports / Masters / Users / Audit / Compliance / Profile / Sign out.
+
+Markdown manuals: [`docs/production/training/`](../../production/training/).
 
 Support: **info@urbeno.in**
 
 ## Recapture screenshots
 
-Requires a running portal (local Docker UAT recommended; `E2E_TEST=true` skips forced MFA enrol so captures can proceed). Credentials via env only — never commit them.
+Requires local Docker UAT (`E2E_TEST=true` recommended so MFA enrol does not block automation).
 
 ```bash
-export BASE_URL=http://localhost:8080   # or https://tectrack.urbeno.in
-# optional overrides: TEST_EMAIL / TEST_PASSWORD (issued separately)
+export BASE_URL=http://localhost:8080
+export PLAYWRIGHT_CHANNEL=chrome
 
-node docs/uat/training/capture-client.mjs
-node docs/uat/training/capture-factory.mjs
-node docs/uat/training/capture-operations.mjs
+node docs/uat/training/capture-lifecycle-admin.mjs   # creates a fresh mock REQ and walks stages 1–9
 node docs/uat/training/capture-admin.mjs
-node docs/uat/training/capture-lifecycle-admin.mjs
-```
-
-## Rebuild PDFs
-
-```bash
-export BASE_URL=https://tectrack.urbeno.in   # or local Docker
-# optional: re-capture screenshots with capture-*.mjs first
+node docs/uat/training/capture-operations.mjs
+node docs/uat/training/capture-factory.mjs
+node docs/uat/training/capture-client.mjs
 .venv-pdf/bin/python docs/uat/training/build-training-pdfs.py
-# or one role: .venv-pdf/bin/python docs/uat/training/build-training-pdfs.py client
 ```
 
-Shared Playwright helpers live in `_capture-lib.mjs`. Manifests use portal **https://tectrack.urbeno.in**, version **1**, and must not contain passwords.
+Shared helpers: `_capture-lib.mjs`. Fixtures: `apps/web/e2e/fixtures/sample.jpg` and `sample.pdf`.
