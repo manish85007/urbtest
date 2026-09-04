@@ -188,7 +188,7 @@ export async function mastersRoutes(app: FastifyInstance) {
     if (!factoryInScope(actor, factoryId) && actor.role !== 'admin') {
       return reply.forbidden('Access denied.');
     }
-    if (actor.role === 'client') {
+    if (actor.role === 'client' || actor.role === 'client_readonly') {
       return reply.forbidden('Access denied.');
     }
 

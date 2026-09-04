@@ -48,7 +48,7 @@ class TrainingPDF(FPDF):
             return
         self.set_font("Helvetica", "", 8)
         self.set_text_color(*MUTED)
-        self.cell(0, 6, safe(f"Urb TecTrack  |  {self.role_label} Training Guide  |  Confidential"), align="L")
+        self.cell(0, 6, safe(f"Urb TecTrack  |  {self.role_label} Training Guide v1  |  Confidential"), align="L")
         self.ln(3)
         self.set_draw_color(*RULE)
         self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
@@ -98,8 +98,10 @@ def add_cover(pdf: TrainingPDF, data: dict):
     pdf.ln(10)
     pdf.set_font("Helvetica", "", 11)
     pdf.set_text_color(*INK)
+    version = data.get("version") or data.get("documentControl") or "Version 1"
     for line in [
-        f"Portal:  {data.get('portal', 'https://uat.urbeno.in')}",
+        f"Version:  {version}",
+        f"Portal:  {data.get('portal', 'https://tectrack.urbeno.in')}",
         "Sign-in:  issued separately by Urb TecTrack (not listed here)",
         "Support:  info@urbeno.in",
         "Format:  screenshot + detailed how-to for each step",
@@ -236,9 +238,10 @@ def build_role(role: str):
     out = role_dir / f"Urb-TecTrack-{role.capitalize()}-Training-Guide.pdf"
     # nicer names
     names = {
-        "client": "Urb-TecTrack-Client-User-Training-Guide.pdf",
-        "factory": "Urb-TecTrack-Factory-Manager-Training-Guide.pdf",
-        "admin": "Urb-TecTrack-Admin-Training-Guide.pdf",
+        "client": "Urb-TecTrack-Client-User-Training-Guide-v1.pdf",
+        "factory": "Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf",
+        "admin": "Urb-TecTrack-Admin-Training-Guide-v1.pdf",
+        "operations": "Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf",
     }
     out = role_dir / names.get(role, out.name)
     pdf.output(str(out))
@@ -247,7 +250,7 @@ def build_role(role: str):
 
 
 def main():
-    roles = sys.argv[1:] or ["client", "factory", "admin"]
+    roles = sys.argv[1:] or ["client", "factory", "admin", "operations"]
     for role in roles:
         build_role(role)
 

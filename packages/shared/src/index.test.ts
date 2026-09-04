@@ -4,7 +4,7 @@ import { invStage, subStage, viewPhaseForStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
 import { formatE164, isValidNational10, national10 } from './phone.js';
-import { isPastCalendarDate, localYmd } from './calendar-date.js';
+import { isPastCalendarDate, localYmd, requestDateError, HISTORICAL_REQUEST_FROM } from './calendar-date.js';
 
 describe('fiscal year', () => {
   it('uses April–March boundaries', () => {
@@ -85,5 +85,14 @@ describe('pick-up calendar date', () => {
     expect(isPastCalendarDate('2026-08-18', now)).toBe(true);
     expect(isPastCalendarDate('2026-08-19', now)).toBe(false);
     expect(isPastCalendarDate('2026-08-20', now)).toBe(false);
+  });
+
+  it('allows Super Admin historical backdate from 1 Apr 2026', () => {
+    const now = new Date(2026, 8, 4, 12, 0, 0);
+    expect(requestDateError('2026-04-01', true, now)).toBeNull();
+    expect(requestDateError('2026-05-15', true, now)).toBeNull();
+    expect(requestDateError('2026-03-31', true, now)).toMatch(/before/);
+    expect(requestDateError('2026-08-18', false, now)).toMatch(/past/);
+    expect(HISTORICAL_REQUEST_FROM).toBe('2026-04-01');
   });
 });

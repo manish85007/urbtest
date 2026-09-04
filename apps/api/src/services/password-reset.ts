@@ -81,6 +81,12 @@ export async function confirmPasswordReset(emailRaw: string, code: string, newPa
   await prisma.$transaction([
     prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
     prisma.session.deleteMany({ where: { userId: user.id } }),
+    // Reset must unlock the account — otherwise users who reset while locked
+    // still cannot sign in and conclude "password reset does not work".
+    prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginCount: 0, lockedUntil: null },
+    }),
   ]);
 
   await auditLog({

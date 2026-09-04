@@ -1,6 +1,11 @@
 import { Prisma, UserRole } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
-import { gstinError, treesEarned } from '@urb-tectrack/shared';
+import {
+  gstinError,
+  isClientPortalRole,
+  requiresUrbenoEmail,
+  treesEarned,
+} from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
@@ -10,6 +15,19 @@ import { sendTransactionalEmail } from './email.js';
 import { recordSecurityEvent } from './security-log.js';
 
 const RESERVED_CLIENT_PREFIX = /^(URB|ADM|SYS|TEST)/;
+const URBENO_EMAIL = /@urbeno\.in$/i;
+
+function assertRoleConstraints(role: UserRole, email: string, clientId?: string | null) {
+  if (requiresUrbenoEmail(role) && !URBENO_EMAIL.test(email)) {
+    throw new AppError(`${role} accounts must use an @urbeno.in email address.`);
+  }
+  if (isClientPortalRole(role) && !clientId) {
+    throw new AppError('Select which client this user belongs to.');
+  }
+  if (role === 'auditor' && clientId) {
+    throw new AppError('Auditor accounts are Urbeno-wide and cannot be linked to a client.');
+  }
+}
 
 export type SiteInput = {
   code: string;
@@ -225,13 +243,12 @@ export async function createUser(
   const email = input.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new AppError(`A user with email ${email} already exists.`);
-  if (input.role === 'client' && !input.clientId) {
-    throw new AppError('Select which client this user belongs to.');
-  }
+  assertRoleConstraints(input.role, email, input.clientId);
 
   const tmp = input.password?.trim() || tempPassword();
   await assertPasswordPolicy(email, tmp);
   const passwordHash = await hashPassword(tmp);
+  const portalClient = isClientPortalRole(input.role);
 
   const user = await prisma.user.create({
     data: {
@@ -241,9 +258,9 @@ export async function createUser(
       passwordHash,
       passwordSetAt: new Date(),
       mustReset: true,
-      clientId: input.role === 'client' ? input.clientId ?? null : null,
+      clientId: portalClient ? input.clientId ?? null : null,
       factoryIds: input.role === 'factory' ? input.factoryIds ?? [] : [],
-      siteIds: input.role === 'client' ? input.siteIds ?? [] : [],
+      siteIds: portalClient ? input.siteIds ?? [] : [],
       featureAccess: input.featureAccess ?? Prisma.JsonNull,
     },
   });
@@ -547,14 +564,29 @@ export async function updateUser(
     await applyTempPassword(existing.id, existing.email, input.password.trim());
   }
 
+  const nextRole = input.role ?? existing.role;
+  const nextClientId = input.clientId !== undefined ? input.clientId : existing.clientId;
+  assertRoleConstraints(nextRole, existing.email, nextClientId);
+  const portalClient = isClientPortalRole(nextRole);
+
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
       name: input.name?.trim() || undefined,
       role: input.role,
-      clientId: input.clientId === undefined ? undefined : input.clientId,
+      clientId: input.role !== undefined || input.clientId !== undefined
+        ? portalClient
+          ? nextClientId
+          : null
+        : undefined,
       factoryIds: input.factoryIds,
-      siteIds: input.siteIds,
+      siteIds: input.siteIds !== undefined
+        ? portalClient
+          ? input.siteIds
+          : []
+        : input.role !== undefined && !portalClient
+          ? []
+          : undefined,
       active: input.active,
       featureAccess: input.featureAccess === undefined ? undefined : (input.featureAccess ?? Prisma.JsonNull),
     },

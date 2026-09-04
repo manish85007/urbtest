@@ -50,8 +50,9 @@ export async function notifyStaff(kind: string, text: string, link?: string) {
 }
 
 export async function notifyClientUsers(clientId: string, kind: string, text: string, link?: string) {
+  // Client Read Only users do not receive operational / new-request notifications.
   const users = await prisma.user.findMany({
-    where: { clientId, active: true },
+    where: { clientId, active: true, role: 'client' },
     select: { email: true },
   });
   await notifyUsers(

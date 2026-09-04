@@ -83,7 +83,7 @@ export function InvoiceLifecyclePanel({
     manageInvoices: userCan(user, 'manageInvoices'),
     uploadCertificate: userCan(user, 'uploadCertificate'),
   };
-  const isClient = user.role === 'client';
+  const isClient = userCan(user, 'closeAsClient');
   const paymentModes = useLookups('paymentMode');
   const taxRates = useLookups('taxRate');
   const [panel, setPanel] = useState<'pay' | 'pay-edit' | 'mrn' | 'recy' | 'cod' | 'close' | null>(null);

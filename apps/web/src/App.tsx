@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { authApi, type SecurityStatus, type SessionUser } from './api';
+import { isClientPortalRole } from '@urb-tectrack/shared';
 import { LogoIcon } from './components/BrandMark';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -24,12 +25,17 @@ import { PasswordMustChangeGate } from './components/PasswordMustChangeGate';
 import { MfaEnrolGate } from './components/MfaEnrolGate';
 
 function StaffOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
-  if (user.role === 'client') return <Navigate to="/" replace />;
+  if (isClientPortalRole(user.role)) return <Navigate to="/" replace />;
   return children;
 }
 
 function AdminOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
   if (user.role !== 'admin') return <Navigate to="/" replace />;
+  return children;
+}
+
+function AdminOrAuditor({ user, children }: { user: SessionUser; children: ReactNode }) {
+  if (user.role !== 'admin' && user.role !== 'auditor') return <Navigate to="/" replace />;
   return children;
 }
 
@@ -198,17 +204,17 @@ export function App() {
         <Route
           path="/audit"
           element={
-            <AdminOnly user={user}>
+            <AdminOrAuditor user={user}>
               <AuditPage />
-            </AdminOnly>
+            </AdminOrAuditor>
           }
         />
         <Route
           path="/compliance"
           element={
-            <AdminOnly user={user}>
+            <AdminOrAuditor user={user}>
               <CompliancePage />
-            </AdminOnly>
+            </AdminOrAuditor>
           }
         />
         <Route path="/profile" element={<ProfilePage user={user} />} />

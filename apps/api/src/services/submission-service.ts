@@ -12,11 +12,16 @@ import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
 import { notifyAdmins, notifyClientUsers, notifyUsers } from './notifications.js';
 import { notifyClient, notifyStaffNewRequest } from './submission-notify.js';
-import { isPastCalendarDate } from '@urb-tectrack/shared';
+import { hasPermission, isClientMutatorRole, isClientPortalRole, isPastCalendarDate, requestDateError } from '@urb-tectrack/shared';
 import {
   logSubmissionLifecycle,
   summarizeSubmissionChanges,
 } from './submission-lifecycle.js';
+
+function assertRequestPickupDate(actor: SessionUser, requestDate: string) {
+  const err = requestDateError(requestDate, hasPermission(actor.role, 'backdateRequests'));
+  if (err) throw new AppError(err);
+}
 
 const PLACEHOLDER_ITEM = 'Mixed e-waste (see attached BoM)';
 
@@ -77,7 +82,10 @@ function linesForCreate(
 
 export async function createSubmission(actor: SessionUser, input: CreateSubmissionInput) {
   const clientId = input.clientId.trim().toUpperCase();
-  if (actor.role === 'client') {
+  if (isClientPortalRole(actor.role)) {
+    if (!isClientMutatorRole(actor.role)) {
+      throw new AppError('Your account is view-only and cannot raise pickup requests.', 403);
+    }
     if (actor.clientId !== clientId) {
       throw new AppError('You can only raise requests for your own organisation.');
     }
@@ -102,9 +110,7 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
   if (!location || !input.requestDate || !approxQty || !approxWeight) {
     throw new AppError('Site, location, date, approximate quantity and weight are all required.');
   }
-  if (isPastCalendarDate(input.requestDate)) {
-    throw new AppError('Pick-up request date cannot be in the past. Choose today or a future date.');
-  }
+  assertRequestPickupDate(actor, input.requestDate);
   if (input.bomFileId || input.bomFileIds?.length) {
     await assertFilesExist(bomIdsFrom(input), ['bom']);
   }
@@ -112,7 +118,7 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
   const lines = linesForCreate(input.items, bomIds[0], approxQty, approxWeight);
 
   let onBehalfOf: string | null = null;
-  if (actor.role !== 'client' && input.onBehalfOf?.trim()) {
+  if (!isClientPortalRole(actor.role) && input.onBehalfOf?.trim()) {
     const email = input.onBehalfOf.trim().toLowerCase();
     const requestor = await prisma.user.findFirst({
       where: {
@@ -167,7 +173,14 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
     action: 'sub.create',
     entity: 'submission',
     entityId: sub.id,
-    details: { clientId, siteId: site.id, approxWeight: input.approxWeight ?? 0 },
+    details: {
+      clientId,
+      siteId: site.id,
+      approxWeight: input.approxWeight ?? 0,
+      ...(isPastCalendarDate(input.requestDate)
+        ? { historicalBackdate: true, requestDate: input.requestDate }
+        : {}),
+    },
   });
 
   await logSubmissionLifecycle(
@@ -337,7 +350,7 @@ export async function updateSubmission(
   }
   if (actor.role === 'admin') {
     requirePermission(actor, 'editRequestAsStaff');
-  } else if (actor.role === 'client') {
+  } else if (isClientMutatorRole(actor.role)) {
     if (stage !== 1) {
       throw new AppError('Only a new request can be edited.');
     }
@@ -366,12 +379,12 @@ export async function updateSubmission(
   }
   if (input.requestDate) {
     const previous = sub.requestDate.toISOString().slice(0, 10);
-    if (input.requestDate.slice(0, 10) !== previous && isPastCalendarDate(input.requestDate)) {
-      throw new AppError('Pick-up request date cannot be in the past. Choose today or a future date.');
+    if (input.requestDate.slice(0, 10) !== previous) {
+      assertRequestPickupDate(actor, input.requestDate);
     }
   }
 
-  const isClientResubmit = actor.role === 'client' && !!sub.rejectNote;
+  const isClientResubmit = isClientMutatorRole(actor.role) && !!sub.rejectNote;
   if (isClientResubmit) {
     const responseNote = input.responseNote?.trim();
     if (!responseNote) {
@@ -401,9 +414,9 @@ export async function updateSubmission(
       bomFileIds: input.bomFileIds !== undefined ? input.bomFileIds : undefined,
       siteId: input.siteId,
       requestDate: input.requestDate ? new Date(input.requestDate) : undefined,
-      rejectNote: actor.role === 'client' ? null : undefined,
-      rejectAt: actor.role === 'client' ? null : undefined,
-      rejectBy: actor.role === 'client' ? null : undefined,
+      rejectNote: isClientMutatorRole(actor.role) ? null : undefined,
+      rejectAt: isClientMutatorRole(actor.role) ? null : undefined,
+      rejectBy: isClientMutatorRole(actor.role) ? null : undefined,
       ...(nextItems
         ? {
             items: {
@@ -447,7 +460,7 @@ export async function updateSubmission(
     );
   }
 
-  if (actor.role === 'client') {
+  if (isClientMutatorRole(actor.role)) {
     await notifyAdmins(
       'sub.resubmit',
       `Request ${updated.id} updated by client${sub.rejectNote ? ' after changes were requested' : ''}`,

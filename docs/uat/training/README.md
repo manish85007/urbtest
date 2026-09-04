@@ -3,29 +3,23 @@
 Visual training packs with **elaborated steps**, **tips**, and **full-page screenshots** for each signed-in role.  
 **No usernames or passwords** are printed — credentials are issued separately by the system.
 
-| Guide | Audience | Steps | PDF |
-|-------|----------|-------|-----|
-| Client User | Waste generator / requestor | 11 | [Urb-TecTrack-Client-User-Training-Guide.pdf](./client/Urb-TecTrack-Client-User-Training-Guide.pdf) |
-| Factory Manager | Facility MRN / Form 6 | 8 | [Urb-TecTrack-Factory-Manager-Training-Guide.pdf](./factory/Urb-TecTrack-Factory-Manager-Training-Guide.pdf) |
-| Super Admin | Urbeno operations | 13 | [Urb-TecTrack-Admin-Training-Guide.pdf](./admin/Urb-TecTrack-Admin-Training-Guide.pdf) |
+**Document control:** Version 1 · Production portal **https://tectrack.urbeno.in**
 
-Portal: **https://uat.urbeno.in** · Support: **info@urbeno.in**
+| Guide | Audience | PDF |
+|-------|----------|-----|
+| Client User | Waste generator / requestor | [Urb-TecTrack-Client-User-Training-Guide-v1.pdf](./client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf) |
+| Factory Manager | Facility MRN / Form 6 | [Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf](./factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf) |
+| Operations Manager | Acknowledge / vehicles / weighment / reports | [Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf](./operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf) |
+| Super Admin | Full lifecycle, Masters, Audit, Compliance | [Urb-TecTrack-Admin-Training-Guide-v1.pdf](./admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf) |
 
-## What’s inside each PDF
+Detailed markdown manuals (Version 1) also live under [`docs/production/training/`](../../production/training/).
 
-1. Cover (role, audience, portal)  
-2. How to use + training agenda  
-3. One chapter per step: **What to do** (numbered), **Tip**, and a screenshot  
+Support: **info@urbeno.in**
 
-## Regenerate from live UAT
+## Regenerate PDFs
 
 ```bash
-# Local Docker UAT (or BASE_URL=https://uat.urbeno.in)
-export BASE_URL=http://localhost:8080
-node docs/uat/training/capture-client.mjs
-node docs/uat/training/capture-factory.mjs
-node docs/uat/training/capture-admin.mjs
+export BASE_URL=https://tectrack.urbeno.in   # or local Docker
+# optional: re-capture screenshots with capture-*.mjs
 .venv-pdf/bin/python docs/uat/training/build-training-pdfs.py
 ```
-
-Capture scripts sign in with env overrides if needed (`TEST_EMAIL` / `TEST_PASSWORD`) but redact profile PII in screenshots.

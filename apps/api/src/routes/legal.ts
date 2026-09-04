@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { attachSession, requireAuth, requireAdmin } from '../middleware/session.js';
+import { attachSession, requireAuth, requireAdminOrAuditor } from '../middleware/session.js';
 import {
   acceptLegalDocuments,
   getLegalDocument,
@@ -46,7 +46,7 @@ export async function auditRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
   // `/audit-log` — not `/audit`, which is the SPA route (same-origin prod build uses no /api prefix).
-  app.get('/audit-log', { preHandler: requireAdmin }, async (request) => {
+  app.get('/audit-log', { preHandler: requireAdminOrAuditor }, async (request) => {
     const q = request.query as {
       limit?: string;
       page?: string;

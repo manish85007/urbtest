@@ -56,7 +56,7 @@ export async function sendComplianceDocuments(
   }
 
   const users = await prisma.user.findMany({
-    where: { clientId: sub.clientId, active: true, role: 'client' },
+    where: { clientId: sub.clientId, active: true, role: { in: ['client', 'client_readonly'] } },
     select: { email: true },
   });
   const recipients = [

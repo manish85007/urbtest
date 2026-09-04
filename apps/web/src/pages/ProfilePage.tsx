@@ -13,6 +13,8 @@ const ROLE_LABEL: Record<SessionUser['role'], string> = {
   operations: roleLabel('operations'),
   factory: roleLabel('factory'),
   client: roleLabel('client'),
+  client_readonly: roleLabel('client_readonly'),
+  auditor: roleLabel('auditor'),
 };
 
 function initials(name: string) {

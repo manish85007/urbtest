@@ -66,7 +66,7 @@ export function QueryThread({
             !disabled &&
             q.status === 'open' &&
             ((q.fromRole === 'client' && isStaff && canManageQueries) ||
-              (q.fromRole === 'admin' && user.role === 'client'));
+              (q.fromRole === 'admin' && user.role === 'client' && userCan(user, 'raiseClientRequest')));
           return (
             <div
               key={q.id}

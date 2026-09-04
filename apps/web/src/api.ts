@@ -33,7 +33,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'operations' | 'factory' | 'client';
+  role: 'admin' | 'operations' | 'factory' | 'client' | 'client_readonly' | 'auditor';
   clientId: string | null;
   factoryIds?: string[];
   siteIds?: string[];
@@ -300,7 +300,7 @@ export interface UserRow {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'factory' | 'client' | string;
+  role: 'admin' | 'operations' | 'factory' | 'client' | 'client_readonly' | 'auditor' | string;
   clientId: string | null;
   factoryIds: string[];
   siteIds?: string[];
@@ -934,7 +934,7 @@ export const dataApi = {
   createUser: (body: {
     email: string;
     name: string;
-    role: 'admin' | 'operations' | 'factory' | 'client';
+    role: 'admin' | 'operations' | 'factory' | 'client' | 'client_readonly' | 'auditor';
     password?: string;
     clientId?: string | null;
     factoryIds?: string[];
@@ -1021,7 +1021,7 @@ export const dataApi = {
     id: string,
     body: {
       name?: string;
-      role?: 'admin' | 'operations' | 'factory' | 'client';
+      role?: 'admin' | 'operations' | 'factory' | 'client' | 'client_readonly' | 'auditor';
       clientId?: string | null;
       factoryIds?: string[];
       siteIds?: string[];

@@ -94,7 +94,7 @@ export function redactSubmissionForActor<T extends {
     recycling?: { reviewStatus?: string } | null;
   }>;
 }>(sub: T, actor: SessionUser): T {
-  if (isStaff(actor)) return sub;
+  if (isStaff(actor) || actor.role === 'auditor') return sub;
   return {
     ...sub,
     invoices: sub.invoices.map((inv) => ({

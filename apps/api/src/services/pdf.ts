@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SUSTAINABILITY, getFY, type ReportPeriod } from '@urb-tectrack/shared';
+import { SUSTAINABILITY, getFY, isClientPortalRole, type ReportPeriod } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { canSeeMrn } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
@@ -163,7 +163,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const recy = invoice.recycling;
   if (!recy) throw new AppError('This invoice has not been processed yet.');
-  if (actor.role === 'client' && recy.reviewStatus !== 'approved') {
+  if (isClientPortalRole(actor.role) && recy.reviewStatus !== 'approved') {
     throw new AppError('Form 6 is awaiting admin approval and is not available yet.');
   }
 
@@ -287,7 +287,7 @@ export async function impactPdf(
   period?: ReportPeriod,
   clientId?: string,
 ): Promise<{ filename: string; buffer: Buffer }> {
-  if (actor.role === 'client' && clientId && clientId !== actor.clientId) {
+  if (isClientPortalRole(actor.role) && clientId && clientId !== actor.clientId) {
     throw new AppError('You can only download your organisation’s impact certificate.');
   }
   const report = await getImpactReport(actor, undefined, period, clientId);
@@ -295,7 +295,7 @@ export async function impactPdf(
     throw new AppError('No completed submissions in this period — nothing to certify yet.');
   }
 
-  const scopedId = actor.role === 'client' ? actor.clientId : clientId;
+  const scopedId = isClientPortalRole(actor.role) ? actor.clientId : clientId;
   const clientName = scopedId
     ? (await prisma.client.findUnique({ where: { id: scopedId } }))?.name ?? 'Client'
     : report.clientName || 'Urbeno portfolio';

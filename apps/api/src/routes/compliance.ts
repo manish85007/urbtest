@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
+import { attachSession, requireAdmin, requireAdminOrAuditor, requireAuth } from '../middleware/session.js';
 import { isAppError } from '../lib/errors.js';
 import { verifyChain } from '../services/audit.js';
 import { listSecurityEvents } from '../services/security-log.js';
@@ -37,12 +37,12 @@ function fail(reply: { badRequest: (m: string) => unknown; status: (n: number) =
 export async function complianceRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
 
-  app.get('/compliance/controls', { preHandler: requireAdmin }, async () => ({
+  app.get('/compliance/controls', { preHandler: requireAdminOrAuditor }, async () => ({
     controls: await controlStatus(),
     stats: await consentStats(),
   }));
 
-  app.get('/compliance/security', { preHandler: requireAdmin }, async (request) => {
+  app.get('/compliance/security', { preHandler: requireAdminOrAuditor }, async (request) => {
     const q = request.query as Record<string, string | undefined>;
     return listSecurityEvents({
       kind: q.kind,
@@ -54,7 +54,7 @@ export async function complianceRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get('/compliance/reviews', { preHandler: requireAdmin }, async () => ({
+  app.get('/compliance/reviews', { preHandler: requireAdminOrAuditor }, async () => ({
     open: await openReview(),
     reviews: await listReviews(),
   }));
@@ -92,7 +92,7 @@ export async function complianceRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/compliance/incidents', { preHandler: requireAdmin }, async () => ({
+  app.get('/compliance/incidents', { preHandler: requireAdminOrAuditor }, async () => ({
     incidents: await listIncidents(),
   }));
 
@@ -138,7 +138,7 @@ export async function complianceRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/compliance/privacy', { preHandler: requireAdmin }, async () => {
+  app.get('/compliance/privacy', { preHandler: requireAdminOrAuditor }, async () => {
     const stats = await consentStats();
     const dsrs = await listDsrs();
     return { ...stats, dsrs };
@@ -170,7 +170,7 @@ export async function complianceRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/compliance/subject', { preHandler: requireAdmin }, async (request, reply) => {
+  app.get('/compliance/subject', { preHandler: requireAdminOrAuditor }, async (request, reply) => {
     const email = (request.query as { email?: string }).email;
     if (!email) return reply.badRequest('Record who made the request.');
     return subjectData(email);
@@ -185,7 +185,7 @@ export async function complianceRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/compliance/retention', { preHandler: requireAdmin }, async () => ({
+  app.get('/compliance/retention', { preHandler: requireAdminOrAuditor }, async () => ({
     register: await retentionRegister(),
     disposals: await listDisposals(),
     years: (await consentStats()).retentionYears,
@@ -208,11 +208,11 @@ export async function complianceRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/compliance/evidence', { preHandler: requireAdmin }, async (request) => {
+  app.get('/compliance/evidence', { preHandler: requireAdminOrAuditor }, async (request) => {
     return evidencePack(request.user!);
   });
 
-  app.get('/compliance/audit-chain', { preHandler: requireAdmin }, async () => verifyChain());
+  app.get('/compliance/audit-chain', { preHandler: requireAdminOrAuditor }, async () => verifyChain());
 
   app.get('/compliance/forbidden-check', { preHandler: requireAuth }, async (request, reply) => {
     if (request.user!.role !== 'admin') {

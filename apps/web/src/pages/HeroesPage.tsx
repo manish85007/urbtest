@@ -23,7 +23,7 @@ interface HeroesPageProps {
 }
 
 export function HeroesPage({ user }: HeroesPageProps) {
-  if (user.role === 'client') return <HeroesClient user={user} />;
+  if (user.role === 'client' || user.role === 'client_readonly') return <HeroesClient user={user} />;
   return <HeroesAdmin />;
 }
 

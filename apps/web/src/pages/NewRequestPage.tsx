@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { HISTORICAL_REQUEST_FROM, earliestRequestDate, isClientPortalRole } from '@urb-tectrack/shared';
 import { dataApi, lifecycleApi, type SessionUser } from '../api';
 import { FileUpload } from '../components/FileUpload';
 import { DateField } from '../components/DateField';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { Modal } from '../components/Modal';
 import { todayIso } from '../lib/format';
+import { userCan } from '../lib/permissions';
 
 const BOM_MAX_MB = 10;
 
 export function NewRequestPage({ user }: { user: SessionUser }) {
   const nav = useNavigate();
+  const canCreate = userCan(user, 'raiseClientRequest') || userCan(user, 'createRequestAsStaff');
+  const canBackdate = userCan(user, 'backdateRequests');
+  const minPickup = earliestRequestDate(canBackdate);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [sites, setSites] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [clientId, setClientId] = useState(user.clientId ?? '');
@@ -51,7 +56,7 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
   }, [clientId]);
 
   useEffect(() => {
-    if (user.role === 'client' || !clientId || !siteId) {
+    if (isClientPortalRole(user.role) || !clientId || !siteId) {
       setPortalUsers([]);
       setOnBehalfOf('');
       return;
@@ -83,8 +88,12 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
       setError('Site, location, date, approximate quantity and weight are all required.');
       return;
     }
-    if (requestDate < todayIso()) {
-      setError('Pick-up request date cannot be in the past. Choose today or a future date.');
+    if (requestDate < minPickup) {
+      setError(
+        canBackdate
+          ? `Pick-up request date cannot be before ${HISTORICAL_REQUEST_FROM} (historical upload window).`
+          : 'Pick-up request date cannot be in the past. Choose today or a future date.',
+      );
       return;
     }
     if (!named.length && !bomIds.length) {
@@ -115,6 +124,8 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
       setBusy(false);
     }
   }
+
+  if (!canCreate) return <Navigate to="/requests" replace />;
 
   return (
     <Modal
@@ -221,10 +232,16 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
             id="ns-date"
             label="Pick Up Request Date *"
             value={requestDate}
-            min={todayIso()}
+            min={minPickup}
             onChange={setRequestDate}
             required
           />
+          {canBackdate ? (
+            <p className="dim" style={{ fontSize: '.78rem', margin: '-.35rem 0 .5rem', gridColumn: '1 / -1' }}>
+              Super Admin historical upload: pick-up dates from {HISTORICAL_REQUEST_FROM} are allowed so FY
+              data can be loaded for clients.
+            </p>
+          ) : null}
           <div className="fg">
             <label htmlFor="ns-qty">Approx. Quantity (units) *</label>
             <input

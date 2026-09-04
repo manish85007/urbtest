@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authApi, filesApi, announcementsApi, type SessionUser, type AnnouncementRow } from '../api';
 import { navItems } from '../lib/nav';
+import { isClientPortalRole } from '@urb-tectrack/shared';
 import { portalSubtitle } from '../lib/roles';
 import { LogoIcon } from './BrandMark';
 import { GlobalSearch } from './GlobalSearch';
@@ -22,7 +23,7 @@ interface ShellProps {
 }
 
 function brandSub(user: SessionUser) {
-  if (user.role === 'client' && user.clientName) return user.clientName;
+  if (isClientPortalRole(user.role) && user.clientName) return user.clientName;
   return portalSubtitle(user.role, user.factoryIds ?? []);
 }
 
@@ -43,7 +44,7 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
   const sideRef = useRef<HTMLElement>(null);
   const burgerRef = useRef<HTMLButtonElement>(null);
   const showClientLogo =
-    user.role === 'client' && user.clientShowPortalLogo && !!user.clientLogoFileId;
+    isClientPortalRole(user.role) && user.clientShowPortalLogo && !!user.clientLogoFileId;
 
   useEffect(() => {
     const mq = window.matchMedia(NARROW_MQ);

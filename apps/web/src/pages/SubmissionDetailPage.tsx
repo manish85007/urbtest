@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL, settledPaise } from '@urb-tectrack/shared';
+import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL, settledPaise, earliestRequestDate, HISTORICAL_REQUEST_FROM } from '@urb-tectrack/shared';
 import {
   dataApi,
   filesApi,
@@ -90,10 +90,10 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
   }, [load]);
 
   useEffect(() => {
-    if (user.role === 'client' && sub?.derivedStage === 1 && sub.rejectNote) {
+    if (userCan(user, 'raiseClientRequest') && sub?.derivedStage === 1 && sub.rejectNote) {
       setStep({ kind: 'edit' });
     }
-  }, [user.role, sub?.id, sub?.derivedStage, sub?.rejectNote]);
+  }, [user, sub?.id, sub?.derivedStage, sub?.rejectNote]);
 
   useEffect(() => {
     if (!sub || searchParams.get('focus') !== 'serials') return;
@@ -165,7 +165,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
     step?.kind === 'invoice' && step.invoiceId
       ? sub.invoices.find((i) => i.id === step.invoiceId)
       : undefined;
-  const showResubmit = user.role === 'client' && stage === 1 && !!sub.rejectNote;
+  const showResubmit = userCan(user, 'raiseClientRequest') && stage === 1 && !!sub.rejectNote;
 
   return (
     <div>
@@ -251,7 +251,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               {sub.rejectBy ? ` · ${sub.rejectBy}` : ''}
             </div>
           ) : null}
-          {user.role === 'client' ? (
+          {userCan(user, 'raiseClientRequest') ? (
             <button
               type="button"
               className="btn bp bsm"
@@ -696,6 +696,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             sub={sub}
             disabled={busy}
             resubmit={showResubmit}
+            canBackdate={userCan(user, 'backdateRequests')}
             onSave={(body) =>
               act(
                 () => lifecycleApi.updateSubmission(sub.id, body),
@@ -722,7 +723,7 @@ function RequestCard({
   onEdit: () => void;
   onBom: (bomFileIds: string[]) => void;
 }) {
-  const isClient = user.role === 'client';
+  const isClient = userCan(user, 'raiseClientRequest');
   const closed = !!sub.closedAt;
   const canEdit = !closed && (userCan(user, 'editRequestAsStaff') || (isClient && sub.derivedStage === 1));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
@@ -1512,12 +1513,14 @@ function EditRequestForm({
   sub,
   disabled,
   resubmit,
+  canBackdate = false,
   onSave,
   formId,
 }: {
   sub: SubmissionDetail;
   disabled: boolean;
   resubmit: boolean;
+  canBackdate?: boolean;
   formId?: string;
   onSave: (body: {
     location?: string;
@@ -1535,6 +1538,11 @@ function EditRequestForm({
   const [siteId, setSiteId] = useState(sub.siteId);
   const originalPickup = sub.requestDate.slice(0, 10);
   const [requestDate, setRequestDate] = useState(originalPickup);
+  const minPickup = canBackdate
+    ? earliestRequestDate(true)
+    : originalPickup < todayIso()
+      ? originalPickup
+      : todayIso();
   const [location, setLocation] = useState(sub.location ?? '');
   const [approxQty, setApproxQty] = useState(String(sub.approxQty));
   const [approxWeight, setApproxWeight] = useState(String(sub.approxWeight));
@@ -1631,10 +1639,15 @@ function EditRequestForm({
           id="er-date"
           label="Pick Up Request Date"
           value={requestDate}
-          min={originalPickup < todayIso() ? originalPickup : todayIso()}
+          min={minPickup}
           onChange={setRequestDate}
           required
         />
+        {canBackdate ? (
+          <p className="dim" style={{ fontSize: '.78rem', margin: '-.2rem 0 .4rem', gridColumn: '1 / -1' }}>
+            Historical upload window from {HISTORICAL_REQUEST_FROM}.
+          </p>
+        ) : null}
         <div className="fg">
           <label htmlFor="er-qty">Approx. Quantity</label>
           <input id="er-qty" type="number" value={approxQty} onChange={(e) => setApproxQty(e.target.value)} />

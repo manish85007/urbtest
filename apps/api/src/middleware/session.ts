@@ -27,6 +27,13 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
+/** Super Admin or Auditor — read paths for audit / compliance. */
+export async function requireAdminOrAuditor(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.user || (request.user.role !== 'admin' && request.user.role !== 'auditor')) {
+    return reply.forbidden('Admin or auditor access required.');
+  }
+}
+
 export async function requireStaff(request: FastifyRequest, reply: FastifyReply) {
   if (!request.user || (request.user.role !== 'admin' && request.user.role !== 'factory' && request.user.role !== 'operations')) {
     return reply.forbidden('Staff access required.');

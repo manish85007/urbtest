@@ -1,23 +1,26 @@
 import { useEffect, useState } from 'react';
 import { dataApi, type ClientSummary, type FactorySummary, type SiteSummary, type UserRow } from '../../api';
 import { Modal } from '../../components/Modal';
+import { isClientPortalRole } from '@urb-tectrack/shared';
 
-const FEATURE_FLAGS: Array<{ id: string; label: string; roles: Array<'admin' | 'operations' | 'factory' | 'client'> }> = [
-  { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin', 'operations'] },
-  { id: 'reports.complete', label: 'Report: Complete Request Summary', roles: ['admin', 'operations', 'client'] },
-  { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin', 'operations'] },
-  { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin', 'operations'] },
-  { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations'] },
+type FormRole = 'admin' | 'operations' | 'factory' | 'client' | 'client_readonly' | 'auditor';
+
+const FEATURE_FLAGS: Array<{ id: string; label: string; roles: FormRole[] }> = [
+  { id: 'reports.summary', label: 'Report: Request Summary', roles: ['admin', 'operations', 'auditor'] },
+  { id: 'reports.complete', label: 'Report: Complete Request Summary', roles: ['admin', 'operations', 'client', 'client_readonly', 'auditor'] },
+  { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin', 'operations', 'auditor'] },
+  { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin', 'operations', 'auditor'] },
+  { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations', 'auditor'] },
   { id: 'reports.mrn', label: 'Report: MRN Register', roles: ['factory'] },
-  { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory', 'client'] },
-  { id: 'reports.serials', label: 'Report: Device Serials', roles: ['admin', 'operations', 'factory', 'client'] },
-  { id: 'reports.cod', label: 'Report: Certificate Log', roles: ['factory', 'client'] },
-  { id: 'reports.category', label: 'Report: Category Recovery', roles: ['factory', 'client'] },
+  { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory', 'client', 'client_readonly', 'auditor'] },
+  { id: 'reports.serials', label: 'Report: Device Serials', roles: ['admin', 'operations', 'factory', 'client', 'client_readonly', 'auditor'] },
+  { id: 'reports.cod', label: 'Report: Certificate Log', roles: ['factory', 'client', 'client_readonly', 'auditor'] },
+  { id: 'reports.category', label: 'Report: Category Recovery', roles: ['factory', 'client', 'client_readonly', 'auditor'] },
   { id: 'reports.capacity', label: 'Report: Capacity Utilisation', roles: ['factory'] },
   { id: 'compliance.email', label: 'Compliance: Send documents by email', roles: ['admin'] },
-  { id: 'portal.requests', label: 'Portal: View requests', roles: ['client'] },
-  { id: 'portal.invoices', label: 'Portal: View invoices', roles: ['client'] },
-  { id: 'portal.reports', label: 'Portal: View reports', roles: ['client'] },
+  { id: 'portal.requests', label: 'Portal: View requests', roles: ['client', 'client_readonly'] },
+  { id: 'portal.invoices', label: 'Portal: View invoices', roles: ['client', 'client_readonly'] },
+  { id: 'portal.reports', label: 'Portal: View reports', roles: ['client', 'client_readonly'] },
 ];
 
 interface UserFormModalProps {
@@ -39,9 +42,7 @@ export function UserFormModal({
 }: UserFormModalProps) {
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
-  const [role, setRole] = useState<'admin' | 'operations' | 'factory' | 'client'>(
-    (user?.role as 'admin' | 'operations' | 'factory' | 'client') || 'client',
-  );
+  const [role, setRole] = useState<FormRole>((user?.role as FormRole) || 'client');
   const [clientId, setClientId] = useState(user?.clientId || presetClientId || clients[0]?.id || '');
   const [siteIds, setSiteIds] = useState<string[]>(user?.siteIds ?? []);
   const [factoryIds, setFactoryIds] = useState<string[]>(user?.factoryIds ?? []);
@@ -49,7 +50,7 @@ export function UserFormModal({
   const [featureAccess, setFeatureAccess] = useState<Record<string, boolean> | null>(
     user?.featureAccess ?? null,
   );
-  const featuresForRole = FEATURE_FLAGS.filter((f) => f.roles.includes(role as 'admin' | 'operations' | 'factory' | 'client'));
+  const featuresForRole = FEATURE_FLAGS.filter((f) => f.roles.includes(role));
   const restrictFeatures = featureAccess !== null;
   const [sites, setSites] = useState<SiteSummary[]>([]);
   const [error, setError] = useState('');
@@ -60,13 +61,15 @@ export function UserFormModal({
     emailSent: boolean;
   } | null>(null);
 
+  const portalRole = isClientPortalRole(role);
+
   useEffect(() => {
-    if (role !== 'client' || !clientId) {
+    if (!portalRole || !clientId) {
       setSites([]);
       return;
     }
     dataApi.sites(clientId, true).then(setSites).catch(() => setSites([]));
-  }, [role, clientId]);
+  }, [portalRole, clientId]);
 
   function toggle(list: string[], id: string, on: boolean) {
     return on ? [...list, id] : list.filter((x) => x !== id);
@@ -97,8 +100,12 @@ export function UserFormModal({
       setError('Full name is required.');
       return;
     }
-    if (role === 'client' && !clientId) {
+    if (portalRole && !clientId) {
       setError('Select which client this user belongs to.');
+      return;
+    }
+    if ((role === 'admin' || role === 'operations' || role === 'factory' || role === 'auditor') && email.trim() && !/@urbeno\.in$/i.test(email.trim())) {
+      setError('Urbeno staff and auditor accounts must use an @urbeno.in email.');
       return;
     }
     setBusy(true);
@@ -107,8 +114,8 @@ export function UserFormModal({
         await dataApi.updateUser(user.id, {
           name,
           role,
-          clientId: role === 'client' ? clientId : null,
-          siteIds: role === 'client' ? siteIds : [],
+          clientId: portalRole ? clientId : null,
+          siteIds: portalRole ? siteIds : [],
           factoryIds: role === 'factory' ? factoryIds : [],
           active,
           featureAccess,
@@ -124,8 +131,8 @@ export function UserFormModal({
           email,
           name,
           role,
-          clientId: role === 'client' ? clientId : null,
-          siteIds: role === 'client' ? siteIds : [],
+          clientId: portalRole ? clientId : null,
+          siteIds: portalRole ? siteIds : [],
           factoryIds: role === 'factory' ? factoryIds : [],
           featureAccess,
         });
@@ -162,14 +169,16 @@ export function UserFormModal({
       </div>
       <label>
         Role *
-        <select value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
-          <option value="client">Client user</option>
+        <select value={role} onChange={(e) => setRole(e.target.value as FormRole)}>
+          <option value="client">Client User</option>
+          <option value="client_readonly">Client Read Only</option>
           <option value="admin">Super Admin</option>
           <option value="operations">Operations Manager</option>
-          <option value="factory">Factory manager</option>
+          <option value="factory">Factory Manager</option>
+          <option value="auditor">Auditor (Urbeno, read-only)</option>
         </select>
       </label>
-      {role === 'client' ? (
+      {portalRole ? (
         <>
           <label>
             Client *
@@ -226,6 +235,18 @@ export function UserFormModal({
         <p className="dim">
           Operations Managers can acknowledge requests, manage vehicles &amp; weighments, and run reports. Other areas are
           read-only.
+        </p>
+      ) : null}
+      {role === 'client_readonly' ? (
+        <p className="dim">
+          Client Read Only can view requests and download Form 6 / Certificate of Destruction. They cannot raise or close
+          requests and do not receive new-request email notifications.
+        </p>
+      ) : null}
+      {role === 'auditor' ? (
+        <p className="dim">
+          Auditors must use an @urbeno.in email. Access is organisation-wide and read-only (including Audit and Compliance
+          views). Masters and lifecycle edits are not available.
         </p>
       ) : null}
 
@@ -325,7 +346,7 @@ export function UserFormModal({
         </>
       ) : (
         <div className="note-box" style={{ background: 'var(--bl2)', color: 'var(--bl)' }}>
-          A welcome email is sent automatically. The sign-in password is <b className="mono">demo</b>.
+          A welcome email is sent automatically with a temporary password. The user must set a new password on first sign-in.
         </div>
       )}
     </Modal>

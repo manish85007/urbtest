@@ -145,6 +145,7 @@ async function main() {
   }
 
   for (const seq of [
+    { key: 'sub', prefix: 'REQ-', pad: 5, nextValue: 1 },
     { key: 'f6', prefix: 'F6-', pad: 5, nextValue: 1 },
     { key: 'dcod', prefix: 'DCOD-', pad: 6, nextValue: 1 },
   ]) {

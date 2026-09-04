@@ -42,6 +42,17 @@ export function navItems(role: SessionUser['role']): NavItem[] {
       { to: '/reports', label: 'Reports', icon: '▦' },
     ];
   }
+  if (role === 'auditor') {
+    return [
+      { to: '/', label: 'Dashboard', icon: '⌂', section: 'Overview', match: (p) => p === '/' },
+      { to: '/requests', label: 'Requests', icon: '📋', match: (p) => p.startsWith('/requests') },
+      { to: '/heroes', label: 'Recycling Heroes', icon: '🌳', section: 'Impact' },
+      { to: '/impact', label: 'Sustainability', icon: '◎' },
+      { to: '/reports', label: 'Reports', icon: '▦', section: 'Records' },
+      { to: '/audit', label: 'Audit', icon: '⌖' },
+      { to: '/compliance', label: 'Compliance', icon: '✓' },
+    ];
+  }
   return [
     { to: '/', label: 'Home', icon: '⌂', section: 'Overview', match: (p) => p === '/' },
     { to: '/requests', label: 'My Requests', icon: '📋', match: (p) => p.startsWith('/requests') },

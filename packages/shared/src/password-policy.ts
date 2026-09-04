@@ -13,7 +13,7 @@ export const PW_POLICY = {
 } as const;
 
 /** Staff roles that must use a second factor (authenticator or email OTP). */
-export const MFA_ROLES = ['admin', 'operations', 'factory'] as const;
+export const MFA_ROLES = ['admin', 'operations', 'factory', 'auditor'] as const;
 
 /** Days after account creation before MFA enrolment is forced for MFA_ROLES. */
 export const MFA_GRACE_DAYS = 15;

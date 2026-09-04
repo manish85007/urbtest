@@ -11,7 +11,7 @@ import {
   type SiteSummary,
 } from '../api';
 import { downloadCsvGrid } from '../lib/csv';
-import { isStaffUser } from '../lib/permissions';
+import { isClientPortalUser, isStaffUser } from '../lib/permissions';
 import { PeriodPicker } from '../components/PeriodPicker';
 
 const KINDS: Array<{
@@ -46,8 +46,8 @@ interface ReportsPageProps {
 }
 
 export function ReportsPage({ user }: ReportsPageProps) {
-  const isStaff = isStaffUser(user);
-  const isClient = user.role === 'client';
+  const isStaff = isStaffUser(user) || user.role === 'auditor';
+  const isClient = isClientPortalUser(user);
   const available = KINDS.filter((k) => {
     if (isClient && k.clientHidden) return false;
     if (user.role === 'factory' && k.factoryHidden) return false;

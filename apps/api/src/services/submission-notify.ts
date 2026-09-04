@@ -26,6 +26,14 @@ export async function clientContactFor(
   });
   if (creator) return { email: creator.email, name: creator.name };
 
+  // Prefer an active Client User (not Read Only) for lifecycle mail.
+  const primary = await prisma.user.findFirst({
+    where: { clientId: sub.clientId, role: 'client', active: true },
+    orderBy: { createdAt: 'asc' },
+    select: { email: true, name: true },
+  });
+  if (primary) return { email: primary.email, name: primary.name };
+
   const fallbackEmail =
     sub.site.contactEmail?.trim().toLowerCase() ||
     sub.client.email?.trim().toLowerCase() ||

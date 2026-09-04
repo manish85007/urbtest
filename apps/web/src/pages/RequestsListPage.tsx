@@ -4,7 +4,7 @@ import { VIEW_PHASES, viewPhaseForStage, getFY, listFiscalYears } from '@urb-tec
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
 import { StageBadge } from '../components/StageProgress';
 import { fmtDate, num } from '../lib/format';
-import { isStaffUser, userCan } from '../lib/permissions';
+import { isClientPortalUser, isStaffUser, userCan } from '../lib/permissions';
 
 interface RequestsListPageProps {
   user: SessionUser;
@@ -26,7 +26,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
   const [fy, setFy] = useState('');
 
   const isStaff = isStaffUser(user);
-  const canCreate = user.role === 'client' || userCan(user, 'createRequestAsStaff');
+  const canCreate = userCan(user, 'raiseClientRequest') || userCan(user, 'createRequestAsStaff');
   const years = listFiscalYears();
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
   }, [isStaff]);
 
   useEffect(() => {
-    if (user.role === 'client' && user.clientId) {
+    if (isClientPortalUser(user) && user.clientId) {
       dataApi.sites(user.clientId).then(setSites).catch(() => undefined);
     } else if (clientId) {
       dataApi.sites(clientId).then(setSites).catch(() => undefined);

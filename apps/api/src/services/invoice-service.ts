@@ -11,6 +11,7 @@ import {
   formatMrnNumber,
   formatForm6Number,
   getFY,
+  isClientMutatorRole,
   type MaterialGroupCode,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
@@ -1354,7 +1355,7 @@ export async function closeInvoice(
     }
     const conflicts = sodCheck('force-close', { invCreatedBy: invoice.createdBy }, actor.email);
     await logSoD(actor, 'force-close', conflicts, invoice.invoiceNo);
-  } else if (actor.role === 'client') {
+  } else if (isClientMutatorRole(actor.role)) {
     if (actor.clientId !== invoice.submission.clientId) {
       throw new AppError('You do not have permission to close this invoice.', 403);
     }

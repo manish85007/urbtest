@@ -16,6 +16,8 @@ enum UserRole {
   operations
   factory
   client
+  client_readonly
+  auditor
 }
 
 enum FileKind {
