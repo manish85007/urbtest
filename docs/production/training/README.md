@@ -1,34 +1,59 @@
 # Urb TecTrack — Production training manuals (Version 1)
 
-Role-wise end-user training for the **production** portal.
+Role-wise end-user training for the **production** portal, covering the **complete pickup lifecycle**.
 
 | Manual | Audience | File |
 |--------|----------|------|
 | Client User | Waste generator / requestor | [01-Client-User-Training-Manual-v1.md](./01-Client-User-Training-Manual-v1.md) |
 | Factory Manager | Facility MRN / Form 6 | [02-Factory-Manager-Training-Manual-v1.md](./02-Factory-Manager-Training-Manual-v1.md) |
 | Operations Manager | Acknowledge, vehicles, weighment, reports | [03-Operations-Manager-Training-Manual-v1.md](./03-Operations-Manager-Training-Manual-v1.md) |
-| Super Admin | Full lifecycle, masters, audit, compliance | [04-Super-Admin-Training-Manual-v1.md](./04-Super-Admin-Training-Manual-v1.md) |
+| Super Admin | Full lifecycle, Masters, Audit, Compliance, historical backdating | [04-Super-Admin-Training-Manual-v1.md](./04-Super-Admin-Training-Manual-v1.md) |
 
 **Portal:** https://tectrack.urbeno.in  
 **Support:** info@urbeno.in  
 
 Related: [Client welcome email template](../CLIENT-WELCOME-EMAIL.md)
 
-## Screenshots / PDFs
+## Complete lifecycle (all roles)
 
-These Version 1 manuals are markdown walkthroughs (no embedded credentials).
+| Stage | Primary actor | Notes |
+|-------|---------------|-------|
+| 1 Request | Client User (or Super Admin on behalf) | Super Admin may backdate from 2026-04-01 |
+| 2 Acknowledge | Operations / Super Admin | |
+| 3 Assign vehicle | Operations / Super Admin | Super Admin may backdate expected pickup |
+| 4 Weighment | Operations / Super Admin | Super Admin may backdate weighment date |
+| 5 Invoice | Super Admin | Historical invoice / e-way / payment dates |
+| 6 MRN | Factory | Historical receiving date for Super Admin |
+| 7 Form 6 | Factory (+ admin review) | Historical processing date for Super Admin |
+| 8 CoD | Super Admin | Historical certificate date |
+| 9 Close | Client User | After CoD + payment |
 
-Screenshot-based PDF packs (Version 1) live under **`docs/uat/training/`**:
+## Screenshot PDFs (Version 1)
 
-- Client User, Factory Manager, Operations Manager, Super Admin (`*-Training-Guide-v1.pdf`)
+Step-by-step screenshot packs live under **`docs/uat/training/`**:
 
-Rebuild with:
+| Pack | PDF |
+|------|-----|
+| Client User | `docs/uat/training/client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf` |
+| Factory Manager | `docs/uat/training/factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf` |
+| Operations Manager | `docs/uat/training/operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf` |
+| Super Admin (day-to-day) | `docs/uat/training/admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf` |
+| Super Admin (complete lifecycle) | `docs/uat/training/lifecycle-admin/Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf` |
+
+Rebuild:
 
 ```bash
+export BASE_URL=http://localhost:8080   # or https://tectrack.urbeno.in after MFA/demo OTP is available
+export PLAYWRIGHT_CHANNEL=chrome
+node docs/uat/training/capture-client.mjs
+node docs/uat/training/capture-factory.mjs
+node docs/uat/training/capture-operations.mjs
+node docs/uat/training/capture-admin.mjs
+node docs/uat/training/capture-lifecycle-admin.mjs   # full Super Admin lifecycle walkthrough
 .venv-pdf/bin/python docs/uat/training/build-training-pdfs.py
 ```
 
-Capture against **https://tectrack.urbeno.in** — never `uat.urbeno.in` — and keep passwords out of the artwork.
+Capture scripts solve the login math captcha automatically. Staff MFA enrolment on aged UAT accounts needs an on-screen demo OTP (`E2E_TEST=true` / `ALLOW_DEMO_OTP=true` on the API) or a fresh MFA grace window.
 
 ## Document control
 

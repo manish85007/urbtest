@@ -148,6 +148,8 @@ Hand off to **Factory** after billing exists (billing is Super Admin), and to **
 
 ## 7. Workflow — Assign vehicles (Stage 3)
 
+**Date rule:** Expected pickup must be **today or a future date**. Super Admin can backdate expected pickup for historical FY upload (from **2026-04-01**); Operations cannot.
+
 1. On an acknowledged request, click **Assign Vehicle**.  
 2. Enter **registration**, **type**, **driver name**, **driver phone** (and any other required fields).  
 3. **Assign vehicle**.  
@@ -160,6 +162,8 @@ Hand off to **Factory** after billing exists (billing is Super Admin), and to **
 ---
 
 ## 8. Workflow — Weighment (Stage 4)
+
+**Date rule:** Weighment date is **today** for Operations. Super Admin may historical-backdate weighment from **2026-04-01** for FY catch-up.
 
 Photographic evidence rules: weighbridge needs **slip photo + pickup photo**; net weight is **gross − tare** (computed, not typed). Manual weighment needs a **written reason** and pickup photo.
 

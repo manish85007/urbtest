@@ -4,7 +4,7 @@ import { invStage, subStage, viewPhaseForStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
 import { formatE164, isValidNational10, national10 } from './phone.js';
-import { isPastCalendarDate, localYmd, requestDateError, HISTORICAL_REQUEST_FROM } from './calendar-date.js';
+import { isPastCalendarDate, localYmd, requestDateError, lifecycleDateError, HISTORICAL_REQUEST_FROM, HISTORICAL_BACKDATE_FROM } from './calendar-date.js';
 
 describe('fiscal year', () => {
   it('uses April–March boundaries', () => {
@@ -94,5 +94,28 @@ describe('pick-up calendar date', () => {
     expect(requestDateError('2026-03-31', true, now)).toMatch(/before/);
     expect(requestDateError('2026-08-18', false, now)).toMatch(/past/);
     expect(HISTORICAL_REQUEST_FROM).toBe('2026-04-01');
+    expect(HISTORICAL_BACKDATE_FROM).toBe('2026-04-01');
+  });
+
+  it('applies historical backdate across recorded lifecycle dates', () => {
+    const now = new Date(2026, 8, 4, 12, 0, 0);
+    const admin = { allowHistoricalBackdate: true, allowFuture: false };
+    const staff = { allowHistoricalBackdate: false, allowFuture: false };
+    const schedule = { allowHistoricalBackdate: false, allowFuture: true, allowPastWithoutBackdate: false };
+    const scheduleAdmin = { allowHistoricalBackdate: true, allowFuture: true, allowPastWithoutBackdate: false };
+
+    expect(lifecycleDateError('2026-05-01', 'Invoice date', admin, now)).toBeNull();
+    expect(lifecycleDateError('2026-03-31', 'Invoice date', admin, now)).toMatch(/before/);
+    expect(lifecycleDateError('2026-09-05', 'Invoice date', admin, now)).toMatch(/future/);
+    expect(lifecycleDateError('2025-01-01', 'Invoice date', staff, now)).toBeNull();
+    expect(lifecycleDateError('2026-08-01', 'Expected pickup', schedule, now)).toMatch(/past/);
+    expect(lifecycleDateError('2026-05-01', 'Expected pickup', scheduleAdmin, now)).toBeNull();
+    expect(
+      lifecycleDateError('2026-08-01', 'Weighment date', {
+        allowHistoricalBackdate: false,
+        allowFuture: false,
+        allowPastWithoutBackdate: false,
+      }, now),
+    ).toMatch(/past/);
   });
 });

@@ -142,12 +142,12 @@ Business rules: **one MRN per invoice**; number format `MRN/[Factory]/[FY]/[0001
 
 ## 7. Workflow — Process & Issue Form 6 (Stage 7)
 
-Rules: category split must **exactly equal** invoice billing weight; recovery fractions must close per category where required; categories come from the facility authorisation.
+Rules: category split must **exactly equal** invoice billing weight; recovery fractions must close per category where required; categories come from the facility authorisation. Processing date is today or earlier (not future). Super Admin may historical-backdate from **2026-04-01** when covering; Factory day-to-day uses the normal past-or-today rule.
 
-1. On the same invoice, click **Process & Issue Form 6**.  
-2. In **Process Invoice**, select authorised categories and enter weights that sum to billing weight.  
+1. On the same invoice, click **Process & Submit Form 6 for Review** (or **Process & Issue Form 6** when offered).  
+2. In **Process Invoice**, set **Processing Date**, select authorised categories, and enter weights that sum to billing weight.  
 3. Complete recovery fields if the form requires them.  
-4. Click **Issue Form 6**.
+4. Submit for admin review (or Issue when permitted).
 
 **Expected outcome:** Message **Recycling recorded** (or equivalent). Form 6 / processing record visible with categories and processed weight. Stage moves toward certificate. Admin approval may be required before CoD upload and before clients can download Form 6 — coordinate with Super Admin if status shows awaiting approval.
 

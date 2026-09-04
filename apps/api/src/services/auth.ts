@@ -138,11 +138,14 @@ export function buildSecurityStatus(user: {
 }): SecurityStatus {
   const enrolled = isMfaEnrolled(user);
   const passwordExpired = pwExpired(user.passwordSetAt);
+  // Local/UAT capture & automation: E2E_TEST skips the hard enrol gate so scripts can
+  // walk the UI without mutating account createdAt. Login MFA still applies if enrolled.
+  const e2e = process.env.E2E_TEST === 'true';
   return {
     mustChangePassword: user.mustReset || passwordExpired,
     mfaRequired: mfaRequired(user.role),
     mfaEnrolled: enrolled,
-    mfaEnrolForced: mfaEnrolForced(user.role, user.createdAt, enrolled),
+    mfaEnrolForced: e2e ? false : mfaEnrolForced(user.role, user.createdAt, enrolled),
     mfaGraceDaysLeft: mfaGraceDaysLeft(user.role, user.createdAt, enrolled),
     mfaGraceDays: MFA_GRACE_DAYS,
     passwordExpired,

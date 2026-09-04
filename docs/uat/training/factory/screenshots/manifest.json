@@ -3,65 +3,72 @@
   "roleLabel": "Factory Manager",
   "audience": "Facility staff who record goods receipt (MRN) and recycling (Form 6)",
   "portal": "https://tectrack.urbeno.in",
+  "version": "1",
+  "documentControl": "Version 1 — Production",
   "baseCaptured": "http://localhost:8080",
   "steps": [
     {
       "id": "login",
-      "title": "Step 1 \u2014 Sign in as Factory Manager",
-      "howTo": "1. Open the portal URL.\n2. Enter the factory account email issued by Urbeno (for example the Bengaluru or Kolar facility login).\n3. Enter your password and click Sign In.\n4. Accept Terms and Privacy on first login if prompted.",
+      "title": "Step 1 — Sign in as Factory Manager",
+      "howTo": "1. Open https://tectrack.urbeno.in.\n2. Enter the factory account email issued by Urbeno (for example the Bengaluru or Kolar facility login).\n3. Enter your password and click Sign In.\n4. Complete MFA if enrolled (staff MFA applies to Factory).\n5. Accept Terms and Privacy on first login if prompted.",
       "tips": "Factory accounts are privileged. Set up two-factor authentication on Profile when Urbeno asks you to. Do not use a client login for factory work.",
       "file": "01-login.png"
     },
     {
       "id": "dashboard",
-      "title": "Step 2 \u2014 Factory dashboard",
-      "howTo": "1. Confirm the heading shows a Factory / facility dashboard (e.g. URB-BLR).\n2. Review tiles for open work, capacity used, and payments if shown.\n3. Use navigation: Dashboard, Requests, Capacity, Reports.\n4. Confirm Masters, Audit, Compliance, Recycling Heroes, and Sustainability are NOT in the menu.",
-      "tips": "If you can open Compliance or Masters, stop and report a Blocker \u2014 those are admin-only.",
+      "title": "Step 2 — Factory dashboard",
+      "howTo": "1. Confirm the heading shows a Factory / facility dashboard (e.g. URB-BLR).\n2. Review tiles for open work, capacity used, and payments if shown.\n3. Use navigation: Dashboard, Requests, Capacity, Reports.\n4. Confirm Masters, Audit, Compliance, Recycling Heroes, and Sustainability are NOT in the menu.\n5. Your lifecycle focus: after Super Admin raises the invoice → you Create MRN → Process Form 6 → monitor Capacity → run factory reports. Clients never see MRN numbers.",
+      "tips": "If you can open Compliance or Masters, stop and report a Blocker — those are admin-only.",
       "file": "02-dashboard.png"
     },
     {
       "id": "requests",
-      "title": "Step 3 \u2014 Requests ready for factory work",
-      "howTo": "1. Open Requests.\n2. Find invoiced requests that need MRN (Stage 5) or Form 6 (Stage 6).\n3. Confirm there is no + New Request for factory users \u2014 clients and admins raise requests.\n4. Open an invoiced request to continue to goods receipt.",
-      "tips": "Seeded training data may include sample REQ numbers. Prefer a live invoiced request for practice.",
+      "title": "Step 3 — Requests ready for factory work",
+      "howTo": "1. Open Requests.\n2. Find invoiced requests that need MRN (Stage 5) or Form 6 (Stage 6).\n3. Confirm there is no + New Request for factory users — clients and Super Admins raise requests.\n4. Confirm you do not Acknowledge, Assign Vehicle, Weigh, Raise Invoice, or Upload Certificate — those belong to Operations / Super Admin.\n5. Open an invoiced request to continue to goods receipt.\n6. Upstream (others): Client raised → Ops/Admin acknowledged → vehicle → weighment → invoice. Downstream: Admin approves Form 6 / uploads CoD; Client closes after payment.",
+      "tips": "Seeded training data may include sample REQ numbers (e.g. invoiced demos). Prefer a live invoiced request for practice when available.",
       "file": "03-requests.png"
     },
     {
       "id": "request-detail",
-      "title": "Step 4 \u2014 Open request detail for MRN / Form 6",
-      "howTo": "1. On request detail, locate the invoice panel.\n2. When Stage is 5 (invoiced) and no MRN exists, look for Create MRN.\n3. After MRN exists, look for Process & Issue Form 6.\n4. Confirm you do NOT see Acknowledge, Raise Invoice, or Upload Certificate (admin actions).\n5. Confirm clients will not see MRN numbers even though you create them here.",
+      "title": "Step 4 — Open request detail for MRN / Form 6",
+      "howTo": "1. On request detail, locate the invoice panel.\n2. When Stage is 5 (invoiced) and no MRN exists, look for Create MRN.\n3. After MRN exists, look for Process & Issue / Submit Form 6.\n4. Confirm you do NOT see Acknowledge, Raise Invoice, Record Payment, or Upload Certificate (admin / ops actions).\n5. Confirm clients will not see MRN numbers even though you create them here.\n6. After you submit Form 6, Super Admin may Approve & release before the client is notified.",
       "tips": "One MRN per invoice. Form 6 category split must equal billing weight exactly.",
       "file": "04-request-detail.png"
     },
     {
+      "id": "form6-form",
+      "title": "Step 5b — Process Form 6 / recycling",
+      "howTo": "1. Click Process & Submit Form 6 for Review (Factory) or Process & Issue Form 6 (when admin covers).\n2. Enter category lines so the total equals billing weight exactly.\n3. Set Processing Date (not a future date). Super Admin may historical-backdate from 2026-04-01.\n4. Watch Capacity — near 80% warns; 100% authorised TPA blocks without an approved override.\n5. Submit. Super Admin approves when review is required; then Admin uploads Certificate of Destruction.\n6. Clients download approved Form 6 — they still never see MRN.",
+      "tips": "Silent billing-weight deviations are not allowed. Escalate capacity overrides to Super Admin with a documented reason.",
+      "file": "05-form6-form.png"
+    },
+    {
       "id": "capacity",
-      "title": "Step 6 \u2014 Monitor factory capacity",
-      "howTo": "1. Open Capacity.\n2. Review category utilisation for your facility.\n3. Watch for warnings near 80% and blocks at 100% authorised TPA.\n4. If Form 6 would exceed capacity, you need an approved override reason \u2014 do not bypass silently.",
+      "title": "Step 6 — Monitor factory capacity",
+      "howTo": "1. Open Capacity.\n2. Review category utilisation for your facility.\n3. Watch for warnings near 80% and blocks at 100% authorised TPA.\n4. If Form 6 would exceed capacity, you need an approved override reason — do not bypass silently.\n5. Use Capacity before issuing unusual Form 6 volumes; coordinate with Super Admin for routing to another plant when needed.",
       "tips": "Capacity protects regulatory limits. Escalate to Urbeno admin before forcing an override.",
-      "file": "05-capacity.png"
+      "file": "06-capacity.png"
     },
     {
       "id": "reports",
-      "title": "Step 7 \u2014 Factory reports",
-      "howTo": "1. Open Reports.\n2. Run MRN Register, Form 6 Log, Device Serials, Certificate Log, or Capacity Utilisation as available to your role.\n3. Export CSV/PDF when needed for audits.\n4. Confirm period filters refresh figures correctly.",
+      "title": "Step 7 — Factory reports",
+      "howTo": "1. Open Reports.\n2. Run MRN Register, Form 6 Log, Device Serials, Certificate Log, or Capacity Utilisation as available to your role.\n3. Export CSV/PDF when needed for audits.\n4. Confirm period filters refresh figures correctly.\n5. Never forward MRN Register exports to clients — MRN is factory / staff chain-of-custody data.",
       "tips": "Factory reports may include MRN data that clients must never receive. Handle exports carefully.",
-      "file": "06-reports.png"
+      "file": "07-reports.png"
     },
     {
       "id": "profile",
-      "title": "Step 8 \u2014 Profile, facilities, and two-factor",
+      "title": "Step 8 — Profile, facilities, and two-factor",
       "howTo": "1. Open Profile.\n2. Confirm Role is Factory Manager and Facilities lists your plant (e.g. URB-BLR).\n3. Set up Two-factor authentication when required for privileged roles.\n4. Change password using the policy (10+ chars, upper, lower, digit) if Urbeno asks.",
       "tips": "Factory MFA is recommended/required by policy for privileged roles. Keep your authenticator device safe.",
-      "file": "07-profile.png"
+      "file": "08-profile.png"
     },
     {
       "id": "signed-out",
-      "title": "Step 9 \u2014 Sign out",
+      "title": "Step 9 — Sign out",
       "howTo": "1. Click Logout when finished.\n2. Confirm the Sign In screen appears.\n3. Never leave a signed-in factory session on a shared kiosk.",
       "tips": "Factory sessions can create legal documents (MRN / Form 6). Always sign out.",
-      "file": "08-signed-out.png"
+      "file": "09-signed-out.png"
     }
-  ],
-  "version": "1",
-  "documentControl": "Version 1 \u2014 Production"
+  ]
 }

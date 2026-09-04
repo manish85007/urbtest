@@ -36,7 +36,7 @@ export interface RolePermissions {
   rejectRequest: boolean;
   editRequestAsStaff: boolean;
   createRequestAsStaff: boolean;
-  /** Super Admin only — raise / edit requests with pick-up dates from HISTORICAL_REQUEST_FROM. */
+  /** Super Admin only — historical dates from HISTORICAL_BACKDATE_FROM on the full lifecycle. */
   backdateRequests: boolean;
   manageQueries: boolean;
   adminReports: boolean;

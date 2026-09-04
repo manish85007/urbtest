@@ -24,6 +24,13 @@ import { DateField } from './DateField';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, num } from '../lib/format';
 import { isStaffUser, userCan } from '../lib/permissions';
+import {
+  historicalBackdateHint,
+  lifecycleMaxDate,
+  lifecycleMinDate,
+  recordedDatePolicy,
+} from '../lib/backdate';
+import { localDateIso } from '../lib/datetime';
 
 /** Goods receipt exists — use hasMrn for clients (MRN payload is R4-redacted). */
 export function invoiceHasGoodsReceipt(invoice: Pick<InvoiceDetail, 'mrn' | 'hasMrn' | 'recycling' | 'certificates' | 'closedAt'>): boolean {
@@ -84,6 +91,7 @@ export function InvoiceLifecyclePanel({
     uploadCertificate: userCan(user, 'uploadCertificate'),
   };
   const isClient = userCan(user, 'closeAsClient');
+  const canBackdate = userCan(user, 'backdateRequests');
   const paymentModes = useLookups('paymentMode');
   const taxRates = useLookups('taxRate');
   const [panel, setPanel] = useState<'pay' | 'pay-edit' | 'mrn' | 'recy' | 'cod' | 'close' | null>(null);
@@ -608,6 +616,7 @@ export function InvoiceLifecyclePanel({
             amountDue={Number(totalPaise - paidPaise) / 100}
             invoiceTotal={Number(totalPaise) / 100}
             disabled={disabled}
+            canBackdate={canBackdate}
             onSubmit={(body) => run(() => lifecycleApi.addPayment(invoice.id, body), 'Payment recorded.')}
           />
         </Modal>
@@ -627,6 +636,7 @@ export function InvoiceLifecyclePanel({
             invoiceTotal={Number(totalPaise) / 100}
             existing={editingPayment}
             disabled={disabled}
+            canBackdate={canBackdate}
             onSubmit={(body) => run(
               () => lifecycleApi.updatePayment(editingPayment.id!, body),
               'Payment updated.',
@@ -652,6 +662,7 @@ export function InvoiceLifecyclePanel({
             lineItems={lineItems}
             userName={user.name}
             disabled={disabled}
+            canBackdate={canBackdate}
             onSubmit={(body) =>
               invoice.mrn
                 ? run(() => lifecycleApi.updateMrn(invoice.id, body), 'MRN updated.')
@@ -722,6 +733,7 @@ export function InvoiceLifecyclePanel({
                   }))
             }
             disabled={disabled}
+            canBackdate={canBackdate}
             onSubmit={(body) =>
               invoice.recycling
                 ? run(
@@ -753,6 +765,7 @@ export function InvoiceLifecyclePanel({
             invoiceNo={invoice.invoiceNo}
             existingCerts={invoice.certificates}
             disabled={disabled}
+            canBackdate={canBackdate}
             onSubmit={(body) =>
               run(() => lifecycleApi.uploadCertificate(invoice.id, body), 'Certificate uploaded.')
             }
@@ -1328,12 +1341,14 @@ function CertificateForm({
   invoiceNo,
   existingCerts,
   disabled,
+  canBackdate = false,
   onSubmit,
 }: {
   formId?: string;
   invoiceNo: string;
   existingCerts?: Array<{ certNo: string; department?: string | null }>;
   disabled: boolean;
+  canBackdate?: boolean;
   onSubmit: (body: {
     certNo: string;
     certDate: string;
@@ -1342,7 +1357,11 @@ function CertificateForm({
     note?: string;
   }) => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const recordedPolicy = recordedDatePolicy(canBackdate);
+  const today = localDateIso();
+  const minDate = lifecycleMinDate(recordedPolicy);
+  const maxDate = lifecycleMaxDate(recordedPolicy) ?? today;
+  const backdateHint = historicalBackdateHint(canBackdate);
   const [certNo, setCertNo] = useState(`URB/COD/${new Date().getFullYear().toString().slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}/0001`);
   const [certDate, setCertDate] = useState(today);
   const [department, setDepartment] = useState('');
@@ -1404,9 +1423,11 @@ function CertificateForm({
         <DateField
           label="Certificate Date *"
           value={certDate}
-          max={today}
+          min={minDate}
+          max={maxDate}
           onChange={setCertDate}
           required
+          hint={backdateHint}
         />
       </div>
       <label>
@@ -1459,6 +1480,7 @@ function PaymentForm({
   invoiceTotal,
   existing,
   disabled,
+  canBackdate = false,
   onSubmit,
 }: {
   formId?: string;
@@ -1466,11 +1488,14 @@ function PaymentForm({
   invoiceTotal?: number;
   existing?: { utr?: string; amountPaise: string; tdsPaise?: string; paidAt?: string; mode?: string; note?: string | null } | null;
   disabled: boolean;
+  canBackdate?: boolean;
   onSubmit: (body: { utr: string; amount: number; tdsAmount: number; paidAt: string; mode: string; note?: string }) => void;
 }) {
-  const today = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const todayYmd = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const recordedPolicy = recordedDatePolicy(canBackdate);
+  const todayYmd = localDateIso();
+  const minDate = lifecycleMinDate(recordedPolicy);
+  const maxDate = lifecycleMaxDate(recordedPolicy) ?? todayYmd;
+  const backdateHint = historicalBackdateHint(canBackdate);
   const paymentModes = useLookups('paymentMode');
   const [utr, setUtr] = useState(existing?.utr ?? '');
   const [amount, setAmount] = useState(existing ? String(Number(asPaise(existing.amountPaise)) / 100) : String(amountDue));
@@ -1495,7 +1520,15 @@ function PaymentForm({
     >
       <h3>{existing ? 'Edit payment' : 'Record payment'}</h3>
       <div className="fr2">
-        <DateField label="Payment date" value={paidAt} max={todayYmd} onChange={setPaidAt} required />
+        <DateField
+          label="Payment date"
+          value={paidAt}
+          min={minDate}
+          max={maxDate}
+          onChange={setPaidAt}
+          required
+          hint={backdateHint}
+        />
         <label>
           Payment mode
           <select value={mode} onChange={(e) => setMode(e.target.value)}>

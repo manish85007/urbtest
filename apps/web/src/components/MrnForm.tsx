@@ -5,6 +5,12 @@ import { FileUpload } from './FileUpload';
 import { DateField } from './DateField';
 import { localDateIso } from '../lib/datetime';
 import { num } from '../lib/format';
+import {
+  historicalBackdateHint,
+  lifecycleMaxDate,
+  lifecycleMinDate,
+  recordedDatePolicy,
+} from '../lib/backdate';
 
 type LineSeed = { name: string; qty: number; weightKg: string | number };
 
@@ -16,6 +22,7 @@ interface MrnFormProps {
   userName: string;
   disabled: boolean;
   mode?: 'create' | 'edit';
+  canBackdate?: boolean;
   onSubmit: (body: {
     factoryId: string;
     receivedAt: string;
@@ -80,10 +87,15 @@ export function MrnForm({
   userName,
   disabled,
   mode = 'create',
+  canBackdate = false,
   onSubmit,
 }: MrnFormProps) {
   const editing = mode === 'edit' && !!invoice.mrn;
-  const today = new Date().toISOString().slice(0, 10);
+  const recordedPolicy = recordedDatePolicy(canBackdate);
+  const today = localDateIso();
+  const minDate = lifecycleMinDate(recordedPolicy);
+  const maxDate = lifecycleMaxDate(recordedPolicy) ?? today;
+  const backdateHint = historicalBackdateHint(canBackdate);
   const invoiceVehs = vehicles.filter(
     (v) => !invoice.vehicleIds?.length || invoice.vehicleIds.includes(v.id),
   );
@@ -245,9 +257,10 @@ export function MrnForm({
           label="Receiving Date"
           value={receivedAt}
           onChange={setReceivedAt}
-          max={localDateIso()}
+          min={minDate}
+          max={maxDate}
           required
-          hint="Today or an earlier date only"
+          hint={backdateHint ?? 'Today or an earlier date only'}
         />
       </div>
 

@@ -242,6 +242,7 @@ def build_role(role: str):
         "factory": "Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf",
         "admin": "Urb-TecTrack-Admin-Training-Guide-v1.pdf",
         "operations": "Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf",
+        "lifecycle-admin": "Urb-TecTrack-Super-Admin-Lifecycle-Training-Guide-v1.pdf",
     }
     out = role_dir / names.get(role, out.name)
     pdf.output(str(out))
@@ -250,7 +251,7 @@ def build_role(role: str):
 
 
 def main():
-    roles = sys.argv[1:] or ["client", "factory", "admin", "operations"]
+    roles = sys.argv[1:] or ["client", "factory", "admin", "operations", "lifecycle-admin"]
     for role in roles:
         build_role(role)
 

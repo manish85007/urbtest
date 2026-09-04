@@ -13,6 +13,12 @@ import { FileUpload } from './FileUpload';
 import { DateField } from './DateField';
 import { localDateIso } from '../lib/datetime';
 import { num } from '../lib/format';
+import {
+  historicalBackdateHint,
+  lifecycleMaxDate,
+  lifecycleMinDate,
+  recordedDatePolicy,
+} from '../lib/backdate';
 
 const GROUPS: MaterialGroupCode[] = ['ITEW', 'CEEW', 'LSEEW', 'EETW', 'TLSEW', 'MDW', 'LIW'];
 
@@ -50,6 +56,7 @@ interface RecyclingFormProps {
     }>;
   };
   disabled: boolean;
+  canBackdate?: boolean;
   onSubmit: (body: {
     processedAt: string;
     factoryId?: string;
@@ -81,9 +88,14 @@ export function RecyclingForm({
   seedHints,
   initial,
   disabled,
+  canBackdate = false,
   onSubmit,
 }: RecyclingFormProps) {
-  const today = new Date().toISOString().slice(0, 10);
+  const recordedPolicy = recordedDatePolicy(canBackdate);
+  const today = localDateIso();
+  const minDate = lifecycleMinDate(recordedPolicy);
+  const maxDate = lifecycleMaxDate(recordedPolicy) ?? today;
+  const backdateHint = historicalBackdateHint(canBackdate);
   const target = round2(billingWeight);
   const [factoryName, setFactoryName] = useState(lockedFactoryId);
   const [processedAt, setProcessedAt] = useState(initial?.processedAt || today);
@@ -280,9 +292,10 @@ export function RecyclingForm({
           label="Processing Date"
           value={processedAt}
           onChange={setProcessedAt}
-          max={localDateIso()}
+          min={minDate}
+          max={maxDate}
           required
-          hint="Today or an earlier date only"
+          hint={backdateHint ?? 'Today or an earlier date only'}
         />
         <div className="fg">
           <label htmlFor="rc-fac">Facility</label>

@@ -238,8 +238,9 @@ export function NewRequestPage({ user }: { user: SessionUser }) {
           />
           {canBackdate ? (
             <p className="dim" style={{ fontSize: '.78rem', margin: '-.35rem 0 .5rem', gridColumn: '1 / -1' }}>
-              Super Admin historical upload: pick-up dates from {HISTORICAL_REQUEST_FROM} are allowed so FY
-              data can be loaded for clients.
+              Super Admin historical upload: dates from {HISTORICAL_REQUEST_FROM} are allowed across the
+              lifecycle (request, vehicle, weighment, invoice, payment, MRN, Form 6, CoD) so FY data can be
+              loaded for clients.
             </p>
           ) : null}
           <div className="fg">

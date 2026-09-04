@@ -164,7 +164,9 @@ async function main() {
     role: 'admin',
     roleLabel: 'Super Admin (Urbeno Operations)',
     audience: 'Urbeno administrators who run the lifecycle, Masters, Audit, and Compliance',
-    portal: 'https://uat.urbeno.in',
+    portal: 'https://tectrack.urbeno.in',
+    version: '1',
+    documentControl: 'Version 1 — Production',
     baseCaptured: BASE,
     steps,
   });

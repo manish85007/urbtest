@@ -32,6 +32,8 @@ services:
       DATABASE_PASSWORD: tectrack_uat
       DATABASE_NAME: tectrack
       NODE_ENV: "uat"
+      # Allow training/e2e captures to complete MFA enrolment using on-screen demo OTPs.
+      E2E_TEST: "true"
       SESSION_SECRET: "urb-tectrack-uat-session-secret-change-for-staging"
       UAT_SEED: "true"
       COOKIE_SECURE: "false"

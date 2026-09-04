@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL, settledPaise, earliestRequestDate, HISTORICAL_REQUEST_FROM } from '@urb-tectrack/shared';
+import { getPayStatus, formatINR, paiseToRupees, rupeesToPaise, VIEW_PHASES, viewPhaseForStage, recyclingSla, SLA_CLASS, SLA_LABEL, settledPaise, earliestRequestDate, HISTORICAL_REQUEST_FROM, lifecycleDateError } from '@urb-tectrack/shared';
 import {
   dataApi,
   filesApi,
@@ -27,6 +27,14 @@ import { lookupLabel, useLookups } from '../hooks/useLookups';
 import { fmtDate, fmtTS, num, todayIso } from '../lib/format';
 import { defaultDateTimeValue, localDateIso, splitDateTime } from '../lib/datetime';
 import { isStaffUser, userCan } from '../lib/permissions';
+import {
+  historicalBackdateHint,
+  lifecycleMaxDate,
+  lifecycleMinDate,
+  recordedDatePolicy,
+  scheduleDatePolicy,
+  weighmentDatePolicy,
+} from '../lib/backdate';
 
 type StepModal =
   | { kind: 'ack' }
@@ -626,6 +634,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             formId="assign-vehicle-form"
             vehicle={vehicleTarget}
             disabled={busy}
+            canBackdate={userCan(user, 'backdateRequests')}
             onAssign={(body) =>
               vehicleTarget
                 ? act(() => lifecycleApi.updateVehicle(vehicleTarget.id, body), 'Vehicle updated.')
@@ -648,6 +657,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             formId="weigh-form"
             vehicle={weighTarget}
             disabled={busy}
+            canBackdate={userCan(user, 'backdateRequests')}
             onWeigh={(body) => act(() => lifecycleApi.weigh(weighTarget.id, body), 'Weighment recorded.')}
           />
         </Modal>
@@ -673,6 +683,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             invoices={sub.invoices}
             invoice={invoiceTarget}
             disabled={busy}
+            canBackdate={userCan(user, 'backdateRequests')}
             onSubmit={(body) =>
               invoiceTarget
                 ? act(() => lifecycleApi.updateInvoice(invoiceTarget.id, body), 'Invoice updated.')
@@ -1739,10 +1750,12 @@ function AssignVehicleForm({
   onAssign,
   formId,
   vehicle,
+  canBackdate = false,
 }: {
   disabled: boolean;
   formId?: string;
   vehicle?: VehicleDetail;
+  canBackdate?: boolean;
   onAssign: (body: {
     registration: string;
     vehicleType: string;
@@ -1757,6 +1770,9 @@ function AssignVehicleForm({
   const vehicleTypes = useLookups('vehicleType');
   const logistics = useLookups('logistics');
   const teamRoles = useLookups('teamRole');
+  const schedulePolicy = scheduleDatePolicy(canBackdate);
+  const minExpected = lifecycleMinDate(schedulePolicy) ?? localDateIso();
+  const backdateHint = historicalBackdateHint(canBackdate);
   const [registration, setRegistration] = useState(
     (vehicle?.registration ?? '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
   );
@@ -1796,6 +1812,14 @@ function AssignVehicleForm({
         if (!expectedAt) {
           setError('Select expected pickup date and time.');
           return;
+        }
+        {
+          const day = splitDateTime(expectedAt).date;
+          const dateErr = lifecycleDateError(day, 'Expected pickup date', schedulePolicy);
+          if (dateErr) {
+            setError(dateErr);
+            return;
+          }
         }
         if (!/^[A-Z0-9]+$/.test(registration)) {
           setError('Vehicle registration can only contain letters and numbers — no spaces or special characters.');
@@ -1878,10 +1902,14 @@ function AssignVehicleForm({
           id="vh-exp"
           label="Expected pickup date & time"
           value={expectedAt}
-          minDate={localDateIso()}
+          minDate={minExpected}
           onChange={setExpectedAt}
           required
-          hint="Choose a date, set the time (or tap a quick slot). No separate confirm step needed."
+          hint={
+            backdateHint
+              ? `${backdateHint} Choose a date, set the time (or tap a quick slot).`
+              : 'Choose a date, set the time (or tap a quick slot). No separate confirm step needed.'
+          }
         />
         <div className="fg">
           <label htmlFor="vh-drv">Driver name</label>
@@ -1970,10 +1998,12 @@ function WeighForm({
   disabled,
   onWeigh,
   formId,
+  canBackdate = false,
 }: {
   vehicle: VehicleDetail;
   disabled: boolean;
   formId?: string;
+  canBackdate?: boolean;
   onWeigh: (body: {
     weighedAt: string;
     manual?: boolean;
@@ -1996,7 +2026,14 @@ function WeighForm({
   const [slipPhotos, setSlipPhotos] = useState<string[]>(existing?.slipPhotoIds ?? []);
   const [pickupPhotos, setPickupPhotos] = useState<string[]>(existing?.pickupPhotoIds ?? []);
   const [formError, setFormError] = useState('');
-  const today = new Date().toISOString().slice(0, 10);
+  const weighPolicy = weighmentDatePolicy(canBackdate);
+  const today = localDateIso();
+  const minWeigh = lifecycleMinDate(weighPolicy) ?? today;
+  const maxWeigh = lifecycleMaxDate(weighPolicy) ?? today;
+  const [weighedAt, setWeighedAt] = useState(
+    existing?.weighedAt ? String(existing.weighedAt).slice(0, 10) : today,
+  );
+  const backdateHint = historicalBackdateHint(canBackdate);
 
   const grossNum = parseFloat(gross) || 0;
   const tareNum = parseFloat(tare) || 0;
@@ -2024,7 +2061,7 @@ function WeighForm({
             return;
           }
           onWeigh({
-            weighedAt: today,
+            weighedAt,
             manual: true,
             net: Number(manualNet),
             reason,
@@ -2043,7 +2080,7 @@ function WeighForm({
             return;
           }
           onWeigh({
-            weighedAt: today,
+            weighedAt,
             gross: Number(gross),
             tare: Number(tare),
             slipNumber: slip,
@@ -2054,6 +2091,16 @@ function WeighForm({
       }}
     >
       <h3>Weigh {vehicle.registration}</h3>
+      <DateField
+        id="wh-dt"
+        label="Weighment date"
+        value={weighedAt}
+        min={minWeigh}
+        max={maxWeigh}
+        onChange={setWeighedAt}
+        required
+        hint={backdateHint ?? 'Weighment date is today.'}
+      />
       <label style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginBottom: '.7rem' }}>
         <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
         Manual weighment (no weighbridge)
@@ -2161,15 +2208,21 @@ function InvoiceForm({
   disabled,
   onSubmit,
   formId,
+  canBackdate = false,
 }: {
   vehicles: Array<{ id: string; registration: string; weighment: { netKg: string } | null }>;
   invoices: Array<{ id: string; billingWeight: string }>;
   invoice?: InvoiceDetail;
   disabled: boolean;
   formId?: string;
+  canBackdate?: boolean;
   onSubmit: (body: InvoiceFormBody) => void;
 }) {
   const today = localDateIso();
+  const recordedPolicy = recordedDatePolicy(canBackdate);
+  const minRecorded = lifecycleMinDate(recordedPolicy);
+  const maxRecorded = lifecycleMaxDate(recordedPolicy) ?? today;
+  const backdateHint = historicalBackdateHint(canBackdate);
   const taxRates = useLookups('taxRate');
   const [invoiceNo, setInvoiceNo] = useState(invoice?.invoiceNo ?? '');
   const [invoiceDate, setInvoiceDate] = useState(splitDateTime(invoice?.invoiceDate).date);
@@ -2233,9 +2286,12 @@ function InvoiceForm({
           setError('Invoice date is required.');
           return;
         }
-        if (invoiceDate > today) {
-          setError('Invoice date cannot be a future date.');
-          return;
+        {
+          const invErr = lifecycleDateError(invoiceDate, 'Invoice date', recordedPolicy);
+          if (invErr) {
+            setError(invErr);
+            return;
+          }
         }
         if (!taxableAmount || Number.isNaN(taxable) || taxable < 0) {
           setError('Taxable amount is required.');
@@ -2257,9 +2313,12 @@ function InvoiceForm({
           setError('E-way bill date is required.');
           return;
         }
-        if (ewayDate > today) {
-          setError('E-way bill date cannot be a future date.');
-          return;
+        {
+          const ewErr = lifecycleDateError(ewayDate, 'E-way bill date', recordedPolicy);
+          if (ewErr) {
+            setError(ewErr);
+            return;
+          }
         }
         if (!billingWeight || !(billWt > 0)) {
           setError('Billing weight is required.');
@@ -2320,9 +2379,11 @@ function InvoiceForm({
           id="iv-dt"
           label="Invoice date"
           value={invoiceDate}
-          max={today}
+          min={minRecorded}
+          max={maxRecorded}
           onChange={setInvoiceDate}
           required
+          hint={backdateHint}
         />
       </div>
       <div className="fr3">
@@ -2396,9 +2457,11 @@ function InvoiceForm({
           id="iv-ewdt"
           label="E-way bill date"
           value={ewayDate}
-          max={today}
+          min={minRecorded}
+          max={maxRecorded}
           onChange={setEwayDate}
           required
+          hint={backdateHint}
         />
       </div>
       <div className="fr2">

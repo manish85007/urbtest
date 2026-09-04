@@ -11,7 +11,9 @@ import {
   formatMrnNumber,
   formatForm6Number,
   getFY,
+  hasPermission,
   isClientMutatorRole,
+  lifecycleDateError,
   type MaterialGroupCode,
 } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
@@ -212,23 +214,23 @@ export interface CloseInvoiceInput {
   forced?: boolean;
 }
 
-function todayYmd(timeZone = 'Asia/Kolkata') {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
+function assertLifecycleDate(
+  actor: SessionUser,
+  raw: string,
+  label: string,
+  opts: { allowFuture?: boolean; allowPastWithoutBackdate?: boolean } = {},
+) {
+  const err = lifecycleDateError(raw, label, {
+    allowHistoricalBackdate: hasPermission(actor.role, 'backdateRequests'),
+    allowFuture: opts.allowFuture === true,
+    allowPastWithoutBackdate: opts.allowPastWithoutBackdate,
+  });
+  if (err) throw new AppError(err);
 }
 
-function assertNotFutureDate(raw: string, label: string) {
-  const ymd = String(raw || '').slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
-    throw new AppError(`${label} is required.`);
-  }
-  if (ymd > todayYmd()) {
-    throw new AppError(`${label} cannot be a future date.`);
-  }
+/** Recorded operational dates — not future; Super Admin may use the historical window. */
+function assertRecordedDate(actor: SessionUser, raw: string, label: string) {
+  assertLifecycleDate(actor, raw, label, { allowFuture: false, allowPastWithoutBackdate: true });
 }
 
 function attachmentIds(ids?: string[], single?: string) {
@@ -318,8 +320,8 @@ export async function createInvoice(
   }
   await assertClientInvoiceNoUnique(sub.clientId, trimmedNo, { excludeSubmissionId: sub.id });
 
-  assertNotFutureDate(input.invoiceDate, 'Invoice date');
-  assertNotFutureDate(input.ewayBillDate, 'E-way bill date');
+  assertRecordedDate(actor, input.invoiceDate, 'Invoice date');
+  assertRecordedDate(actor, input.ewayBillDate, 'E-way bill date');
 
   const invoiceFileIds = attachmentIds(input.invoiceFileIds, input.invoiceFileId);
   const ewayFileIds = attachmentIds(input.ewayFileIds, input.ewayFileId);
@@ -404,8 +406,8 @@ export async function updateInvoice(actor: SessionUser, invoiceId: string, input
     excludeSubmissionId: sub.id,
   });
 
-  assertNotFutureDate(input.invoiceDate, 'Invoice date');
-  assertNotFutureDate(input.ewayBillDate, 'E-way bill date');
+  assertRecordedDate(actor, input.invoiceDate, 'Invoice date');
+  assertRecordedDate(actor, input.ewayBillDate, 'E-way bill date');
 
   const invoiceFileIds = attachmentIds(input.invoiceFileIds, input.invoiceFileId);
   const ewayFileIds = attachmentIds(input.ewayFileIds, input.ewayFileId);
@@ -507,7 +509,7 @@ export async function addPayment(actor: SessionUser, invoiceId: string, input: P
   requirePermission(actor, 'manageInvoices');
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   assertLifecycleOpen(invoice);
-  assertNotFutureDate(input.paidAt, 'Payment date');
+  assertRecordedDate(actor, input.paidAt, 'Payment date');
 
   const tdsAmount = Number(input.tdsAmount ?? 0);
   if (tdsAmount < 0) throw new AppError('TDS cannot be negative.');
@@ -558,7 +560,7 @@ export async function updatePayment(actor: SessionUser, paymentId: string, input
   if (!existing) throw new AppError('Payment not found.', 404);
   const invoice = await loadInvoiceForActor(existing.invoiceId, actor);
   assertLifecycleOpen(invoice);
-  assertNotFutureDate(input.paidAt, 'Payment date');
+  assertRecordedDate(actor, input.paidAt, 'Payment date');
 
   const tdsAmount = Number(input.tdsAmount ?? 0);
   if (tdsAmount < 0) throw new AppError('TDS cannot be negative.');
@@ -702,7 +704,7 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
   const { gatePhotoIds, materialPhotoIds } = await resolveMrnPhotos(input);
   assertInvoiceVehiclesWeighed(invoice);
 
-  assertNotFutureDate(input.receivedAt, 'Receiving date');
+  assertRecordedDate(actor, input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
 
   const mrn = await prisma.$transaction(async (tx) => {
@@ -764,7 +766,7 @@ export async function updateMrn(actor: SessionUser, invoiceId: string, input: Mr
   const { gatePhotoIds, materialPhotoIds } = await resolveMrnPhotos(input, existing);
   assertInvoiceVehiclesWeighed(invoice);
 
-  assertNotFutureDate(input.receivedAt, 'Receiving date');
+  assertRecordedDate(actor, input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
 
   const mrn = await prisma.mrn.update({
@@ -922,7 +924,7 @@ export async function createRecycling(
   }
 
   const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
-  assertNotFutureDate(input.processedAt, 'Processing date');
+  assertRecordedDate(actor, input.processedAt, 'Processing date');
   const processedAt = new Date(input.processedAt);
   const autoApprove = actor.role === 'admin';
 
@@ -1116,7 +1118,7 @@ export async function updateRecycling(
   if (input.serialFileId) await assertFilesExist([input.serialFileId], ['serials']);
 
   const vehicleIds = resolveForm6Vehicles(invoice, input.vehicleIds);
-  assertNotFutureDate(input.processedAt, 'Processing date');
+  assertRecordedDate(actor, input.processedAt, 'Processing date');
   const processedAt = new Date(input.processedAt);
   const photoIds = input.photoIds?.length ? input.photoIds : existing.photoIds;
   const reportIds = input.reportIds?.length ? input.reportIds : existing.reportIds;
@@ -1274,6 +1276,7 @@ export async function uploadCertificate(
   const certNo = input.certNo.trim();
   if (!certNo) throw new AppError('Certificate number is required.');
   if (!input.certDate) throw new AppError('Certificate date is required.');
+  assertRecordedDate(actor, input.certDate, 'Certificate date');
   if (!input.fileId) throw new AppError('Attach the signed Certificate of Destruction PDF.');
   await assertFilesExist([input.fileId], ['certificate']);
 

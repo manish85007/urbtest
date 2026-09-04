@@ -12,7 +12,13 @@ function sixDigitCode(): string {
 }
 
 function allowDemoCode(): boolean {
-  return process.env.NODE_ENV === 'development' || process.env.E2E_TEST === 'true';
+  const env = process.env.NODE_ENV || '';
+  return (
+    env === 'development' ||
+    env === 'uat' ||
+    process.env.E2E_TEST === 'true' ||
+    process.env.ALLOW_DEMO_OTP === 'true'
+  );
 }
 
 export function emailOtpDue(emailVerifiedAt: Date | null | undefined): boolean {

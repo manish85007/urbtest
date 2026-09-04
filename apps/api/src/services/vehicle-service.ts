@@ -1,4 +1,4 @@
-import { isValidNational10, national10, formatE164, countryCodeOf } from '@urb-tectrack/shared';
+import { hasPermission, isValidNational10, national10, formatE164, countryCodeOf, lifecycleDateError } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { roundKg, toKg } from '../lib/decimal.js';
@@ -9,6 +9,44 @@ import { withDerivedStages } from '../lib/stage-mapper.js';
 import { auditLog } from './audit.js';
 import { assertFilesExist } from './file-service.js';
 import { notifyClient } from './submission-notify.js';
+
+/** Calendar day in Asia/Kolkata for ISO timestamps; plain YYYY-MM-DD kept as-is. */
+function calendarDayOf(raw: string): string {
+  const s = String(raw || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s) && !s.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(s)) {
+    return s.slice(0, 10);
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s.slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+function assertVehicleScheduleDate(actor: SessionUser, expectedAt?: string) {
+  if (!expectedAt?.trim()) return;
+  const day = calendarDayOf(expectedAt);
+  const err = lifecycleDateError(day, 'Expected pickup date', {
+    allowHistoricalBackdate: hasPermission(actor.role, 'backdateRequests'),
+    allowFuture: true,
+    allowPastWithoutBackdate: false,
+  });
+  if (err) throw new AppError(err);
+}
+
+function assertWeighmentDate(actor: SessionUser, weighedAt: string) {
+  const day = calendarDayOf(weighedAt);
+  const err = lifecycleDateError(day, 'Weighment date', {
+    allowHistoricalBackdate: hasPermission(actor.role, 'backdateRequests'),
+    allowFuture: false,
+    allowPastWithoutBackdate: false,
+  });
+  if (err) throw new AppError(err);
+}
 
 export interface TeamMemberInput {
   name: string;
@@ -89,6 +127,7 @@ export async function addVehicle(
   if (sub.closedAt) {
     throw new AppError('This request is closed — vehicles can no longer be assigned.');
   }
+  assertVehicleScheduleDate(actor, input.expectedAt);
 
   const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
   const registration = requireRegistration(input.registration);
@@ -157,6 +196,7 @@ export async function recordWeighment(
   input: WeighmentInput,
 ) {
   requirePermission(actor, 'manageVehicles');
+  assertWeighmentDate(actor, input.weighedAt);
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
@@ -312,6 +352,7 @@ export async function updateVehicle(
   if (sub.closedAt) {
     throw new AppError('This request is closed — vehicle details can no longer be changed.');
   }
+  assertVehicleScheduleDate(actor, input.expectedAt);
 
   const driverPhone = requireMobile(input.driverPhone, 'Driver phone');
   const extraTeam = (input.team ?? []).filter((m) => m.name?.trim() && m.phone?.trim());

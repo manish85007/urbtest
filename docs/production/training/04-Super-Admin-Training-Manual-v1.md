@@ -37,7 +37,7 @@ Super Admin has **full operational and configuration access**:
 - Stages **2–5** and **8** (acknowledge through billing, CoD), plus ability to perform factory actions when needed.  
 - **Masters** — clients, sites, users, factories, categories, lookups, email templates.  
 - **Audit** and **Compliance**.  
-- **Backdating** pickup requests within the configured historical window (when enabled).  
+- **Historical backdating** (permission `backdateRequests`) across the full lifecycle from **2026-04-01**: request date, vehicle expected pickup, weighment, invoice / e-way, payment, MRN receiving, Form 6 processing, and CoD certificate dates.  
 - Staff-raised requests on behalf of a client.
 
 You remain bound by business rules (weighment evidence, unique certificate numbers, payment before close, clients never see MRN, etc.).
@@ -112,13 +112,14 @@ You remain bound by business rules (weighment evidence, unique certificate numbe
 
 ## 5. Workflow — Acknowledge, vehicles, weighment
 
-These steps match Operations Manager practice; Super Admin can always perform them.
+These steps match Operations Manager practice; Super Admin can always perform them — and may **backdate** dates for historical FY upload.
 
 1. **Dashboard** → open a stage-1 request → **Acknowledge Request**.  
-2. **Assign Vehicle**(s) with registration, type, driver details.  
-3. **Weigh** each vehicle (slip + pickup photos; net = gross − tare). Complete loading acknowledgement if shown.
+2. **Assign Vehicle**(s) with registration, type, logistics partner, driver, phone, and team.  
+3. Set **Expected pickup date & time**. For historical data, choose a date from **2026-04-01** onward (hint on the form). Operations cannot backdate this field.  
+4. **Weigh** each vehicle (slip + pickup photos; net = gross − tare). Super Admin may set **Weighment date** in the same historical window; other staff remain on today. Complete loading acknowledgement if shown.
 
-**Expected outcome:** Request ready for billing (stage path toward invoicing).
+**Expected outcome:** Request ready for billing (stage path toward invoicing). Backdated vehicle/weighment dates show on request detail.
 
 **Tip:** Use **Request changes** with a clear note when client data is wrong — do not invent site details on their behalf.
 
@@ -131,7 +132,8 @@ Rules: tax derived from taxable value + rate master; e-way bill per invoice; bil
 1. Click **Raise Invoice**.  
 2. Enter invoice number, taxable amount, tax rate, e-way bill number/date/PDF as required.  
 3. Confirm billing weight (default vehicle net) and deviation note if it differs.  
-4. **Create invoice**.
+4. For historical upload, Super Admin may set **invoice / e-way dates** from **2026-04-01** (not future).  
+5. **Create invoice**.
 
 **Expected outcome:** Message **Invoice created.** Totals calculated. Multiple invoices may split one pickup; sum of billing weights must reconcile to total weighment.
 
@@ -154,15 +156,25 @@ Rules: tax derived from taxable value + rate master; e-way bill per invoice; bil
 
 ---
 
-## 8. Workflow — Staff-created and backdated requests
+## 8. Workflow — Staff-created and historically backdated requests
 
-1. **Requests** → new request. **Client** dropdown is present for Super Admin.  
-2. Select client/site and complete the form. Submit.  
-3. For historical catch-up (when enabled): set pickup date within the allowed historical window from configuration (`HISTORICAL_REQUEST_FROM` / backdate permission). Operations cannot do this.
+1. **Requests → + New Request** (or staff create path).  
+2. Choose client, site, and optional **on behalf of** Client User.  
+3. For historical catch-up: Super Admin may set dates from **2026-04-01** on:
+   - Pick-up **request date**
+   - Vehicle **expected pickup**
+   - **Weighment date**
+   - **Invoice** / e-way dates
+   - **Payment** date
+   - **MRN** receiving date
+   - **Form 6** processing date
+   - **CoD** certificate date  
+   Operations and Factory cannot open that historical window.
+4. Submit and continue the lifecycle with the same evidence rules as live work.
 
-**Expected outcome:** `REQ-` issued and visible to that client’s users. Backdated dates outside the window are refused.
+**Expected outcome:** `REQ-` issued and visible to that client’s users. Dates before 2026-04-01 are refused. Future dates remain blocked on recorded fields (invoice, weighment, MRN, Form 6, CoD, payment).
 
-**Tip:** Document why a backdated request was raised (audit trail already captures who/when; keep the business reason in notes).
+**Tip:** Document why a historical request was raised in the notes field; the audit trail already captures who/when.
 
 ---
 

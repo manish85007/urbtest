@@ -1,11 +1,10 @@
 /**
  * Capture Client User training screenshots.
  * Usage: BASE_URL=http://localhost:8080 node docs/uat/training/capture-client.mjs
+ *
+ * Credentials are used only to sign in — never shown in screenshots or howTo text.
  */
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
-  acceptPoliciesIfNeeded,
   clearShots,
   makeSnapper,
   redactProfilePii,
@@ -15,7 +14,6 @@ import {
   writeManifest,
 } from './_capture-lib.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE_URL || 'http://localhost:8080';
 const EMAIL = process.env.TEST_EMAIL || 'ramesh@techcorp.in';
 const PASSWORD = process.env.TEST_PASSWORD || 'demo';
@@ -33,7 +31,14 @@ async function main() {
       page,
       'login',
       'Step 1 — Open the portal and sign in',
-      '1. Open the portal URL provided by Urbeno in your browser (Chrome, Edge, or Safari recommended).\n2. Enter the email address from your account notification email.\n3. Enter the password issued to you (or the temporary password from your welcome email).\n4. Click Sign In.\n5. On first login, open Terms of Use and Privacy Policy, tick the acceptance box, then Accept.',
+      [
+        '1. Open https://tectrack.urbeno.in in your browser (Chrome, Edge, or Safari recommended).',
+        '2. Enter the email address from your account notification email.',
+        '3. Enter the password issued to you (or the temporary password from your welcome email).',
+        '4. Click Sign In.',
+        '5. On first login, open Terms of Use and Privacy Policy, tick the acceptance box, then Accept.',
+        '6. Change a temporary password immediately when prompted.',
+      ].join('\n'),
       'Never share your password. Use a private/incognito window if you also use other roles on the same computer. If Sign In fails, contact info@urbeno.in — do not email your password.',
     );
 
@@ -43,7 +48,14 @@ async function main() {
       page,
       'home',
       'Step 2 — Home dashboard overview',
-      '1. After sign-in you land on Home.\n2. Read the welcome line — it should show your first name and organisation.\n3. Review the summary tiles: open requests, completed work, recycled kg, and trees planted.\n4. Use the top navigation: Home, My Requests, Recycling Heroes, Sustainability, Reports.\n5. Click + New Request when you are ready to raise a pickup.',
+      [
+        '1. After sign-in you land on Home.',
+        '2. Read the welcome line — it should show your first name and organisation.',
+        '3. Review the summary tiles: open requests, completed work, recycled kg, and trees planted.',
+        '4. Use the top navigation: Home, My Requests, Recycling Heroes, Sustainability, Reports.',
+        '5. Click + New Request when you are ready to raise a pickup.',
+        '6. Lifecycle from your view: you raise → Urbeno acknowledges / vehicles / weigh / invoice → Factory MRN & Form 6 → Urbeno uploads CoD → you download Form 6 / CoD when ready → you close after payment.',
+      ].join('\n'),
       'You should NOT see Masters, Audit, Capacity, or Compliance. Those areas are for Urbeno staff only. Your Home figures reflect your organisation only.',
     );
 
@@ -51,13 +63,27 @@ async function main() {
     if (await newBtn.isVisible().catch(() => false)) {
       await newBtn.click();
       await page.waitForTimeout(700);
+    } else {
+      console.warn('  skip opening New Request button — capturing page context if available');
     }
     await snap(
       page,
       'new-request',
       'Step 3 — Raise a new collection request',
-      '1. Click + New Request from Home or My Requests.\n2. Select Site (required) from the dropdown — only your organisation sites appear.\n3. Enter Pickup Location (building / floor / warehouse).\n4. Optionally enter Your PO / Reference.\n5. Confirm Pick Up Request Date.\n6. Enter Approx. Quantity (units) and Approx. Weight (kg). Exact weight is captured later at weighment.\n7. Add Notes if the team needs access instructions or a preferred window.\n8. Optionally attach a Bill of Materials (CSV/Excel/PDF) and/or add Line Items.\n9. Click Submit Request.\n10. Note the new REQ- number on the request detail screen — share it with Urbeno if staff need to advance the job.',
-      'Leave required fields empty once to see validation messages, then fill them correctly. You cannot Acknowledge, Assign Vehicle, Weigh, or Raise Invoice — those are Urbeno actions.',
+      [
+        '1. Click + New Request from Home or My Requests.',
+        '2. Select Site (required) from the dropdown — only your organisation sites appear.',
+        '3. Enter Pickup Location (building / floor / warehouse).',
+        '4. Optionally enter Your PO / Reference.',
+        '5. Confirm Pick Up Request Date.',
+        '6. Enter Approx. Quantity (units) and Approx. Weight (kg). Exact weight is captured later at weighment by Urbeno.',
+        '7. Add Notes if the team needs access instructions or a preferred window.',
+        '8. Optionally attach a Bill of Materials (CSV/Excel/PDF) and/or add Line Items.',
+        '9. Click Submit Request.',
+        '10. Note the new REQ- number on the request detail screen — share it with Urbeno if staff need to advance the job.',
+        '11. What happens next (others): Operations / Super Admin Acknowledge → Assign Vehicle → Weigh → Raise Invoice; Factory Create MRN → Form 6; Super Admin Upload Certificate; you Review & Close after payment.',
+      ].join('\n'),
+      'Leave required fields empty once to see validation messages, then fill them correctly. You cannot Acknowledge, Assign Vehicle, Weigh, Raise Invoice, Create MRN, or Upload Certificate — those are Urbeno actions. Client Read Only users cannot raise requests.',
     );
     await page.keyboard.press('Escape').catch(() => {});
     await page.waitForTimeout(400);
@@ -67,8 +93,15 @@ async function main() {
       page,
       'my-requests',
       'Step 4 — Track your requests list',
-      '1. Open My Requests from the top navigation.\n2. Scan the list — every row should belong to your organisation.\n3. Use filters or search if available to find a specific REQ- number.\n4. Click a row to open request detail and see stage progress.',
-      'You must never see another company\'s requests. If you do, stop and report it to Urbeno as a Blocker.',
+      [
+        '1. Open My Requests from the top navigation.',
+        '2. Scan the list — every row should belong to your organisation.',
+        '3. Use filters or search if available to find a specific REQ- number.',
+        '4. Click a row to open request detail and see stage progress (1–9).',
+        '5. Watch for vehicle details, invoice totals, Form 6 / CoD download links, and payment status as Urbeno advances the job.',
+        '6. You must never see MRN numbers or another company\'s requests.',
+      ].join('\n'),
+      'If you see another company\'s requests or an MRN number, stop and report it to Urbeno as a Blocker.',
     );
 
     const reqLink = page.locator('a[href*="/requests/REQ-"]').first();
@@ -79,9 +112,40 @@ async function main() {
         page,
         'request-detail',
         'Step 5 — Follow a request through the lifecycle',
-        '1. On request detail, find the stage badge (1–9) and header information (site, raised by, dates).\n2. As Urbeno advances the job, refresh to see vehicle, invoice, and certificate updates.\n3. Confirm you do NOT see Create MRN, Form 6 issue controls, or Upload Certificate.\n4. When certificate and payment are both complete, look for Review & Close.\n5. Open Review & Close → Acknowledge closure to finish Stage 9.',
-        'Clients close the request after certificate + payment. Do not try Review & Close while payment is still outstanding — the system should refuse or hide the action.',
+        [
+          '1. On request detail, find the stage badge (1–9) and header information (site, raised by, dates).',
+          '2. As Urbeno advances the job, refresh to see vehicle, invoice, Form 6, and certificate updates.',
+          '3. Confirm you do NOT see Create MRN, Form 6 issue controls, Acknowledge, Assign Vehicle, Weigh, Raise Invoice, or Upload Certificate.',
+          '4. When Form 6 is approved, download Form 6 PDF from the invoice panel if offered.',
+          '5. When the Certificate of Destruction is uploaded, download the CoD PDF for your records.',
+          '6. When certificate and payment are both complete, look for Review & Close.',
+          '7. Open Review & Close → Acknowledge closure to finish Stage 9.',
+        ].join('\n'),
+        'Clients close the request after certificate + payment. Do not try Review & Close while payment is still outstanding — the system should refuse or hide the action. Client Read Only can download Form 6 / CoD but cannot close.',
       );
+
+      const closeBtn = page.getByRole('button', { name: /review\s*&\s*close/i }).first();
+      if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await closeBtn.click();
+        await page.waitForTimeout(700);
+        await snap(
+          page,
+          'review-close',
+          'Step 5b — Review & Close after payment and CoD',
+          [
+            '1. Click Review & Close when both Certificate of Destruction and payment are complete.',
+            '2. Confirm you have received the CoD.',
+            '3. Click Acknowledge closure.',
+            '4. Expected outcome: Stage 9 closed; impact / Heroes figures can include this work.',
+          ].join('\n'),
+          'Only Client Users close on the normal path. If the button is missing, payment or CoD may still be outstanding — check with Urbeno.',
+        );
+        await page.keyboard.press('Escape').catch(() => {});
+      } else {
+        console.warn('  skip review-close — Review & Close not visible on this request');
+      }
+    } else {
+      console.warn('  skip request-detail — no REQ- link visible');
     }
 
     await page.goto(BASE + '/heroes', { waitUntil: 'networkidle' });
@@ -89,7 +153,12 @@ async function main() {
       page,
       'heroes',
       'Step 6 — Recycling Heroes impact',
-      '1. Open Recycling Heroes from the navigation.\n2. Explore planting / tonnage views for your organisation\'s contribution.\n3. Open any available detail cards or photos to understand the CSR story.',
+      [
+        '1. Open Recycling Heroes from the navigation.',
+        '2. Explore planting / tonnage views for your organisation\'s contribution.',
+        '3. Open any available detail cards or photos to understand the CSR story.',
+        '4. Closed recycled work feeds Heroes milestones — in-progress pickups do not count early.',
+      ].join('\n'),
       'This is a read-focused client view. Urbeno-wide planting controls may not appear for client users.',
     );
 
@@ -98,7 +167,12 @@ async function main() {
       page,
       'sustainability',
       'Step 7 — Sustainability figures',
-      '1. Open Sustainability.\n2. Review recycled weight, CO2 avoided, and related impact for closed work.\n3. Open How these numbers are built / Methodology if offered.\n4. Download Impact PDF when you need a shareable summary for your organisation.',
+      [
+        '1. Open Sustainability.',
+        '2. Review recycled weight, CO2 avoided, and related impact for closed work.',
+        '3. Open How these numbers are built / Methodology if offered.',
+        '4. Download Impact PDF when you need a shareable summary for your organisation.',
+      ].join('\n'),
       'In-progress requests do not inflate closed impact until the invoice is closed.',
     );
 
@@ -107,7 +181,14 @@ async function main() {
       page,
       'reports',
       'Step 8 — Run and export reports',
-      '1. Open Reports.\n2. Choose a report type such as Request Summary, Invoice Register, Certificate Log, Sustainability, or Recycling Heroes.\n3. Set the period (FY / month) if a picker is shown.\n4. Run the report and Export CSV or PDF when available.\n5. Confirm there is no MRN Register — that report is for factory staff only.',
+      [
+        '1. Open Reports.',
+        '2. Choose a report type such as Request Summary, Invoice Register, Certificate Log, Form 6 Log, Sustainability, or Recycling Heroes.',
+        '3. Set the period (FY / month) if a picker is shown.',
+        '4. Run the report and Export CSV or PDF when available.',
+        '5. Confirm there is no MRN Register — that report is for factory staff only.',
+        '6. Use Certificate Log / Form 6 Log to find downloads when you need audit evidence after Urbeno completes those stages.',
+      ].join('\n'),
       'Exports must contain only your organisation\'s rows. Keep downloaded files confidential.',
     );
 
@@ -116,7 +197,11 @@ async function main() {
       page,
       'legal-terms',
       'Step 9 — Read Terms of Use',
-      '1. Open Terms of Use from the footer or the first-login acceptance gate.\n2. Scroll through the document so you understand obligations before accepting.\n3. Return to the portal via navigation or the browser back control.',
+      [
+        '1. Open Terms of Use from the footer or the first-login acceptance gate.',
+        '2. Scroll through the document so you understand obligations before accepting.',
+        '3. Return to the portal via navigation or the browser back control.',
+      ].join('\n'),
       'You will not be asked to re-accept unless Urbeno publishes a new version.',
     );
 
@@ -126,7 +211,14 @@ async function main() {
       page,
       'profile',
       'Step 10 — Profile and change password',
-      '1. Click your name / avatar → open profile (or go to /profile).\n2. Confirm Role is Client User and Organisation is correct.\n3. To change password: enter Current password, New password, Confirm new password.\n4. New password must be 10+ characters with upper-case, lower-case, and a digit.\n5. Click Update password.\n6. Confirm Two-factor authentication is NOT shown for client users.',
+      [
+        '1. Click your name / avatar → open profile (or go to /profile).',
+        '2. Confirm Role is Client User and Organisation is correct.',
+        '3. To change password: enter Current password, New password, Confirm new password.',
+        '4. New password must be 10+ characters with upper-case, lower-case, and a digit.',
+        '5. Click Update password.',
+        '6. Confirm Two-factor authentication is NOT shown for client users.',
+      ].join('\n'),
       'Do not change a shared training password unless Urbeno asks you to. Prefer N/A for password-change practice on shared accounts.',
     );
 
@@ -138,9 +230,15 @@ async function main() {
         page,
         'signed-out',
         'Step 11 — Sign out safely',
-        '1. Click Logout in the top-right when you finish.\n2. Confirm you return to the Sign In screen.\n3. Close the browser tab if you are on a shared computer.',
+        [
+          '1. Click Logout in the top-right when you finish.',
+          '2. Confirm you return to the Sign In screen.',
+          '3. Close the browser tab if you are on a shared computer.',
+        ].join('\n'),
         'Always sign out on shared machines. Policies are not re-prompted on the next visit unless updated.',
       );
+    } else {
+      console.warn('  skip signed-out — Sign out control not visible');
     }
   });
 
@@ -148,7 +246,9 @@ async function main() {
     role: 'client',
     roleLabel: 'Client User (Requestor)',
     audience: 'Waste generator / client organisation users who raise and close collection requests',
-    portal: 'https://uat.urbeno.in',
+    portal: 'https://tectrack.urbeno.in',
+    version: '1',
+    documentControl: 'Version 1 — Production',
     baseCaptured: BASE,
     steps,
   });
