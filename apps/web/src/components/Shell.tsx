@@ -168,7 +168,7 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
             <div className="brand-i">
               {showClientLogo ? (
                 <img
-                  src={filesApi.url(user.clientLogoFileId!)}
+                  src={filesApi.url(user.clientLogoFileId!, { stream: true })}
                   alt=""
                   style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }}
                 />

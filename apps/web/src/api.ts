@@ -1180,7 +1180,8 @@ export const filesApi = {
       kind: string;
     }>;
   },
-  url: (id: string) => `${base}/files/${id}`,
+  url: (id: string, opts?: { stream?: boolean }) =>
+    `${base}/files/${id}${opts?.stream ? '?stream=1' : ''}`,
   pdf: (path: string) => `${base}${path}`,
 };
 

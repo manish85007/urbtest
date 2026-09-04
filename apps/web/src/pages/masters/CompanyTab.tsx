@@ -156,7 +156,7 @@ export function CompanyTab({ onChanged }: Props) {
           onChange={(ids) => patch('logoFileId', ids[0] ?? null)}
         />
         {form.logoFileId ? (
-          <img className="logo-preview" src={filesApi.url(form.logoFileId)} alt="Urbeno logo preview" />
+          <img className="logo-preview" src={filesApi.url(form.logoFileId, { stream: true })} alt="Urbeno logo preview" />
         ) : null}
         {error ? <p className="error">{error}</p> : null}
         <button type="submit" className="btn bp" disabled={busy}>

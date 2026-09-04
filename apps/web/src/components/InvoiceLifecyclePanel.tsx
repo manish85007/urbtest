@@ -292,7 +292,7 @@ export function InvoiceLifecyclePanel({
             <div className="frow">
               {(invoice.invoiceFileIds?.length ? invoice.invoiceFileIds : invoice.invoiceFileId ? [invoice.invoiceFileId] : []).length ? (
                 (invoice.invoiceFileIds?.length ? invoice.invoiceFileIds : [invoice.invoiceFileId!]).map((id, i) => (
-                  <FileThumb key={id} id={id} kind="doc" name={i === 0 ? 'Invoice' : `Invoice ${i + 1}`} />
+                  <FileThumb key={id} id={id} kind="doc" index={i + 1} name={i === 0 ? 'Invoice' : `Invoice ${i + 1}`} />
                 ))
               ) : (
                 <span className="dim" style={{ fontSize: '.75rem' }}>
@@ -308,7 +308,7 @@ export function InvoiceLifecyclePanel({
             <div className="frow">
               {(invoice.ewayFileIds?.length ? invoice.ewayFileIds : invoice.ewayFileId ? [invoice.ewayFileId] : []).length ? (
                 (invoice.ewayFileIds?.length ? invoice.ewayFileIds : [invoice.ewayFileId!]).map((id, i) => (
-                  <FileThumb key={id} id={id} kind="doc" name={i === 0 ? 'E-way' : `E-way ${i + 1}`} />
+                  <FileThumb key={id} id={id} kind="doc" index={i + 1} name={i === 0 ? 'E-way' : `E-way ${i + 1}`} />
                 ))
               ) : (
                 <span className="dim" style={{ fontSize: '.75rem' }}>

@@ -72,16 +72,28 @@ export async function filesRoutes(app: FastifyInstance) {
     try {
       const parsed = idParamsSchema.safeParse(request.params);
       if (!parsed.success) return reply.badRequest('Invalid file id');
-      const { file, buffer, signedUrl } = await authorizeFileDownload(
-        request.user!,
-        parsed.data.id,
-      );
-      if (signedUrl) {
-        return reply.redirect(signedUrl);
+      const forceStream = (request.query as { stream?: string }).stream === '1';
+
+      // Thumbnails / <img> embeds must stay same-origin (CSP). Skip GCS redirect when stream=1.
+      if (!forceStream) {
+        const authorized = await authorizeFileDownload(request.user!, parsed.data.id);
+        if (authorized.signedUrl) {
+          return reply.redirect(authorized.signedUrl);
+        }
+        if (authorized.buffer) {
+          return reply
+            .header('Content-Type', authorized.file.mimeType)
+            .header('Content-Disposition', contentDisposition('inline', authorized.file.name))
+            .header('Cache-Control', 'private, max-age=60')
+            .send(authorized.buffer);
+        }
       }
+
+      const { file, buffer } = await readFileBlob(request.user!, parsed.data.id);
       return reply
         .header('Content-Type', file.mimeType)
         .header('Content-Disposition', contentDisposition('inline', file.name))
+        .header('Cache-Control', 'private, max-age=60')
         .send(buffer);
     } catch (err) {
       return handleServiceError(err, reply);

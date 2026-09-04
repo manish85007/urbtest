@@ -85,9 +85,23 @@ export function TreeCard({
         </div>
       </div>
       {t.photoFileId ? (
-        <div className="frow">
-          <a className="fthumb" href={filesApi.url(t.photoFileId)} target="_blank" rel="noopener noreferrer">
-            <img src={filesApi.url(t.photoFileId)} alt="Planting day" />
+        <div className="fattachment-list">
+          <a
+            className="fattachment has-preview"
+            href={filesApi.url(t.photoFileId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open planting photo"
+          >
+            <img
+              className="fattachment-preview"
+              src={filesApi.url(t.photoFileId, { stream: true })}
+              alt="Planting day"
+            />
+            <span className="fattachment-meta">
+              <span className="fattachment-label">Planting photo</span>
+              <span className="fattachment-action">Open</span>
+            </span>
           </a>
         </div>
       ) : null}
@@ -122,7 +136,7 @@ export function TreeCard({
                 <div className="frow" style={{ marginBottom: '.2rem' }}>
                   {p.photoFileId ? (
                     <a className="fthumb" href={filesApi.url(p.photoFileId)} target="_blank" rel="noopener noreferrer">
-                      <img src={filesApi.url(p.photoFileId)} alt="" />
+                      <img src={filesApi.url(p.photoFileId, { stream: true })} alt="" />
                     </a>
                   ) : (
                     <div className="fthumb">

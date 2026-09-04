@@ -177,7 +177,7 @@ export function ProfilePage({ user }: ProfilePageProps) {
             {user.role !== 'admin' && support.logoFileId ? (
               <img
                 className="logo-preview"
-                src={filesApi.url(support.logoFileId)}
+                src={filesApi.url(support.logoFileId, { stream: true })}
                 alt={`${support.name} logo`}
                 style={{ maxHeight: 56, margin: '.4rem 0 .6rem' }}
               />

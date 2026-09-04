@@ -304,7 +304,7 @@ function NewClientModal({
         Client Logo <span className="hint">optional · PNG/JPG/SVG</span>
       </div>
       {logoIds[0] ? (
-        <img className="logo-preview" src={filesApi.url(logoIds[0])} alt="Logo" />
+        <img className="logo-preview" src={filesApi.url(logoIds[0], { stream: true })} alt="Logo" />
       ) : null}
       <FileUpload kind="logo" label="Upload logo" accept="image/*" value={logoIds} onChange={setLogoIds} />
       <label className="legal-consent-check" style={{ marginTop: '.45rem' }}>

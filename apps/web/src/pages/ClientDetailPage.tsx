@@ -68,7 +68,7 @@ export function ClientDetailPage() {
       <div className="f-row" style={{ marginBottom: '.9rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem' }}>
           {client.logoFileId ? (
-            <img className="logo-preview" src={filesApi.url(client.logoFileId)} alt="" />
+            <img className="logo-preview" src={filesApi.url(client.logoFileId, { stream: true })} alt="" />
           ) : (
             <div className="logo-fallback">{client.name[0]}</div>
           )}
@@ -273,7 +273,7 @@ export function ClientDetailPage() {
               <div style={{ marginTop: '.3rem' }}>
                 {client.logoFileId ? (
                   <>
-                    <img className="logo-preview" src={filesApi.url(client.logoFileId)} alt="" />
+                    <img className="logo-preview" src={filesApi.url(client.logoFileId, { stream: true })} alt="" />
                     <div className="dim" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
                       Header display: {client.showPortalLogo ? 'On' : 'Off'}
                     </div>
@@ -444,7 +444,7 @@ function EditClientModal({
       <p className="dim" style={{ fontSize: '.78rem', margin: '0 0 .45rem' }}>
         Optional. When enabled, the logo appears in the client portal header.
       </p>
-      {logoIds[0] ? <img className="logo-preview" src={filesApi.url(logoIds[0])} alt="" /> : null}
+      {logoIds[0] ? <img className="logo-preview" src={filesApi.url(logoIds[0], { stream: true })} alt="" /> : null}
       <FileUpload kind="logo" label="Upload logo" accept="image/*" value={logoIds} onChange={setLogoIds} />
       <label className="legal-consent-check" style={{ marginTop: '.55rem' }}>
         <input
