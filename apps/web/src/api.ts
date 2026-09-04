@@ -43,6 +43,16 @@ export interface SessionUser {
   clientShowPortalLogo?: boolean;
 }
 
+export interface SecurityStatus {
+  mustChangePassword: boolean;
+  mfaRequired: boolean;
+  mfaEnrolled: boolean;
+  mfaEnrolForced: boolean;
+  mfaGraceDaysLeft: number | null;
+  mfaGraceDays: number;
+  passwordExpired: boolean;
+}
+
 export type RegisterType =
   | 'summary'
   | 'complete'
@@ -685,12 +695,12 @@ export const authApi = {
       challengeAnswer?: string;
     },
   ) =>
-    api<{ user: SessionUser }>('/auth/login', {
+    api<{ user: SessionUser; security: SecurityStatus }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, mfaCode, emailOtp, ...captcha }),
     }),
   logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
-  me: () => api<{ user: SessionUser }>('/auth/me'),
+  me: () => api<{ user: SessionUser; security: SecurityStatus }>('/auth/me'),
   legalStatus: () =>
     api<{
       compliant: boolean;
@@ -731,6 +741,10 @@ export const authApi = {
       enrolledAt: string | null;
       passwordAgeDays: number | null;
       passwordExpired: boolean;
+      mustChangePassword: boolean;
+      mfaEnrolForced: boolean;
+      mfaGraceDaysLeft: number | null;
+      mfaGraceDays: number;
       policyText: string;
     }>('/auth/mfa'),
   mfaStart: (method: 'totp' | 'email' = 'totp') =>

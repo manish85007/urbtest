@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
-import { authApi, type SessionUser } from './api';
+import { useCallback, useEffect, useState } from 'react';
+import { authApi, type SecurityStatus, type SessionUser } from './api';
 import { LogoIcon } from './components/BrandMark';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -20,6 +20,8 @@ import { ProfilePage } from './pages/ProfilePage';
 import { CompliancePage } from './pages/CompliancePage';
 import { Shell } from './components/Shell';
 import { LegalConsentGate } from './components/LegalConsentGate';
+import { PasswordMustChangeGate } from './components/PasswordMustChangeGate';
+import { MfaEnrolGate } from './components/MfaEnrolGate';
 
 function StaffOnly({ user, children }: { user: SessionUser; children: ReactNode }) {
   if (user.role === 'client') return <Navigate to="/" replace />;
@@ -33,20 +35,37 @@ function AdminOnly({ user, children }: { user: SessionUser; children: ReactNode 
 
 export function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [security, setSecurity] = useState<SecurityStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [legalOk, setLegalOk] = useState(false);
   const [checkingLegal, setCheckingLegal] = useState(false);
 
+  const refreshSecurity = useCallback(async () => {
+    const { security: s } = await authApi.me();
+    setSecurity(s);
+    return s;
+  }, []);
+
   useEffect(() => {
     authApi
       .me()
-      .then(({ user: u }) => setUser(u))
-      .catch(() => setUser(null))
+      .then(({ user: u, security: s }) => {
+        setUser(u);
+        setSecurity(s);
+      })
+      .catch(() => {
+        setUser(null);
+        setSecurity(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     if (!user) {
+      setLegalOk(false);
+      return;
+    }
+    if (security?.mustChangePassword) {
       setLegalOk(false);
       return;
     }
@@ -56,7 +75,12 @@ export function App() {
       .then((s) => setLegalOk(s.compliant))
       .catch(() => setLegalOk(true))
       .finally(() => setCheckingLegal(false));
-  }, [user]);
+  }, [user, security?.mustChangePassword]);
+
+  function onLogin(u: SessionUser, s: SecurityStatus) {
+    setUser(u);
+    setSecurity(s);
+  }
 
   if (loading) {
     return (
@@ -76,8 +100,20 @@ export function App() {
       <div className="page-root">
         <Routes>
           <Route path="/legal/:key" element={<LegalPage standalone />} />
-          <Route path="*" element={<LoginPage onLogin={setUser} />} />
+          <Route path="*" element={<LoginPage onLogin={onLogin} />} />
         </Routes>
+      </div>
+    );
+  }
+
+  if (security?.mustChangePassword) {
+    return (
+      <div className="page-root">
+        <PasswordMustChangeGate
+          onChanged={() => {
+            void refreshSecurity().catch(() => undefined);
+          }}
+        />
       </div>
     );
   }
@@ -103,8 +139,30 @@ export function App() {
     );
   }
 
+  if (security?.mfaEnrolForced) {
+    return (
+      <div className="page-root">
+        <MfaEnrolGate
+          graceDays={security.mfaGraceDays}
+          onEnrolled={() => {
+            void refreshSecurity().catch(() => undefined);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <Shell user={user} onLogout={() => setUser(null)}>
+    <Shell
+      user={user}
+      onLogout={() => {
+        setUser(null);
+        setSecurity(null);
+      }}
+      mfaGraceDaysLeft={
+        security?.mfaRequired && !security.mfaEnrolled ? security.mfaGraceDaysLeft : null
+      }
+    >
       <Routes>
         <Route path="/" element={<DashboardPage user={user} />} />
         <Route path="/requests" element={<RequestsListPage user={user} />} />

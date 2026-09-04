@@ -112,7 +112,18 @@ ensure_secret() {
 
 DB_PASSWORD="$(ensure_secret "${SECRET_DB}")"
 SESSION_SECRET="$(ensure_secret "${SECRET_SESSION}")"
-ADMIN_PASSWORD="$(ensure_secret "${SECRET_ADMIN}")"
+
+# Always rotate the bootstrap admin password on this deploy path so production
+# never keeps a shared/demo credential. User must change it on first login.
+ADMIN_PASSWORD="$(openssl rand -base64 36 | tr -d '\n+/=' | head -c 32)"
+# Guarantee policy shape: upper, lower, digit
+ADMIN_PASSWORD="Ur${ADMIN_PASSWORD}9A"
+if gcloud secrets describe "${SECRET_ADMIN}" --project="${PROJECT}" >/dev/null 2>&1; then
+  printf '%s' "${ADMIN_PASSWORD}" | gcloud secrets versions add "${SECRET_ADMIN}" --data-file=- --project="${PROJECT}" >/dev/null
+else
+  printf '%s' "${ADMIN_PASSWORD}" | gcloud secrets create "${SECRET_ADMIN}" --data-file=- --project="${PROJECT}" >/dev/null
+fi
+echo "Rotated Secret Manager ${SECRET_ADMIN} (one-time bootstrap password; must change on first login)."
 
 if ! gcloud secrets describe "${SECRET_SMTP}" --project="${PROJECT}" >/dev/null 2>&1; then
   echo "Missing Secret Manager secret ${SECRET_SMTP}." >&2
@@ -175,7 +186,15 @@ gcloud run deploy "${SERVICE}" \
   --max-instances 4 \
   --cpu-boost \
   --set-secrets "DATABASE_PASSWORD=${SECRET_DB}:latest,SESSION_SECRET=${SECRET_SESSION}:latest,SMTP_PASS=${SECRET_SMTP}:latest,ADMIN_BOOTSTRAP_PASSWORD=${SECRET_ADMIN}:latest" \
-  --set-env-vars "NODE_ENV=production,PRODUCTION_SEED=true,API_HOST=0.0.0.0,WEB_DIST=/app/apps/web/dist,COOKIE_SECURE=true,ENABLE_JOBS=true,EMAIL_PROVIDER=smtp,SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_SECURE=false,SMTP_USER=noreply@urbeno.in,SMTP_FROM_NAME=Urb TecTrack,SMTP_FROM_EMAIL=noreply@urbeno.in,URBENO_EMAIL=info@urbeno.in,DATABASE_USER=${DB_USER},DATABASE_NAME=${DB_NAME},CLOUD_SQL_CONNECTION_NAME=${SQL_CONN},GCS_BUCKET=${BUCKET},PORTAL_URL=${PORTAL_URL},CORS_ORIGIN=${PORTAL_URL},ADMIN_BOOTSTRAP_EMAIL=manish@urbeno.in,ADMIN_BOOTSTRAP_NAME=Manish Jain" \
+  --set-env-vars "NODE_ENV=production,PRODUCTION_SEED=true,ADMIN_BOOTSTRAP_FORCE_PASSWORD=true,API_HOST=0.0.0.0,WEB_DIST=/app/apps/web/dist,COOKIE_SECURE=true,ENABLE_JOBS=true,EMAIL_PROVIDER=smtp,SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_SECURE=false,SMTP_USER=noreply@urbeno.in,SMTP_FROM_NAME=Urb TecTrack,SMTP_FROM_EMAIL=noreply@urbeno.in,URBENO_EMAIL=info@urbeno.in,DATABASE_USER=${DB_USER},DATABASE_NAME=${DB_NAME},CLOUD_SQL_CONNECTION_NAME=${SQL_CONN},GCS_BUCKET=${BUCKET},PORTAL_URL=${PORTAL_URL},CORS_ORIGIN=${PORTAL_URL},ADMIN_BOOTSTRAP_EMAIL=manish@urbeno.in,ADMIN_BOOTSTRAP_NAME=Manish Jain" \
+  --quiet
+
+echo
+echo "Clearing one-shot ADMIN_BOOTSTRAP_FORCE_PASSWORD so future restarts do not keep rotating…"
+gcloud run services update "${SERVICE}" \
+  --region "${REGION}" \
+  --project "${PROJECT}" \
+  --update-env-vars "ADMIN_BOOTSTRAP_FORCE_PASSWORD=false" \
   --quiet
 
 echo
@@ -185,11 +204,8 @@ echo
 echo "  Run URL   $(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT}" --format='value(status.url)')"
 echo "  Public    ${PORTAL_URL}  (after DNS + LB — see docs/PRODUCTION-GCP.md)"
 echo "  Superadmin  manish@urbeno.in"
-echo "  Password    Secret Manager: ${SECRET_ADMIN}"
+echo "  Bootstrap password (must change on first login):"
 echo "    gcloud secrets versions access latest --secret=${SECRET_ADMIN} --project=${PROJECT}"
 echo
-echo "Next: provision HTTPS LB + cert:"
-echo "  GCP_RUN_SERVICE=${SERVICE} GCP_LB_DOMAIN=${PORTAL_HOST} GCP_LB_PREFIX=tectrack-prod \\"
-echo "    ./infra/gcp/setup-lb.sh"
-echo "Then create DNS A record: ${PORTAL_HOST} → printed LB IP"
+echo "  MFA: staff roles must enrol within 15 days of account creation; after that enrolment is forced."
 echo "────────────────────────────────────────────────────────────"

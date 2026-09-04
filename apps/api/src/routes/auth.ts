@@ -1,6 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
-import { signIn, signOut, changePassword, AuthError, startMfaEnrol, confirmMfaEnrol, disableMfa, mfaStatus } from '../services/auth.js';
+import {
+  signIn,
+  signOut,
+  changePassword,
+  AuthError,
+  startMfaEnrol,
+  confirmMfaEnrol,
+  disableMfa,
+  mfaStatus,
+  securityStatusFor,
+} from '../services/auth.js';
 import { confirmPasswordReset, requestPasswordReset } from '../services/password-reset.js';
 import { assertCaptcha, getCaptchaConfig, issueChallenge } from '../services/captcha.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
@@ -120,7 +130,7 @@ export async function authRoutes(app: FastifyInstance) {
           });
         }
       }
-      const { user, token } = await signIn(
+      const { user, token, security } = await signIn(
         body.email,
         body.password,
         body.mfaCode,
@@ -135,7 +145,7 @@ export async function authRoutes(app: FastifyInstance) {
           (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production'),
         maxAge: 8 * 60 * 60,
       });
-      return { user };
+      return { user, security };
     } catch (err) {
       if (err instanceof ZodError) {
         return reply.status(400).send({
@@ -179,7 +189,8 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.get('/auth/me', { preHandler: requireAuth }, async (request) => {
-    return { user: request.user };
+    const security = await securityStatusFor(request.user!);
+    return { user: request.user, security };
   });
 
   app.post('/auth/change-password', { preHandler: requireAuth }, async (request, reply) => {

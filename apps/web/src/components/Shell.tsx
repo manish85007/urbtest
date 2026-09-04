@@ -17,6 +17,8 @@ interface ShellProps {
   user: SessionUser;
   onLogout: () => void;
   children: ReactNode;
+  /** When set, show a staff MFA grace reminder in the header strip. */
+  mfaGraceDaysLeft?: number | null;
 }
 
 function brandSub(user: SessionUser) {
@@ -29,7 +31,7 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '--';
 }
 
-export function Shell({ user, onLogout, children }: ShellProps) {
+export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: ShellProps) {
   const loc = useLocation();
   const items = navItems(user.role);
   const [navOpen, setNavOpen] = useState(false);
@@ -236,6 +238,24 @@ export function Shell({ user, onLogout, children }: ShellProps) {
       </aside>
 
       <div className="shell-main">
+        {mfaGraceDaysLeft != null && mfaGraceDaysLeft > 0 ? (
+          <div
+            className="ann-bar"
+            role="status"
+            style={{ background: 'var(--am, #8a5a00)', color: '#fff' }}
+          >
+            <div className="ann-bar-inner" style={{ animation: 'none', justifyContent: 'center' }}>
+              <span className="ann-bar-item">
+                Two-factor authentication is required for your role. Enrol within {mfaGraceDaysLeft}{' '}
+                day{mfaGraceDaysLeft === 1 ? '' : 's'} —{' '}
+                <Link to="/profile" style={{ color: '#fff', textDecoration: 'underline' }}>
+                  set up now
+                </Link>
+                .
+              </span>
+            </div>
+          </div>
+        ) : null}
         {announcements.length > 0 && (
           <div className="ann-bar" role="marquee" aria-label="Announcements">
             <div className="ann-bar-inner">

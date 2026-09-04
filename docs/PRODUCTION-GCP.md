@@ -43,11 +43,13 @@ From the repo root:
 
 This builds `:prod`, creates SQL/Run/bucket if missing, runs Prisma migrations, and production seed (factory + categories + admin only — **no demo clients or demo password**).
 
-Retrieve the one-time admin password:
+Retrieve the one-time admin bootstrap password (must change on first login):
 
 ```bash
 gcloud secrets versions access latest --secret=tectrack-prod-admin-password
 ```
+
+Staff MFA is mandatory for admin / operations / factory within **15 days** of account creation; after that the portal blocks until enrolment.
 
 Sign in as **manish@urbeno.in** and **change the password** immediately (Profile → Change password). Use Forgot password if you prefer email reset.
 

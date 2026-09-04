@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { PW_POLICY, pwCheck, pwExpired, pwPolicyText } from './password-policy.js';
+import {
+  MFA_GRACE_DAYS,
+  PW_POLICY,
+  mfaEnrolForced,
+  mfaGraceDaysLeft,
+  pwCheck,
+  pwExpired,
+  pwPolicyText,
+} from './password-policy.js';
 
 describe('password policy X4', () => {
   it('requires at least 10 characters', () => {
@@ -31,5 +39,16 @@ describe('password policy X4', () => {
   it('expires after 180 days', () => {
     const old = new Date(Date.now() - 181 * 86400000);
     expect(pwExpired(old)).toBe(true);
+  });
+
+  it(`forces MFA after ${MFA_GRACE_DAYS} days for staff who have not enrolled`, () => {
+    const within = new Date(Date.now() - 3 * 86400000);
+    expect(mfaEnrolForced('admin', within, false)).toBe(false);
+    expect(mfaGraceDaysLeft('admin', within, false)).toBe(MFA_GRACE_DAYS - 3);
+
+    const overdue = new Date(Date.now() - (MFA_GRACE_DAYS + 1) * 86400000);
+    expect(mfaEnrolForced('admin', overdue, false)).toBe(true);
+    expect(mfaEnrolForced('admin', overdue, true)).toBe(false);
+    expect(mfaEnrolForced('client', overdue, false)).toBe(false);
   });
 });

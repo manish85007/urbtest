@@ -1,10 +1,15 @@
 import bcrypt from 'bcryptjs';
 import {
+  MFA_GRACE_DAYS,
   PW_POLICY,
+  mfaEnrolForced,
+  mfaGraceDaysLeft,
   mfaRequired,
+  pwAgeDays,
   pwCheck,
   pwExpired,
   pwNeedsMessage,
+  pwPolicyText,
   pwReusedMessage,
 } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
@@ -14,13 +19,29 @@ import { auditLog } from './audit.js';
 import { recordSecurityEvent } from './security-log.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { enrichSessionUser } from '../lib/auth-context.js';
-import { emailOtpDue, issueLoginEmailOtp, issueMfaEmailOtp, verifyLoginEmailOtp, verifyMfaEmailOtp } from './login-email-otp.js';
+import {
+  emailOtpDue,
+  issueLoginEmailOtp,
+  issueMfaEmailOtp,
+  verifyLoginEmailOtp,
+  verifyMfaEmailOtp,
+} from './login-email-otp.js';
 
 const LOCK_ATTEMPTS = PW_POLICY.lockAfter;
 const LOCK_WINDOW_MS = PW_POLICY.lockWindowMins * 60 * 1000;
 const SESSION_HOURS = 8;
 
 export type MfaMethod = 'totp' | 'email';
+
+export type SecurityStatus = {
+  mustChangePassword: boolean;
+  mfaRequired: boolean;
+  mfaEnrolled: boolean;
+  mfaEnrolForced: boolean;
+  mfaGraceDaysLeft: number | null;
+  mfaGraceDays: number;
+  passwordExpired: boolean;
+};
 
 export class AuthError extends Error {
   mfaRequired = false;
@@ -79,6 +100,7 @@ export async function rememberPassword(userId: string, passwordHash: string) {
   }
 }
 
+/** User-chosen password — clears the mandatory-reset flag. */
 export async function applyPassword(userId: string, email: string, password: string) {
   await assertPasswordPolicy(email, password, userId);
   const passwordHash = await hashPassword(password);
@@ -90,13 +112,66 @@ export async function applyPassword(userId: string, email: string, password: str
   return passwordHash;
 }
 
+/** Temporary / bootstrap password — user must change it on next sign-in. */
+export async function applyTempPassword(userId: string, email: string, password: string) {
+  await assertPasswordPolicy(email, password, userId);
+  const passwordHash = await hashPassword(password);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, passwordSetAt: new Date(), mustReset: true },
+  });
+  await rememberPassword(userId, passwordHash);
+  return passwordHash;
+}
+
+function isMfaEnrolled(user: { mfaSecret: string | null; mfaMethod: string | null }): boolean {
+  return user.mfaMethod === 'email' || !!user.mfaSecret;
+}
+
+export function buildSecurityStatus(user: {
+  role: string;
+  createdAt: Date;
+  mustReset: boolean;
+  passwordSetAt: Date | null;
+  mfaSecret: string | null;
+  mfaMethod: string | null;
+}): SecurityStatus {
+  const enrolled = isMfaEnrolled(user);
+  const passwordExpired = pwExpired(user.passwordSetAt);
+  return {
+    mustChangePassword: user.mustReset || passwordExpired,
+    mfaRequired: mfaRequired(user.role),
+    mfaEnrolled: enrolled,
+    mfaEnrolForced: mfaEnrolForced(user.role, user.createdAt, enrolled),
+    mfaGraceDaysLeft: mfaGraceDaysLeft(user.role, user.createdAt, enrolled),
+    mfaGraceDays: MFA_GRACE_DAYS,
+    passwordExpired,
+  };
+}
+
+export async function securityStatusFor(actor: SessionUser): Promise<SecurityStatus> {
+  const user = await prisma.user.findUnique({ where: { id: actor.id } });
+  if (!user) {
+    return {
+      mustChangePassword: false,
+      mfaRequired: false,
+      mfaEnrolled: false,
+      mfaEnrolForced: false,
+      mfaGraceDaysLeft: null,
+      mfaGraceDays: MFA_GRACE_DAYS,
+      passwordExpired: false,
+    };
+  }
+  return buildSecurityStatus(user);
+}
+
 export async function signIn(
   email: string,
   password: string,
   mfaCode?: string,
   userAgent?: string,
   emailOtp?: string,
-): Promise<{ user: SessionUser; token: string; passwordExpired: boolean }> {
+): Promise<{ user: SessionUser; token: string; security: SecurityStatus }> {
   const normalized = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalized } });
 
@@ -159,11 +234,7 @@ export async function signIn(
   }
 
   const mfaMethod: MfaMethod | null =
-    user.mfaMethod === 'email'
-      ? 'email'
-      : user.mfaSecret
-        ? 'totp'
-        : null;
+    user.mfaMethod === 'email' ? 'email' : user.mfaSecret ? 'totp' : null;
 
   if (mfaMethod === 'totp' && user.mfaSecret) {
     if (!mfaCode?.trim()) {
@@ -224,7 +295,7 @@ export async function signIn(
 
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
-  const expired = pwExpired(user.passwordSetAt);
+  const security = buildSecurityStatus(user);
 
   await prisma.$transaction([
     prisma.user.update({
@@ -247,11 +318,17 @@ export async function signIn(
     entityId: user.email,
   });
   await recordSecurityEvent('auth.success', user.email, {}, 'info', userAgent);
-  if (expired) {
+  if (security.passwordExpired) {
     await recordSecurityEvent('auth.password.expired', user.email, {}, 'warn', userAgent);
   }
+  if (security.mustChangePassword) {
+    await recordSecurityEvent('auth.password.must_reset', user.email, {}, 'warn', userAgent);
+  }
+  if (security.mfaEnrolForced) {
+    await recordSecurityEvent('mfa.enrol.forced', user.email, { graceDays: MFA_GRACE_DAYS }, 'high', userAgent);
+  }
 
-  return { user: await enrichSessionUser(user), token, passwordExpired: expired };
+  return { user: await enrichSessionUser(user), token, security };
 }
 
 export async function signOut(token: string, actor?: SessionUser) {
@@ -339,14 +416,14 @@ export async function confirmMfaEnrol(
     try {
       await verifyMfaEmailOtp(user.email, opts.code);
     } catch (err) {
-      throw new AppError(err instanceof Error ? err.message : 'Email verification failed.');
+      throw new AppError(err instanceof Error ? err.message : 'Email two-factor failed.');
     }
     await prisma.user.update({
       where: { id: user.id },
       data: { mfaSecret: null, mfaMethod: 'email', mfaAt: new Date() },
     });
   } else {
-    if (!opts.secret) throw new AppError('Authenticator secret is required.');
+    if (!opts.secret?.trim()) throw new AppError('Authenticator secret is required.');
     if (!verifyTotp(opts.secret, opts.code)) {
       throw new AppError('That code is not right. It changes every 30 seconds — try the current one.');
     }
@@ -369,7 +446,11 @@ export async function confirmMfaEnrol(
 }
 
 export async function disableMfa(actor: SessionUser, reason: string) {
-  if (!reason?.trim()) throw new AppError('Record why the second factor is being removed.');
+  if (mfaRequired(actor.role)) {
+    throw new AppError(
+      `Two-factor authentication is mandatory for ${actor.role} accounts and cannot be turned off.`,
+    );
+  }
   const user = await prisma.user.findUnique({ where: { id: actor.id } });
   if (!user) throw new AppError('User not found');
   await prisma.user.update({
@@ -388,24 +469,34 @@ export async function disableMfa(actor: SessionUser, reason: string) {
   return { ok: true, enrolled: false };
 }
 
-function isMfaEnrolled(user: { mfaSecret: string | null; mfaMethod: string | null }): boolean {
-  return user.mfaMethod === 'email' || !!user.mfaSecret;
-}
-
 export async function mfaStatus(actor: SessionUser) {
   const user = await prisma.user.findUnique({ where: { id: actor.id } });
   const method: MfaMethod | null =
     user?.mfaMethod === 'email' ? 'email' : user?.mfaSecret ? 'totp' : null;
+  const enrolled = user ? isMfaEnrolled(user) : false;
+  const security = user
+    ? buildSecurityStatus(user)
+    : {
+        mustChangePassword: false,
+        mfaRequired: mfaRequired(actor.role),
+        mfaEnrolled: false,
+        mfaEnrolForced: false,
+        mfaGraceDaysLeft: null,
+        mfaGraceDays: MFA_GRACE_DAYS,
+        passwordExpired: false,
+      };
   return {
-    required: mfaRequired(actor.role),
-    enrolled: user ? isMfaEnrolled(user) : false,
+    required: security.mfaRequired,
+    enrolled,
     method,
     enrolledAt: user?.mfaAt?.toISOString() ?? null,
-    passwordAgeDays: user?.passwordSetAt
-      ? Math.floor((Date.now() - user.passwordSetAt.getTime()) / 86400000)
-      : null,
-    passwordExpired: pwExpired(user?.passwordSetAt ?? null),
-    policyText: (await import('@urb-tectrack/shared')).pwPolicyText(),
+    passwordAgeDays: pwAgeDays(user?.passwordSetAt ?? null),
+    passwordExpired: security.passwordExpired,
+    mustChangePassword: security.mustChangePassword,
+    mfaEnrolForced: security.mfaEnrolForced,
+    mfaGraceDaysLeft: security.mfaGraceDaysLeft,
+    mfaGraceDays: MFA_GRACE_DAYS,
+    policyText: pwPolicyText(),
   };
 }
 

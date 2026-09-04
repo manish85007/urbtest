@@ -5,8 +5,10 @@
  *   ADMIN_BOOTSTRAP_EMAIL     default manish@urbeno.in
  *   ADMIN_BOOTSTRAP_NAME      default Manish Jain
  *   ADMIN_BOOTSTRAP_PASSWORD  required (from Secret Manager on Cloud Run)
+ *   ADMIN_BOOTSTRAP_FORCE_PASSWORD  when "true", rotate existing admin password
+ *                                   and set must_reset (mandatory change on next login)
  *
- * Idempotent: existing admin password is never overwritten.
+ * Idempotent by default: existing admin password is never overwritten unless forced.
  */
 import { config } from 'dotenv';
 import { existsSync, readFileSync } from 'node:fs';
@@ -34,10 +36,14 @@ async function main() {
   const adminEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? 'manish@urbeno.in').trim().toLowerCase();
   const adminName = (process.env.ADMIN_BOOTSTRAP_NAME ?? 'Manish Jain').trim();
   const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
+  const forcePassword = process.env.ADMIN_BOOTSTRAP_FORCE_PASSWORD === 'true';
   if (!bootstrapPassword || bootstrapPassword.length < 12) {
     throw new Error(
       'ADMIN_BOOTSTRAP_PASSWORD is required (≥ 12 characters). Do not use the UAT demo password.',
     );
+  }
+  if (/^demo$/i.test(bootstrapPassword)) {
+    throw new Error('ADMIN_BOOTSTRAP_PASSWORD must not be the demo password.');
   }
 
   await seedLookups();
@@ -103,19 +109,34 @@ async function main() {
   }
 
   const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  const passwordHash = await bcrypt.hash(bootstrapPassword, 12);
   if (!existingAdmin) {
-    const passwordHash = await bcrypt.hash(bootstrapPassword, 12);
     await prisma.user.create({
       data: {
         email: adminEmail,
         name: adminName,
         role: UserRole.admin,
         passwordHash,
+        passwordSetAt: new Date(),
+        mustReset: true,
         active: true,
         factoryIds: [],
         siteIds: [],
       },
     });
+  } else if (forcePassword) {
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: {
+        name: adminName,
+        role: UserRole.admin,
+        active: true,
+        passwordHash,
+        passwordSetAt: new Date(),
+        mustReset: true,
+      },
+    });
+    await prisma.session.deleteMany({ where: { userId: existingAdmin.id } });
   } else {
     await prisma.user.update({
       where: { email: adminEmail },
@@ -186,7 +207,12 @@ async function main() {
   await backfillAuditHashes();
 
   console.log(
-    `Production seed: factory ${FACTORY_ID} (${FACTORY_NAME}), authorised TPA ${tpa}, admin ${adminEmail}`,
+    `Production seed: factory ${FACTORY_ID} (${FACTORY_NAME}), authorised TPA ${tpa}, admin ${adminEmail}` +
+      (forcePassword
+        ? ' (password rotated, must_reset=true)'
+        : existingAdmin
+          ? ''
+          : ' (created, must_reset=true)'),
   );
 }
 

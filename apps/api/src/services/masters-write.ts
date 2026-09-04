@@ -4,7 +4,7 @@ import { gstinError, treesEarned } from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
-import { applyPassword, assertPasswordPolicy, hashPassword } from './auth.js';
+import { applyPassword, applyTempPassword, assertPasswordPolicy, hashPassword } from './auth.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { sendTransactionalEmail } from './email.js';
 import { recordSecurityEvent } from './security-log.js';
@@ -144,15 +144,15 @@ export async function createSite(actor: SessionUser, clientId: string, input: Si
   return site;
 }
 
-/** Same password as seeded demo accounts — used so testers can sign in immediately. */
-function tempPassword() {
-  return 'demo';
+/** Policy-compliant temporary password (never a shared/demo string). */
+export function generateAdminTempPassword(): string {
+  const chunk = randomBytes(12).toString('base64url').replace(/[^a-zA-Z0-9]/g, '');
+  // Guaranteed upper + lower + digit; length well above PW_POLICY.minLen.
+  return `Ur${chunk}9Kx!`;
 }
 
-/** Policy-compliant temporary password for admin-initiated resets (shown to admin; email optional). */
-export function generateAdminTempPassword(): string {
-  const chunk = randomBytes(5).toString('base64url').replace(/[^a-zA-Z0-9]/g, '');
-  return `Tmp${chunk}9A`;
+function tempPassword() {
+  return generateAdminTempPassword();
 }
 
 /**
@@ -165,7 +165,7 @@ export async function adminResetUserPassword(actor: SessionUser, userId: string)
   if (!existing.active) throw new AppError('Cannot reset password for a disabled account. Re-activate the user first.');
 
   const tmp = generateAdminTempPassword();
-  await applyPassword(existing.id, existing.email, tmp);
+  await applyTempPassword(existing.id, existing.email, tmp);
   await prisma.$transaction([
     prisma.session.deleteMany({ where: { userId: existing.id } }),
     prisma.user.update({
@@ -230,7 +230,7 @@ export async function createUser(
   }
 
   const tmp = input.password?.trim() || tempPassword();
-  if (tmp !== 'demo') await assertPasswordPolicy(email, tmp);
+  await assertPasswordPolicy(email, tmp);
   const passwordHash = await hashPassword(tmp);
 
   const user = await prisma.user.create({
@@ -239,6 +239,8 @@ export async function createUser(
       name: input.name.trim(),
       role: input.role,
       passwordHash,
+      passwordSetAt: new Date(),
+      mustReset: true,
       clientId: input.role === 'client' ? input.clientId ?? null : null,
       factoryIds: input.role === 'factory' ? input.factoryIds ?? [] : [],
       siteIds: input.role === 'client' ? input.siteIds ?? [] : [],
@@ -541,8 +543,8 @@ export async function updateUser(
     throw new AppError('You cannot disable your own account.');
   }
 
-  if (input.password && input.password !== 'demo') {
-    await applyPassword(existing.id, existing.email, input.password);
+  if (input.password?.trim()) {
+    await applyTempPassword(existing.id, existing.email, input.password.trim());
   }
 
   const updated = await prisma.user.update({

@@ -110,7 +110,7 @@ export function ProfilePage({ user }: ProfilePageProps) {
             </div>
           </div>
 
-          {user.role === 'admin' || user.role === 'factory' ? (
+          {(user.role === 'admin' || user.role === 'operations' || user.role === 'factory') ? (
             <div className="card">
               <div className="card-ttl">Two-factor authentication</div>
               <MfaCard />
@@ -286,13 +286,23 @@ function MfaCard() {
 
   return (
     <div style={{ marginTop: '.5rem' }}>
-      {status?.required ? <span className="badge bg-am">Required for your role</span> : null}
+      {status?.required ? (
+        <span className="badge bg-am">
+          {status.mfaEnrolForced
+            ? 'Required now — grace period ended'
+            : status.mfaGraceDaysLeft != null
+              ? `Required within ${status.mfaGraceDaysLeft} day${status.mfaGraceDaysLeft === 1 ? '' : 's'}`
+              : 'Required for your role'}
+        </span>
+      ) : null}
       <p className="dim" style={{ fontSize: '.84rem', margin: '.4rem 0' }}>
         {status?.enrolled
           ? `Enrolled${status.enrolledAt ? ` on ${status.enrolledAt.slice(0, 10)}` : ''}${
               methodLabel ? ` via ${methodLabel}` : ''
             }.`
-          : 'Not enrolled. Super Admins, Ops, and factory managers should set up two-factor — authenticator app or email OTP.'}
+          : `Not enrolled. Super Admins, Ops, and factory managers must set up two-factor within ${
+              status?.mfaGraceDays ?? 15
+            } days of account creation — authenticator app or email OTP.`}
       </p>
       {status?.passwordExpired ? (
         <p className="error">Your password is past the rotation period.</p>
@@ -455,7 +465,7 @@ function MfaCard() {
             </button>
           </div>
         </div>
-      ) : status?.enrolled ? (
+      ) : status?.enrolled && !status.required ? (
         <div>
           <input placeholder="Reason for removal" value={reason} onChange={(e) => setReason(e.target.value)} />
           <button
@@ -474,6 +484,10 @@ function MfaCard() {
             Remove
           </button>
         </div>
+      ) : status?.enrolled && status.required ? (
+        <p className="dim" style={{ fontSize: '.84rem' }}>
+          Two-factor is mandatory for your role and cannot be turned off.
+        </p>
       ) : pickMethod ? (
         <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
           <button type="button" className="btn bp bsm" onClick={() => void start('totp')}>

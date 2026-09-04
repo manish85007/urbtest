@@ -15,6 +15,9 @@ export const PW_POLICY = {
 /** Staff roles that must use a second factor (authenticator or email OTP). */
 export const MFA_ROLES = ['admin', 'operations', 'factory'] as const;
 
+/** Days after account creation before MFA enrolment is forced for MFA_ROLES. */
+export const MFA_GRACE_DAYS = 15;
+
 export function pwCheck(pw: string, em?: string | null): string[] {
   const p = PW_POLICY;
   const fails: string[] = [];
@@ -62,4 +65,35 @@ export function pwExpired(
 
 export function mfaRequired(role: string | null | undefined): boolean {
   return (MFA_ROLES as readonly string[]).includes(role ?? '');
+}
+
+/** Whole days elapsed since account creation (floor). */
+export function mfaAgeDays(createdAt: Date | string | null | undefined, now = Date.now()): number | null {
+  if (!createdAt) return null;
+  return Math.floor((now - new Date(createdAt).getTime()) / 86400000);
+}
+
+/** Days remaining in the MFA grace window; 0 when due or overdue; null if MFA not required for role. */
+export function mfaGraceDaysLeft(
+  role: string | null | undefined,
+  createdAt: Date | string | null | undefined,
+  enrolled: boolean,
+  now = Date.now(),
+): number | null {
+  if (!mfaRequired(role) || enrolled) return null;
+  const age = mfaAgeDays(createdAt, now);
+  if (age === null) return MFA_GRACE_DAYS;
+  return Math.max(0, MFA_GRACE_DAYS - age);
+}
+
+/** True when a staff account past the grace window must enrol MFA before using the app. */
+export function mfaEnrolForced(
+  role: string | null | undefined,
+  createdAt: Date | string | null | undefined,
+  enrolled: boolean,
+  now = Date.now(),
+): boolean {
+  if (!mfaRequired(role) || enrolled) return false;
+  const left = mfaGraceDaysLeft(role, createdAt, enrolled, now);
+  return left !== null && left <= 0;
 }

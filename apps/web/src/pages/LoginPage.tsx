@@ -4,7 +4,7 @@ import { LogoPrimary } from '../components/BrandMark';
 import { LoginCaptcha, type CaptchaPayload } from '../components/LoginCaptcha';
 
 interface LoginPageProps {
-  onLogin: (user: SessionUser) => void;
+  onLogin: (user: SessionUser, security: import('../api').SecurityStatus) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -51,14 +51,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setBusy(true);
     setError('');
     try {
-      const { user } = await authApi.login(
+      const { user, security } = await authApi.login(
         email,
         password,
         needMfa ? mfaCode : undefined,
         needEmailOtp ? emailOtp : undefined,
         continuing ? undefined : captcha ?? undefined,
       );
-      onLogin(user);
+      onLogin(user, security);
     } catch (err) {
       const e = err as Error & {
         mfaRequired?: boolean;
