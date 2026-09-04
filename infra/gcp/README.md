@@ -50,3 +50,16 @@ Optionally lock Cloud Run to LB-only ingress:
 gcloud run services update tectrack-uat --region=asia-south1 \
   --ingress=internal-and-cloud-load-balancing
 ```
+
+## Production (tectrack.urbeno.in)
+
+Separate stack from UAT. Full steps: **[docs/PRODUCTION-GCP.md](../../docs/PRODUCTION-GCP.md)**.
+
+```bash
+./infra/gcp/deploy-prod.sh
+GCP_RUN_SERVICE=tectrack-prod GCP_LB_DOMAIN=tectrack.urbeno.in GCP_LB_PREFIX=tectrack-prod \
+  ./infra/gcp/setup-lb.sh
+# DNS A: tectrack.urbeno.in → LB IP
+```
+
+Super Admin: `manish@urbeno.in` (password in `tectrack-prod-admin-password`). Factory: **Urbeno - Aerospace Park - Unit 1** at **3060 TPA**.

@@ -54,7 +54,10 @@ async function main() {
     if (/\.(png|jpg|json)$/.test(f)) fs.unlinkSync(path.join(OUT, f));
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--disable-save-password-bubble', '--disable-password-manager'],
+  });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
@@ -63,6 +66,13 @@ async function main() {
 
   // Login — empty form only (no credentials on screen for the PDF)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+      for (const el of document.querySelectorAll('input[type="email"], input[type="password"]')) {
+        el.value = '';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+  });
+  await page.waitForTimeout(200);
   await snap(
     page,
     'login',
@@ -73,6 +83,17 @@ async function main() {
   // Sign in for the rest of the walkthrough (credentials never shown in screenshots)
   await page.locator('input[type="email"], input[name="email"]').first().fill(EMAIL);
   await page.locator('input[type="password"]').first().fill(PASSWORD);
+  const q = await page.getByText(/What is \d+ \+ \d+\?/).textContent().catch(() => '');
+  const m = /What is (\d+) \+ (\d+)\?/.exec(q || '');
+  if (m) {
+    const sum = String(Number(m[1]) + Number(m[2]));
+    const ans = page.getByLabel(/answer/i).or(page.locator('input[name="challengeAnswer"], input[autocomplete="off"]').last());
+    await ans.fill(sum).catch(async () => {
+      const inputs = page.locator('input:not([type="email"]):not([type="password"]):not([type="hidden"])');
+      const n = await inputs.count();
+      if (n) await inputs.nth(n - 1).fill(sum);
+    });
+  }
   await page.getByRole('button', { name: /sign in|log in|login/i }).click();
   await page.waitForTimeout(1500);
   await acceptPoliciesIfNeeded(page);
@@ -82,20 +103,10 @@ async function main() {
     page,
     'home',
     'Home dashboard',
-    'After sign-in you land on Home. Review open and completed request counts, sustainability figures, and recent activity. Use the top navigation (Home, My Requests, Recycling Heroes, Sustainability, Reports) to move around the client portal.',
+    'After sign-in you land on Home. Review open and completed request counts, sustainability figures, and recent activity. Use the left menu (Home, My Requests, Recycling Heroes, Sustainability, Reports) to move around the client portal. On a phone the menu slides in from the left.',
   );
 
-  // New Request early — as requested
-  const newBtn = page.getByRole('button', { name: /new request/i }).first();
-  if (await newBtn.isVisible().catch(() => false)) {
-    await newBtn.click();
-    await page.waitForTimeout(700);
-  } else {
-    await page.goto(BASE + '/requests', { waitUntil: 'networkidle' });
-    const alt = page.getByRole('button', { name: /new request/i }).first();
-    if (await alt.isVisible().catch(() => false)) await alt.click();
-    await page.waitForTimeout(700);
-  }
+  await page.goto(BASE + '/requests/new', { waitUntil: 'networkidle' });
   await snap(
     page,
     'new-request',

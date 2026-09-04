@@ -10,7 +10,7 @@
     {
       "id": "home",
       "title": "Home dashboard",
-      "notes": "After sign-in you land on Home. Review open and completed request counts, sustainability figures, and recent activity. Use the top navigation (Home, My Requests, Recycling Heroes, Sustainability, Reports) to move around the client portal.",
+      "notes": "After sign-in you land on Home. Review open and completed request counts, sustainability figures, and recent activity. Use the left menu (Home, My Requests, Recycling Heroes, Sustainability, Reports) to move around the client portal. On a phone the menu slides in from the left.",
       "file": "02-home.jpg"
     },
     {

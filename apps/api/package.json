@@ -13,6 +13,7 @@
     "db:migrate": "DOTENV_CONFIG_PATH=../../.env prisma migrate dev",
     "db:migrate:deploy": "DOTENV_CONFIG_PATH=../../.env prisma migrate deploy",
     "db:seed": "DOTENV_CONFIG_PATH=../../.env tsx prisma/seed.ts",
+    "db:seed:production": "DOTENV_CONFIG_PATH=../../.env tsx prisma/seed-production.ts",
     "db:studio": "DOTENV_CONFIG_PATH=../../.env prisma studio"
   },
   "dependencies": {

@@ -28,5 +28,7 @@ function run(cmd, args) {
 run('pnpm', ['--filter', '@urb-tectrack/api', 'exec', 'prisma', 'migrate', 'deploy']);
 if (process.env.UAT_SEED === 'true') {
   run('pnpm', ['--filter', '@urb-tectrack/api', 'db:seed']);
+} else if (process.env.PRODUCTION_SEED === 'true') {
+  run('pnpm', ['--filter', '@urb-tectrack/api', 'db:seed:production']);
 }
 run('node', ['apps/api/dist/index.js']);

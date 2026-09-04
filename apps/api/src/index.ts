@@ -42,6 +42,9 @@ if (isProd && process.env.UAT_SEED === 'true') {
   );
   process.exit(1);
 }
+if (isProd && process.env.PRODUCTION_SEED === 'true') {
+  console.log('[boot] PRODUCTION_SEED=true — factory/admin bootstrap will run on container start.');
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);

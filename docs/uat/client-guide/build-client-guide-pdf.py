@@ -43,7 +43,7 @@ class GuidePDF(FPDF):
             return
         self.set_font("Helvetica", "", 9)
         self.set_text_color(*MUTED)
-        self.cell(0, 8, "Urb TecTrack  |  Client Access Visual Guide  |  Confidential", align="L")
+        self.cell(0, 8, "Urb TecTrack  |  Client Portal Overview  |  Confidential", align="L")
         self.ln(4)
         self.set_draw_color(*RULE)
         self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
@@ -75,7 +75,7 @@ def add_cover(pdf: GuidePDF, base: str):
     pdf.set_x(pdf.l_margin)
     pdf.set_font("Helvetica", "", 15)
     pdf.set_text_color(*INK)
-    pdf.multi_cell(pdf.epw, 8, "Client Access Visual Guide", align="C")
+    pdf.multi_cell(pdf.epw, 8, "Client Portal Overview", align="C")
     pdf.set_x(pdf.l_margin)
     pdf.ln(4)
     pdf.set_font("Helvetica", "", 11)
@@ -83,8 +83,8 @@ def add_cover(pdf: GuidePDF, base: str):
     pdf.multi_cell(
         pdf.epw,
         6,
-        "Step-by-step walkthrough for client (requestor) users\n"
-        "User Acceptance Testing",
+        "Visual walkthrough for client (requestor) users\n"
+        "Screens captured from the live UAT environment",
         align="C",
     )
     pdf.set_x(pdf.l_margin)
@@ -99,7 +99,7 @@ def add_cover(pdf: GuidePDF, base: str):
     pdf.set_text_color(*INK)
     for line in [
         f"Portal:  {base}",
-        "Audience:  Client organisation testers",
+        "Audience:  Client organisations (EHS, facilities, finance, IT, site leads)",
         "Support:  info@urbeno.in",
         "Screens captured from the live UAT environment",
     ]:
@@ -114,8 +114,8 @@ def add_cover(pdf: GuidePDF, base: str):
         pdf.epw,
         5,
         "This guide does not contain account credentials. Use the sign-in details "
-        "issued separately by Urbeno. Pair this document with the Client UAT Pack "
-        "to mark Pass / Fail and record findings.",
+        "issued separately by Urbeno. Use it to decide who in your organisation "
+        "needs access, then follow the screens to understand the portal.",
         align="C",
     )
 
@@ -124,27 +124,62 @@ def add_howto(pdf: GuidePDF):
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_text_color(*GREEN)
-    pdf.cell(0, 10, "How to use this guide", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
+    pdf.cell(0, 10, "What Urb TecTrack is", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(*INK)
+    pdf.multi_cell(
+        pdf.epw,
+        6,
+        ascii_safe(
+            "Urb TecTrack is Urbeno's e-waste collection and recycling portal. "
+            "Your team raises pickup requests, tracks each job from acknowledgement "
+            "through weighment, invoicing and Certificate of Destruction (CoD), "
+            "and downloads reports for audit and ESG. Each organisation only sees "
+            "its own data. Urbeno staff handle vehicles, MRN, recycling and CoD upload."
+        ),
+    )
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(*GREEN)
+    pdf.cell(0, 8, "Who typically needs access", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(*INK)
+    for line in [
+        "EHS / Environment / Sustainability  -  CoD, compliance trail, ESG numbers",
+        "Facilities / Admin / Store  -  raise pickups and keep site history",
+        "Finance / Accounts  -  invoices, outstanding and payment status",
+        "IT / Asset / Store  -  serials and asset movement on each request",
+        "Site / plant in-charge  -  visibility for their location",
+        "Management (optional)  -  dashboard and impact; often view-only",
+    ]:
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(pdf.epw, 6, ascii_safe(f"- {line}"))
+        pdf.ln(0.4)
+
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(*GREEN)
+    pdf.cell(0, 8, "How to use this guide", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
     pdf.set_font("Helvetica", "", 11)
     pdf.set_text_color(*INK)
     bullets = [
-        "Follow the steps in order for a complete client-portal experience.",
-        "Each step shows what you should see on screen and what to do next.",
-        "Sign-in credentials are provided by Urbeno in a separate communication — they are intentionally omitted here.",
-        "After Step 2 (Home), you immediately raise a New Collection Request so you experience the core workflow first.",
-        "Profile and password settings appear near the end.",
-        "Record results in the Client UAT Pack checklist and return findings to info@urbeno.in.",
+        "Each page shows a live screen from the client portal and a short explanation.",
+        "Sign-in credentials are issued separately by Urbeno and are omitted here.",
+        "Use the left menu on desktop; on a phone the same menu slides in from the left.",
+        "Reply to Urbeno with the named users who should receive access (name, email, site, function).",
     ]
     for b in bullets:
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 6, ascii_safe(f"- {b}"))
         pdf.ln(1)
 
-    pdf.ln(6)
+    pdf.ln(4)
     pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(*GREEN)
-    pdf.cell(0, 8, "Contents", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, "Screens in this document", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 11)
     pdf.set_text_color(*INK)
