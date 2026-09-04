@@ -1,109 +1,165 @@
 {
   "role": "client",
-  "roleLabel": "Client User (Requestor)",
-  "audience": "Waste generator / client organisation users who raise, track, download documents, and close collection requests",
+  "roleLabel": "Client User — Complete Process Flow",
+  "audience": "Client organisation requestors who raise pickups, track the e-waste lifecycle, download Form 6 / CoD, and close after payment",
   "portal": "https://tectrack.urbeno.in",
   "version": "1",
-  "documentControl": "Version 1 — Production (detailed)",
+  "documentControl": "Version 1 — Production (detailed process flow)",
   "baseCaptured": "http://localhost:8080",
   "steps": [
     {
       "id": "login",
-      "title": "Step 1 — Open the portal and sign in",
-      "howTo": "1. Open https://tectrack.urbeno.in in Chrome, Edge, or Safari.\n2. Enter the email from your account notification.\n3. Enter your password (or temporary password from the welcome email).\n4. Click Sign In.\n5. On first login, accept Terms of Use and Privacy Policy.\n6. Change a temporary password immediately when prompted.",
-      "tips": "Never share your password. Contact info@urbeno.in if locked out — do not email your password.",
+      "title": "Step 1 — Sign in to the Client portal",
+      "howTo": "1. Open https://tectrack.urbeno.in in Chrome, Edge, or Safari.\n2. Enter the work email from your Urb TecTrack welcome / account notification.\n3. Enter the temporary password from that email (or your current password).\n4. Click Sign In.\n5. On first login: set a new password when prompted (10+ characters, upper, lower, digit).\n6. Accept Terms of Use and Privacy Policy when the policy gate appears.",
+      "tips": "Never share passwords. Client Users typically do not use MFA (unlike Urbeno staff). Contact info@urbeno.in if locked out — never email your password.",
       "file": "01-login.png"
     },
     {
       "id": "home",
-      "title": "Step 2 — Home dashboard",
-      "howTo": "1. After sign-in you land on Home.\n2. Read the welcome line — your name and organisation.\n3. Review tiles: open requests, completed work, recycled kg, trees planted.\n4. Navigation: Home, My Requests, Recycling Heroes, Sustainability, Reports.\n5. Click + New Request when ready to raise a pickup.\n6. Your lifecycle: raise → Urbeno ack/vehicle/weigh/invoice → Factory MRN & Form 6 → Urbeno CoD → you download Form 6/CoD → you close after payment.",
-      "tips": "You must NOT see Masters, Audit, Capacity, or Compliance. Figures are your organisation only.",
+      "title": "Step 2 — Home dashboard (your organisation only)",
+      "howTo": "1. Confirm you land on Home with a welcome line showing your name and organisation.\n2. Review tiles: open requests, completed work, recycled kg, trees planted.\n3. Note navigation: Home, My Requests, Recycling Heroes, Sustainability, Reports.\n4. Confirm you do NOT see Masters, Audit, Capacity, or Compliance.\n5. Use + New Request to start a pickup.",
+      "tips": "PROCESS FLOW (client view): You raise (Stage 1) → Urbeno acknowledges / vehicles / weigh / invoice → Factory MRN & Form 6 → Urbeno uploads CoD & records payment → you download Form 6/CoD → you Review & Close (Stage 9).",
       "file": "02-home.png"
     },
     {
-      "id": "new-request-form",
-      "title": "Step 3 — New collection request form (filled)",
-      "howTo": "1. Click + New Request from Home or My Requests.\n2. Select Site (required) — only your organisation sites appear.\n3. Enter Pickup Location (building / floor / warehouse).\n4. Optionally enter Your PO / Reference.\n5. Confirm Pick Up Request Date (clients cannot historical-backdate like Super Admin).\n6. Enter Approx. Quantity (units) and Approx. Weight (kg).\n7. Add Notes for access instructions if needed.\n8. Optionally attach a Bill of Materials and/or add Line Items.\n9. Click Submit Request.",
-      "tips": "Exact weight is captured later at weighment by Urbeno. Client Read Only users cannot raise requests.",
-      "file": "03-new-request-form.png"
+      "id": "process-overview",
+      "title": "Step 3 — Your role in the nine-stage process",
+      "howTo": "1. Remember which stages you own vs Urbeno:\n   • Stage 1 Request — YOU raise (and resubmit if changes requested).\n   • Stages 2–8 — Urbeno Operations / Super Admin / Factory advance the job.\n   • Stage 9 Closed — YOU acknowledge after CoD + payment.\n2. You can view vehicles, invoices, Form 6, and CoD when ready — but you never Create MRN, Acknowledge, Assign Vehicle, Weigh, Raise Invoice, or Upload Certificate.\n3. Client Read Only users can view/download but cannot raise or close.",
+      "tips": "If you ever see another company’s request or an MRN number, stop and report a Blocker to info@urbeno.in.",
+      "file": "03-process-overview.png"
+    },
+    {
+      "id": "new-request-blank",
+      "title": "Step 4 — Open New Collection Request (blank form)",
+      "howTo": "1. From Home or My Requests, click + New Request.\n2. Confirm the heading New Collection Request.\n3. There is no Client dropdown — your organisation is implied.\n4. Required fields typically include: Site, Pickup Location, Pick Up Request Date, Approx. Quantity, Approx. Weight, and at least one line item or BoM.",
+      "tips": "Leave a required field empty once in training to see validation, then fill correctly. Exact weight is captured later at Urbeno weighment.",
+      "file": "04-new-request-blank.png"
+    },
+    {
+      "id": "new-request-filled",
+      "title": "Step 5 — Complete the request form",
+      "howTo": "1. Select Site (only your organisation’s sites appear).\n2. Enter Pickup Location (building / floor / warehouse / bay).\n3. Optionally enter Your PO / Reference for finance matching.\n4. Confirm Pick Up Request Date (clients cannot use Super Admin historical backdating).\n5. Enter Approx. Quantity (units) and Approx. Weight (kg).\n6. Add Notes for access windows, PPE, or contact person.\n7. Add Line Items and/or attach a Bill of Materials file.\n8. Click Submit Request.",
+      "tips": "Double-check site and location before submit. After Urbeno acknowledges, corrections usually go through Request changes → you Edit & resubmit.",
+      "file": "05-new-request-filled.png"
     },
     {
       "id": "request-submitted",
-      "title": "Step 4 — Request submitted (Stage 1)",
-      "howTo": "1. Note the new REQ- number on the detail screen.\n2. Share it with Urbeno if staff need to advance the job.\n3. Stage shows awaiting acknowledgement.\n4. You cannot Acknowledge, Assign Vehicle, Weigh, Raise Invoice, Create MRN, or Upload Certificate.",
-      "tips": "What happens next: Operations/Admin Acknowledge → Vehicle → Weigh → Invoice; Factory MRN → Form 6; Admin CoD; you Review & Close after payment. Training REQ: REQ-00103.",
-      "file": "04-request-submitted.png"
+      "title": "Step 6 — Request created (Stage 1 — awaiting Urbeno)",
+      "howTo": "1. Confirm the heading shows your new REQ- number (e.g. REQ-00104).\n2. Read site, raised-by, approx weight/qty, and line items / BoM.\n3. Stage shows Request / awaiting acknowledgement.\n4. Confirm you do NOT see Acknowledge, Assign Vehicle, Weigh, Raise Invoice, Create MRN, or Upload Certificate.\n5. Share the REQ- with Urbeno if they ask for the reference.",
+      "tips": "Next (Urbeno): Acknowledge → Assign Vehicle → Weigh → Raise Invoice. Next (Factory): MRN → Form 6. Next (you): download docs → Review & Close after payment + CoD.",
+      "file": "06-request-submitted.png"
     },
     {
       "id": "my-requests",
-      "title": "Step 5 — My Requests list",
-      "howTo": "1. Open My Requests.\n2. Every row must belong to your organisation only.\n3. Use search/filters to find a REQ- number.\n4. Click a row to open detail and track stages 1–9.\n5. You must never see MRN numbers or another company's requests.",
-      "tips": "If you see another company or an MRN number, stop and report a Blocker to Urbeno.",
-      "file": "05-my-requests.png"
+      "title": "Step 7 — My Requests list",
+      "howTo": "1. Open My Requests.\n2. Every row must belong to your organisation only.\n3. Use search or filters to find a REQ- by number or site.\n4. Click a row to open detail and track stages 1–9.\n5. Watch for badges such as awaiting ack, in progress, or closed.",
+      "tips": "If another company’s request appears, report a Blocker immediately.",
+      "file": "07-my-requests.png"
     },
     {
-      "id": "request-detail",
-      "title": "Step 6 — Follow a request through the lifecycle",
-      "howTo": "1. Read the stage badge and header (site, raised by, dates).\n2. Refresh as Urbeno advances vehicles, invoice, Form 6, and certificate.\n3. Confirm you do NOT see Create MRN, Acknowledge, Assign Vehicle, Weigh, Raise Invoice, or Upload Certificate.\n4. When Form 6 is approved, download Form 6 PDF if offered.\n5. When CoD is uploaded, download the certificate PDF.\n6. When certificate + payment are complete, use Review & Close.",
-      "tips": "Clients close after certificate + payment. Client Read Only can download but cannot close.",
-      "file": "06-request-detail.png"
+      "id": "track-vehicles",
+      "title": "Step 8 — Track Vehicles & Weighment (read-only)",
+      "howTo": "1. Open a request that Urbeno has acknowledged and assigned.\n2. Review vehicle registration, driver, and weighment progress when shown.\n3. You can see evidence Urbeno recorded — you cannot edit weighment or assign vehicles.\n4. Refresh the page as Operations completes loading.",
+      "tips": "Missing Assign Vehicle / Weigh buttons is correct for Client Users.",
+      "file": "08-track-vehicles.png"
     },
     {
-      "id": "form6-download",
-      "title": "Step 7 — Download Form 6 when available",
-      "howTo": "1. On an advanced request, locate Form 6 on the invoice / documents area.\n2. Click Download / Form 6 PDF when approved.\n3. Store the PDF with your compliance records.\n4. You still must never see an MRN number.",
-      "tips": "Form 6 appears after Factory processing and (when required) Super Admin approval.",
-      "file": "07-form6-download.png"
+      "id": "track-invoice-docs",
+      "title": "Step 9 — Track invoice, Form 6, and Certificate on a completed job",
+      "howTo": "1. Open a closed or advanced request (classroom often uses a demo REQ-).\n2. Expand Invoicing / Recycling / Closed sections as shown.\n3. Review invoice number, billing weight, and totals when visible.\n4. Locate Form 6 and Certificate of Destruction download controls.\n5. Confirm MRN number is NOT shown — factory goods receipt stays internal.",
+      "tips": "From billing onward each invoice can progress independently. The request stage follows the least-advanced invoice.",
+      "file": "09-track-invoice-docs.png"
     },
     {
-      "id": "cod-download",
-      "title": "Step 8 — Certificate of Destruction available",
-      "howTo": "1. Locate Certificate of Destruction on the request.\n2. Download the signed CoD PDF for your records.\n3. Payment must also be recorded before Review & Close unlocks.",
-      "tips": "Keep CoD with your organisation audit pack.",
-      "file": "08-cod-download.png"
+      "id": "download-form6",
+      "title": "Step 10 — Download Form 6",
+      "howTo": "1. On the invoice / recycling area, find Form 6.\n2. Download the Form 6 PDF when status is approved / available.\n3. Store it with your EHS / compliance records.\n4. If Form 6 is missing, Urbeno may still be processing or awaiting admin approval — ask your Urbeno contact.",
+      "tips": "Form 6 is client-visible after Factory entry and (when required) Super Admin approval. You still never see MRN.",
+      "file": "10-download-form6.png"
+    },
+    {
+      "id": "download-cod",
+      "title": "Step 11 — Download Certificate of Destruction (CoD)",
+      "howTo": "1. Locate Certificate of Destruction on the request / invoice panel.\n2. Download the signed CoD PDF.\n3. Keep the portal file and any email attachment Urbeno sent.\n4. Payment must also be recorded before Review & Close unlocks.",
+      "tips": "CoD without payment is not enough to close. Payment without CoD is not enough either.",
+      "file": "11-download-cod.png"
+    },
+    {
+      "id": "changes-requested",
+      "title": "Step 12 — Changes requested by Urbeno",
+      "howTo": "1. Open the request from My Requests when Urbeno sends it back.\n2. Read the Changes requested note carefully.\n3. Click Edit / update the fields named in the note.\n4. Enter Your response to Urbeno if asked.\n5. Click Save and resubmit.",
+      "tips": "Answer every point in the note in one pass so the request is not returned again.",
+      "file": "12-changes-requested.png"
+    },
+    {
+      "id": "resubmit-changes",
+      "title": "Step 13 — Edit and resubmit after changes requested",
+      "howTo": "1. Update Pickup Location / notes / BoM as requested.\n2. Add a short response confirming what you fixed.\n3. Click Save and resubmit.\n4. Expected outcome: request returns to Urbeno awaiting acknowledgement. You still cannot Acknowledge yourself.",
+      "tips": "Do not invent site details Urbeno did not ask for — only fix what the note requires.",
+      "file": "13-resubmit-changes.png"
+    },
+    {
+      "id": "ready-to-close",
+      "title": "Step 14 — Ready to close (CoD + payment complete)",
+      "howTo": "1. Refresh the request after Urbeno finishes Stages 2–8.\n2. Confirm Certificate of Destruction is present.\n3. Confirm payment is recorded (no outstanding balance).\n4. Look for the Review & Close control — it appears only when both conditions are met.",
+      "tips": "If Review & Close is missing, payment or CoD is still outstanding. Contact Urbeno rather than forcing a close.",
+      "file": "14-ready-to-close.png"
+    },
+    {
+      "id": "review-close-modal",
+      "title": "Step 15 — Review & Close modal (Stage 9)",
+      "howTo": "1. Click Review & Close.\n2. Read the summary in the modal (invoice, certificate, payment).\n3. Click Acknowledge closure.\n4. Expected outcome: Invoice closed / Stage Closed. Home Completed count increases. Sustainability will include this weight after closure.",
+      "tips": "Only your organisation’s Client Users close normal invoices. Client Read Only cannot close.",
+      "file": "15-review-close-modal.png"
+    },
+    {
+      "id": "request-closed",
+      "title": "Step 16 — Request closed",
+      "howTo": "1. Confirm the stage badge shows Closed.\n2. Downloads for Form 6 / CoD remain available for your records.\n3. Open Home to see Completed / impact tiles update.",
+      "tips": "Closed consignments feed Recycling Heroes and Sustainability. In-progress jobs do not.",
+      "file": "16-request-closed.png"
     },
     {
       "id": "heroes",
-      "title": "Step 10 — Recycling Heroes",
-      "howTo": "1. Open Recycling Heroes.\n2. Explore planting / tonnage views for your organisation.\n3. Closed recycled work feeds Heroes milestones.",
-      "tips": "This is a read-focused client view.",
-      "file": "09-heroes.png"
+      "title": "Step 17 — Recycling Heroes",
+      "howTo": "1. Open Recycling Heroes.\n2. Review tonnage milestones and planting progress for your organisation.\n3. Use this view for CSR / ESG storytelling with closed recycled work.",
+      "tips": "You do not manage Urbeno-wide planting controls from the client portal.",
+      "file": "17-heroes.png"
     },
     {
       "id": "sustainability",
-      "title": "Step 11 — Sustainability figures",
-      "howTo": "1. Open Sustainability.\n2. Review recycled weight, CO2 avoided, and related impact.\n3. Open methodology notes if offered.\n4. Download Impact PDF when you need a shareable summary.",
-      "tips": "In-progress requests do not inflate closed impact.",
-      "file": "10-sustainability.png"
+      "title": "Step 18 — Sustainability impact",
+      "howTo": "1. Open Sustainability.\n2. Review recycled weight, CO₂e avoided, landfill diverted, and related figures.\n3. Open How these numbers are built / methodology if offered.\n4. Download Impact PDF for board or EHS packs when available.",
+      "tips": "Only closed (certified and acknowledged) consignments count — do not add in-flight pickups to board packs.",
+      "file": "18-sustainability.png"
     },
     {
       "id": "reports",
-      "title": "Step 12 — Reports and exports",
-      "howTo": "1. Open Reports.\n2. Choose Request Summary, Invoice Register, Certificate Log, Form 6 Log, Sustainability, or Heroes.\n3. Set period filters and export CSV/PDF when available.\n4. Confirm there is no MRN Register — that is factory-only.",
-      "tips": "Exports must contain only your organisation's rows.",
-      "file": "11-reports.png"
-    },
-    {
-      "id": "legal-terms",
-      "title": "Step 13 — Terms of Use",
-      "howTo": "1. Open Terms of Use from the footer or first-login gate.\n2. Scroll through obligations before accepting on first login.",
-      "tips": "You are not re-prompted unless Urbeno publishes a new version.",
-      "file": "12-legal-terms.png"
+      "title": "Step 19 — Reports and exports",
+      "howTo": "1. Open Reports.\n2. Choose Request Summary, Invoice Register, Form 6 Log, Certificate Log, Sustainability, Heroes, or Device Serials as listed.\n3. Set FY / period filters.\n4. Export CSV or PDF for finance / EHS.\n5. Confirm there is NO MRN Register — that report is factory-only.",
+      "tips": "Exports must contain only your organisation. Re-export after a batch of closures so CoD columns stay current.",
+      "file": "19-reports.png"
     },
     {
       "id": "profile",
-      "title": "Step 14 — Profile and password",
-      "howTo": "1. Open Profile.\n2. Confirm Role is Client User and Organisation is correct.\n3. Change password: Current → New (10+ chars, upper, lower, digit) → Confirm → Update.\n4. Confirm Two-factor authentication is NOT shown for client users.",
-      "tips": "Do not change shared training passwords unless Urbeno asks.",
-      "file": "13-profile.png"
+      "title": "Step 20 — Profile and password",
+      "howTo": "1. Open Profile from your avatar / name menu.\n2. Confirm Role is Client User and Organisation is correct.\n3. Change password anytime: Current → New (policy) → Confirm → Update.\n4. Confirm Two-factor authentication is NOT shown (staff-only).",
+      "tips": "Client Read Only users see the same Profile pattern but cannot raise or close requests.",
+      "file": "20-profile.png"
+    },
+    {
+      "id": "legal-terms",
+      "title": "Step 21 — Terms of Use",
+      "howTo": "1. Open Terms of Use from the footer or first-login gate.\n2. Read obligations before accepting on first login.\n3. You are not re-prompted unless Urbeno publishes a new version.",
+      "tips": "Privacy Policy is accepted the same way on first login.",
+      "file": "21-legal-terms.png"
     },
     {
       "id": "signed-out",
-      "title": "Step 15 — Sign out safely",
-      "howTo": "1. Click Logout when finished.\n2. Confirm the Sign In screen appears.\n3. Close the browser tab on shared computers.",
-      "tips": "Always sign out on shared machines.",
-      "file": "14-signed-out.png"
+      "title": "Step 22 — Sign out safely",
+      "howTo": "1. Open your avatar menu and click Logout / Sign out.\n2. Confirm the Sign In screen appears.\n3. Close the browser on shared computers.",
+      "tips": "Always sign out on shared workstations. Do not leave a client session open on a kiosk.",
+      "file": "22-signed-out.png"
     }
   ]
 }

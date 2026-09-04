@@ -34,7 +34,7 @@ Step-by-step screenshot packs live under **`docs/uat/training/`**. Each step has
 
 | Pack | PDF | Typical steps |
 |------|-----|---------------|
-| Client User | `docs/uat/training/client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf` | ~14 |
+| Client User | `docs/uat/training/client/Urb-TecTrack-Client-User-Training-Guide-v1.pdf` | **~22** (full process flow: raise → track → docs → close) |
 | Factory Manager | `docs/uat/training/factory/Urb-TecTrack-Factory-Manager-Training-Guide-v1.pdf` | ~11 |
 | Operations Manager | `docs/uat/training/operations/Urb-TecTrack-Operations-Manager-Training-Guide-v1.pdf` | ~14 |
 | Super Admin (day-to-day) | `docs/uat/training/admin/Urb-TecTrack-Admin-Training-Guide-v1.pdf` | ~20 |
