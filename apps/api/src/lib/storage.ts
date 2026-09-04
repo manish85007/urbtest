@@ -82,12 +82,21 @@ export class GcsStorage implements ObjectStorage {
   }
 
   async signedUrl(key: string, expiresSeconds = 300): Promise<string | null> {
-    const [url] = await this.bucket.file(key).getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: Date.now() + expiresSeconds * 1000,
-    });
-    return url;
+    try {
+      const [url] = await this.bucket.file(key).getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + expiresSeconds * 1000,
+      });
+      return url;
+    } catch (err) {
+      // Missing iam.serviceAccounts.signBlob / Token Creator → fall back to streaming.
+      console.warn(
+        '[storage] GCS signed URL failed; streaming instead:',
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
   }
 }
 

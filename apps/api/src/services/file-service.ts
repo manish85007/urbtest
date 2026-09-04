@@ -104,23 +104,30 @@ export async function authorizeFileDownload(actor: SessionUser, fileId: string) 
   if (process.env.USE_SIGNED_URLS === 'true') {
     const storage = getStorage();
     if (typeof storage.signedUrl === 'function') {
-      const url = await storage.signedUrl(file.storageKey, 300);
-      if (url) {
-        if (FILE_CLASS[file.kind] === 'restricted') {
-          await recordSecurityEvent('access.restricted', actor.email, {
-            ref: file.name,
-            cls: 'restricted',
+      try {
+        const url = await storage.signedUrl(file.storageKey, 300);
+        if (url) {
+          if (FILE_CLASS[file.kind] === 'restricted') {
+            await recordSecurityEvent('access.restricted', actor.email, {
+              ref: file.name,
+              cls: 'restricted',
+            });
+          }
+          await auditLog({
+            actorEmail: actor.email,
+            actorId: actor.id,
+            action: 'file.download',
+            entity: 'file',
+            entityId: file.id,
+            details: { name: file.name, via: 'signed-url' },
           });
+          return { file, signedUrl: url as string | undefined, buffer: undefined as Buffer | undefined };
         }
-        await auditLog({
-          actorEmail: actor.email,
-          actorId: actor.id,
-          action: 'file.download',
-          entity: 'file',
-          entityId: file.id,
-          details: { name: file.name, via: 'signed-url' },
-        });
-        return { file, signedUrl: url as string | undefined, buffer: undefined as Buffer | undefined };
+      } catch (err) {
+        console.warn(
+          '[files] signed URL unavailable; streaming blob:',
+          err instanceof Error ? err.message : err,
+        );
       }
     }
   }

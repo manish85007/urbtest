@@ -170,6 +170,12 @@ gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
   --member="serviceAccount:${SA_EMAIL}" \
   --role="roles/storage.objectAdmin" >/dev/null
 
+# Required for GCS V4 signed download URLs (USE_SIGNED_URLS=true).
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --project="${PROJECT}" \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role="roles/iam.serviceAccountTokenCreator" >/dev/null
+
 echo "Building and pushing production image…"
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 docker build -t "${IMAGE}" "${ROOT}"
