@@ -95,6 +95,54 @@ export async function readFileBlob(actor: SessionUser, fileId: string) {
   return { file, buffer: blob.buffer };
 }
 
+/** Authorize + optionally return a GCS signed URL for browser redirect downloads. */
+export async function authorizeFileDownload(actor: SessionUser, fileId: string) {
+  const file = await prisma.storedFile.findUnique({ where: { id: fileId } });
+  if (!file) throw new AppError('File not found.', 404);
+  await assertFileAccess(actor, file);
+
+  if (process.env.USE_SIGNED_URLS === 'true') {
+    const storage = getStorage();
+    if (typeof storage.signedUrl === 'function') {
+      const url = await storage.signedUrl(file.storageKey, 300);
+      if (url) {
+        if (FILE_CLASS[file.kind] === 'restricted') {
+          await recordSecurityEvent('access.restricted', actor.email, {
+            ref: file.name,
+            cls: 'restricted',
+          });
+        }
+        await auditLog({
+          actorEmail: actor.email,
+          actorId: actor.id,
+          action: 'file.download',
+          entity: 'file',
+          entityId: file.id,
+          details: { name: file.name, via: 'signed-url' },
+        });
+        return { file, signedUrl: url as string | undefined, buffer: undefined as Buffer | undefined };
+      }
+    }
+  }
+
+  const { buffer } = await (async () => {
+    const blob = await getStorage().read(file.storageKey);
+    if (FILE_CLASS[file.kind] === 'restricted') {
+      await recordSecurityEvent('access.restricted', actor.email, { ref: file.name, cls: 'restricted' });
+    }
+    await auditLog({
+      actorEmail: actor.email,
+      actorId: actor.id,
+      action: 'file.download',
+      entity: 'file',
+      entityId: file.id,
+      details: { name: file.name },
+    });
+    return blob;
+  })();
+  return { file, buffer, signedUrl: undefined as string | undefined };
+}
+
 export async function assertFilesExist(fileIds: string[], kinds?: FileKind[]) {
   if (!fileIds.length) return;
   const unique = [...new Set(fileIds)];

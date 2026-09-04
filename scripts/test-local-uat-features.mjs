@@ -84,7 +84,7 @@ async function main() {
     );
   }
 
-  const subs = (await api('GET', '/submissions')).data || [];
+  const subs = ((d)=>Array.isArray(d)?d:(d?.items||[]))((await api('GET', '/submissions')).data);
   let serialSample = '';
   let serialSubId = '';
   for (const s of subs.slice(0, 30)) {
@@ -122,7 +122,7 @@ async function main() {
   // --- Staff: duplicate invoice + serial checks ---
   await login(STAFF_EMAIL);
 
-  const allSubs = (await api('GET', '/submissions')).data || [];
+  const allSubs = ((d)=>Array.isArray(d)?d:(d?.items||[]))((await api('GET', '/submissions')).data);
   let refInv = null;
   let refSub = null;
   for (const s of allSubs) {

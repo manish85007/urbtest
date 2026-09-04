@@ -3,8 +3,9 @@ import multipart from '@fastify/multipart';
 import { FileKind } from '@prisma/client';
 import { isAppError } from '../lib/errors.js';
 import { contentDisposition } from '../lib/http-headers.js';
+import { idParamsSchema } from '../lib/params.js';
 import { attachSession, requireAuth } from '../middleware/session.js';
-import { readFileBlob, uploadFile } from '../services/file-service.js';
+import { readFileBlob, authorizeFileDownload, uploadFile } from '../services/file-service.js';
 
 const FILE_KINDS = new Set<string>(Object.values(FileKind));
 
@@ -69,8 +70,15 @@ export async function filesRoutes(app: FastifyInstance) {
 
   app.get('/files/:id', { preHandler: requireAuth }, async (request, reply) => {
     try {
-      const { id } = request.params as { id: string };
-      const { file, buffer } = await readFileBlob(request.user!, id);
+      const parsed = idParamsSchema.safeParse(request.params);
+      if (!parsed.success) return reply.badRequest('Invalid file id');
+      const { file, buffer, signedUrl } = await authorizeFileDownload(
+        request.user!,
+        parsed.data.id,
+      );
+      if (signedUrl) {
+        return reply.redirect(signedUrl);
+      }
       return reply
         .header('Content-Type', file.mimeType)
         .header('Content-Disposition', contentDisposition('inline', file.name))

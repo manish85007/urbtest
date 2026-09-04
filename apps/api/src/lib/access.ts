@@ -35,8 +35,13 @@ export async function loadSubmissionForActor(
 }
 
 export async function loadInvoiceForActor(invoiceId: string, actor: SessionUser) {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
+  // Scope at the DB layer (same pattern as loadSubmissionForActor) so out-of-scope
+  // invoices are never loaded into memory before the access check.
+  const invoice = await prisma.invoice.findFirst({
+    where: {
+      id: invoiceId,
+      submission: clientScopeFilter(actor),
+    },
     include: {
       submission: { include: submissionInclude },
       payments: true,
@@ -46,22 +51,6 @@ export async function loadInvoiceForActor(invoiceId: string, actor: SessionUser)
     },
   });
   if (!invoice) throw new AppError('Invoice not found', 404);
-
-  const scope = clientScopeFilter(actor);
-  if ('clientId' in scope && scope.clientId && invoice.submission.clientId !== scope.clientId) {
-    throw new AppError('Invoice not found', 404);
-  }
-  if (
-    'siteId' in scope &&
-    scope.siteId &&
-    typeof scope.siteId === 'object' &&
-    'in' in scope.siteId &&
-    Array.isArray(scope.siteId.in) &&
-    !scope.siteId.in.includes(invoice.submission.siteId)
-  ) {
-    throw new AppError('Invoice not found', 404);
-  }
-
   return invoice;
 }
 

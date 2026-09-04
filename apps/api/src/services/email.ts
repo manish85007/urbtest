@@ -214,14 +214,29 @@ export async function sendTransactionalEmail(
 }
 
 export async function processEmailQueue(limit = 20) {
+  const now = new Date();
   const pending = await prisma.emailOutbox.findMany({
-    where: { status: 'queued' },
+    where: {
+      OR: [
+        {
+          status: 'queued',
+          OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
+        },
+        {
+          status: 'failed',
+          attempts: { lt: 3 },
+          nextRetryAt: { lte: now },
+        },
+      ],
+    },
     orderBy: { createdAt: 'asc' },
     take: limit,
   });
 
   let sent = 0;
   let failed = 0;
+
+  const backoffMs = [30_000, 5 * 60_000, 30 * 60_000];
 
   for (const email of pending) {
     try {
@@ -232,7 +247,13 @@ export async function processEmailQueue(limit = 20) {
       });
       await prisma.emailOutbox.update({
         where: { id: email.id },
-        data: { status: 'sent', sentAt: new Date(), attempts: { increment: 1 } },
+        data: {
+          status: 'sent',
+          sentAt: new Date(),
+          attempts: { increment: 1 },
+          error: null,
+          nextRetryAt: null,
+        },
       });
       await auditLog({
         actorEmail: 'system',
@@ -244,9 +265,17 @@ export async function processEmailQueue(limit = 20) {
       sent++;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Send failed';
+      const nextAttempts = email.attempts + 1;
+      const canRetry = nextAttempts < 3;
+      const delay = backoffMs[Math.min(nextAttempts - 1, backoffMs.length - 1)] ?? 30 * 60_000;
       await prisma.emailOutbox.update({
         where: { id: email.id },
-        data: { status: 'failed', error: message, attempts: { increment: 1 } },
+        data: {
+          status: canRetry ? 'queued' : 'failed',
+          error: message,
+          attempts: { increment: 1 },
+          nextRetryAt: canRetry ? new Date(Date.now() + delay) : null,
+        },
       });
       failed++;
     }

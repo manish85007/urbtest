@@ -75,7 +75,7 @@ function esc(s) {
 }
 
 async function testSerialSearch(clientId) {
-  const subs = (await api('GET', '/submissions')).data || [];
+  const subs = ((d)=>Array.isArray(d)?d:(d?.items||[]))((await api('GET', '/submissions')).data);
   let serial = '';
   let subId = '';
   for (const s of subs.slice(0, 40)) {
@@ -136,7 +136,7 @@ async function testCompleteReport() {
 }
 
 async function testInvoiceDuplicate(clientId) {
-  const subs = (await api('GET', '/submissions')).data || [];
+  const subs = ((d)=>Array.isArray(d)?d:(d?.items||[]))((await api('GET', '/submissions')).data);
   let invNo = '';
   let otherSub = null;
   for (const s of subs) {

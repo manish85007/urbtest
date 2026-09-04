@@ -18,9 +18,11 @@ import { reportsRoutes } from './routes/reports.js';
 import { legalRoutes, auditRoutes, registerSecurityHeaders } from './routes/legal.js';
 import { searchRoutes } from './routes/search.js';
 import { complianceRoutes } from './routes/compliance.js';
+import { jobsRoutes } from './routes/jobs.js';
 import { startScheduler } from './jobs/scheduler.js';
 import { prisma } from './lib/prisma.js';
 import { captureException } from './lib/sentry.js';
+import { registerCsrfProtection } from './middleware/csrf.js';
 import {
   HTML_CACHE_CONTROL,
   cacheControlForPath,
@@ -62,7 +64,10 @@ export async function buildApp() {
       global: true,
       max: isSecureDeployment() ? 120 : 1000,
       timeWindow: '1 minute',
-      allowList: (req) => req.url.split('?')[0] === '/health',
+      allowList: (req) => {
+        const path = req.url.split('?')[0] ?? '';
+        return path === '/health' || path.startsWith('/internal/jobs');
+      },
       errorResponseBuilder: (_req, context) => ({
         statusCode: 429,
         error: 'Too Many Requests',
@@ -72,6 +77,7 @@ export async function buildApp() {
   }
 
   registerSecurityHeaders(app);
+  registerCsrfProtection(app);
 
   app.addHook('onSend', async (request, reply, payload) => {
     // Do not advertise the app server stack (Cloud Run GFE may still set its own).
@@ -121,7 +127,11 @@ export async function buildApp() {
   await app.register(auditRoutes);
   await app.register(searchRoutes);
   await app.register(complianceRoutes);
+  await app.register(jobsRoutes);
 
+  // Inline setInterval jobs — fine for long-lived processes / UAT.
+  // On Cloud Run, prefer ENABLE_JOBS=false + Cloud Scheduler → POST /internal/jobs/*
+  // with Authorization: Bearer $JOBS_SECRET so work continues when instances scale to zero.
   if (process.env.ENABLE_JOBS !== 'false') {
     startScheduler(app);
   }

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { isAppError } from '../lib/errors.js';
+import { idParamsSchema } from '../lib/params.js';
 import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
 import {
   acknowledgeSubmission,
@@ -136,6 +137,13 @@ const invoiceSchema = z.object({
 
 export async function lifecycleRoutes(app: FastifyInstance) {
   app.addHook('preHandler', attachSession);
+  app.addHook('preHandler', async (request, reply) => {
+    const params = request.params as Record<string, unknown> | undefined;
+    if (params && typeof params.id === 'string') {
+      const parsed = idParamsSchema.safeParse({ id: params.id });
+      if (!parsed.success) return reply.badRequest('Invalid id');
+    }
+  });
 
   app.post('/submissions', { preHandler: requireAuth }, async (request, reply) => {
     try {

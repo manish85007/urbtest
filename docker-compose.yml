@@ -1,3 +1,5 @@
+# Local development database only — credentials are intentionally simple and
+# must NEVER be reused in UAT/production. Override with POSTGRES_* env vars if needed.
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,9 +8,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: tectrack
-      POSTGRES_PASSWORD: tectrack_dev
-      POSTGRES_DB: tectrack
+      POSTGRES_USER: ${POSTGRES_USER:-tectrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tectrack_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-tectrack}
     volumes:
       - tectrack_pgdata:/var/lib/postgresql/data
     healthcheck:

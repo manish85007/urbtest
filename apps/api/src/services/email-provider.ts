@@ -39,7 +39,15 @@ export async function deliverEmail(email: OutboundEmail): Promise<void> {
   }
 
   const provider = process.env.EMAIL_PROVIDER ?? 'console';
-  if (provider === 'console' || provider === 'smtp') {
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (provider === 'smtp' || (isProd && provider !== 'console')) {
+    throw new Error(
+      'Outgoing mail requires SMTP. Configure host/credentials under Masters → Email & Templates → Outgoing mail (or SMTP_* env vars).',
+    );
+  }
+
+  if (provider === 'console') {
     console.log('\n--- Urb TecTrack email ---');
     console.log('To:', outbound.to.join(', '));
     if (email.to.join(', ') !== outbound.to.join(', ')) {
@@ -48,11 +56,6 @@ export async function deliverEmail(email: OutboundEmail): Promise<void> {
     console.log('Subject:', outbound.subject);
     console.log(outbound.body);
     console.log('--- end email ---\n');
-    if (provider === 'smtp') {
-      throw new Error(
-        'Outgoing mail is set to SMTP but host/credentials are not configured under Masters → Email & Templates → Outgoing mail.',
-      );
-    }
     return;
   }
 

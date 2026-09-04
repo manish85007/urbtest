@@ -8,6 +8,8 @@ const REMINDER_CHECK_MS = Number(process.env.REMINDER_CHECK_MS ?? 3_600_000);
 const SESSION_CLEANUP_MS = Number(process.env.SESSION_CLEANUP_MS ?? 3_600_000);
 
 export function startScheduler(app: FastifyInstance) {
+  // Prefer Cloud Scheduler → POST /internal/jobs/* when ENABLE_JOBS=false.
+  // These intervals only run while the process is warm (not reliable on scale-to-zero).
   const runQueue = () => {
     processEmailQueue().catch((err) => app.log.error({ err }, 'Email queue processing failed'));
   };

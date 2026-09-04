@@ -15,6 +15,8 @@ import { confirmPasswordReset, requestPasswordReset } from '../services/password
 import { assertCaptcha, getCaptchaConfig, issueChallenge } from '../services/captcha.js';
 import { attachSession, requireAuth, SESSION_COOKIE } from '../middleware/session.js';
 import { isSecureDeployment } from '../lib/http-headers.js';
+import { isAppError } from '../lib/errors.js';
+import { bumpRateLimit } from '../lib/rate-limit-store.js';
 
 const captchaFields = {
   turnstileToken: z.string().optional(),
@@ -32,55 +34,30 @@ const loginSchema = z.object({
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_PER_IP = isSecureDeployment() && process.env.E2E_TEST !== 'true' ? 10 : 1000;
-const ipLoginCounts = new Map<string, { count: number; resetAt: number }>();
 
 const RESET_IP_WINDOW_MS = 15 * 60 * 1000;
 const RESET_EMAIL_WINDOW_MS = 60 * 60 * 1000;
 const RESET_MAX_PER_IP = isSecureDeployment() && process.env.E2E_TEST !== 'true' ? 10 : 100;
 const RESET_MAX_PER_EMAIL = isSecureDeployment() && process.env.E2E_TEST !== 'true' ? 3 : 20;
-const ipResetCounts = new Map<string, { count: number; resetAt: number }>();
-const emailResetCounts = new Map<string, { count: number; resetAt: number }>();
 
-function bumpWindow(
-  map: Map<string, { count: number; resetAt: number }>,
-  key: string,
-  windowMs: number,
-  max: number,
-  message: string,
-) {
-  if (process.env.E2E_TEST === 'true' || process.env.NODE_ENV === 'test') return;
-  const now = Date.now();
-  const rec = map.get(key) ?? { count: 0, resetAt: now + windowMs };
-  if (now > rec.resetAt) {
-    rec.count = 0;
-    rec.resetAt = now + windowMs;
-  }
-  rec.count += 1;
-  map.set(key, rec);
-  if (rec.count > max) throw new Error(message);
-}
-
-function checkLoginRateLimit(ip: string) {
-  bumpWindow(
-    ipLoginCounts,
-    ip,
+async function checkLoginRateLimit(ip: string) {
+  await bumpRateLimit(
+    `login:ip:${ip}`,
     LOGIN_WINDOW_MS,
     LOGIN_MAX_PER_IP,
     'Too many sign-in attempts from this network. Try again later.',
   );
 }
 
-function checkResetRateLimit(ip: string, email: string) {
-  bumpWindow(
-    ipResetCounts,
-    ip,
+async function checkResetRateLimit(ip: string, email: string) {
+  await bumpRateLimit(
+    `reset:ip:${ip}`,
     RESET_IP_WINDOW_MS,
     RESET_MAX_PER_IP,
     'Too many password-reset requests from this network. Try again later.',
   );
-  bumpWindow(
-    emailResetCounts,
-    email.trim().toLowerCase(),
+  await bumpRateLimit(
+    `reset:email:${email.trim().toLowerCase()}`,
     RESET_EMAIL_WINDOW_MS,
     RESET_MAX_PER_EMAIL,
     'Too many password-reset requests for this email. Try again later.',
@@ -110,7 +87,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/login', async (request, reply) => {
     try {
-      checkLoginRateLimit(request.ip);
+      await checkLoginRateLimit(request.ip);
       const body = loginSchema.parse(request.body);
       // Skip captcha on MFA / email-OTP continuation (already passed on first step).
       const continuing = !!body.mfaCode?.trim() || !!body.emailOtp?.trim();
@@ -154,7 +131,7 @@ export async function authRoutes(app: FastifyInstance) {
           statusCode: 400,
         });
       }
-      if (err instanceof Error && /Too many sign-in attempts/.test(err.message)) {
+      if (isAppError(err) && err.statusCode === 429) {
         return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
       }
       const message = err instanceof Error ? err.message : 'Login failed';
@@ -215,7 +192,7 @@ export async function authRoutes(app: FastifyInstance) {
           ...captchaFields,
         })
         .parse(request.body);
-      checkResetRateLimit(request.ip, body.email);
+      await checkResetRateLimit(request.ip, body.email);
       const captchaErr = await assertCaptcha({
         turnstileToken: body.turnstileToken,
         challengeToken: body.challengeToken,
@@ -239,7 +216,7 @@ export async function authRoutes(app: FastifyInstance) {
           statusCode: 400,
         });
       }
-      if (err instanceof Error && /Too many password-reset/.test(err.message)) {
+      if (isAppError(err) && err.statusCode === 429) {
         return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
       }
       return reply.badRequest(err instanceof Error ? err.message : 'Reset request failed');

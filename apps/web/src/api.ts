@@ -1,9 +1,15 @@
-const base = import.meta.env.VITE_API_URL ?? '/api';
+const base = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');
+
+const CSRF_HEADER = 'X-Requested-With';
+const CSRF_VALUE = 'UrbTecTrack';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
+  }
+  if (!headers.has(CSRF_HEADER)) {
+    headers.set(CSRF_HEADER, CSRF_VALUE);
   }
   const res = await fetch(`${base}${path}`, {
     credentials: 'include',
@@ -798,7 +804,20 @@ export const legalApi = {
 };
 
 export const dataApi = {
-  submissions: () => api<SubmissionSummary[]>('/submissions'),
+  submissions: async () => {
+    const all: SubmissionSummary[] = [];
+    let cursor: string | undefined;
+    do {
+      const qs = new URLSearchParams({ limit: '100' });
+      if (cursor) qs.set('cursor', cursor);
+      const page = await api<{ items: SubmissionSummary[]; nextCursor: string | null }>(
+        `/submissions?${qs}`,
+      );
+      all.push(...page.items);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor && all.length < 5000);
+    return all;
+  },
   submission: (id: string) => api<SubmissionDetail>(`/submissions/${id}`),
   dashboard: () =>
     api<{ openRequests: number; openInvoices: number; activeClients: number }>(
@@ -1146,6 +1165,7 @@ export const filesApi = {
     const res = await fetch(`${base}/files?kind=${encodeURIComponent(kind)}`, {
       method: 'POST',
       credentials: 'include',
+      headers: { [CSRF_HEADER]: CSRF_VALUE },
       body: form,
     });
     if (!res.ok) {

@@ -9,16 +9,46 @@ import {
 } from '../services/legal.js';
 import { listAudit } from '../services/audit.js';
 import { HSTS_HEADER, SECURITY_HEADERS, isSecureDeployment } from '../lib/http-headers.js';
+import { bumpRateLimit } from '../lib/rate-limit-store.js';
+import { isAppError } from '../lib/errors.js';
 
 export async function legalRoutes(app: FastifyInstance) {
-  // Use /legal-documents so paths do not collide with the SPA at /legal/:key.
-  app.get('/legal-documents', async () => listLegalDocuments());
+  // Public legal catalogue — rate-limited to deter scraping.
+  app.get('/legal-documents', async (request, reply) => {
+    try {
+      await bumpRateLimit(
+        `legal:list:${request.ip}`,
+        60_000,
+        60,
+        'Too many requests for legal documents. Try again shortly.',
+      );
+      return listLegalDocuments();
+    } catch (err) {
+      if (isAppError(err) && err.statusCode === 429) {
+        return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
+      }
+      throw err;
+    }
+  });
 
   app.get('/legal-documents/:key', async (request, reply) => {
-    const { key } = request.params as { key: string };
-    const doc = await getLegalDocument(key);
-    if (!doc) return reply.notFound('Legal document not found.');
-    return doc;
+    try {
+      await bumpRateLimit(
+        `legal:doc:${request.ip}`,
+        60_000,
+        30,
+        'Too many requests for legal documents. Try again shortly.',
+      );
+      const { key } = request.params as { key: string };
+      const doc = await getLegalDocument(key);
+      if (!doc) return reply.notFound('Legal document not found.');
+      return doc;
+    } catch (err) {
+      if (isAppError(err) && err.statusCode === 429) {
+        return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
+      }
+      throw err;
+    }
   });
 
   app.addHook('preHandler', attachSession);
@@ -50,6 +80,7 @@ export async function auditRoutes(app: FastifyInstance) {
     const q = request.query as {
       limit?: string;
       page?: string;
+      cursor?: string;
       entity?: string;
       q?: string;
       actor?: string;
@@ -59,6 +90,7 @@ export async function auditRoutes(app: FastifyInstance) {
       sort?: string;
     };
     const sort = q.sort;
+    const limit = q.limit ? Math.min(Number(q.limit), 200) : 100;
     return listAudit({
       q: q.q,
       actor: q.actor,
@@ -71,12 +103,15 @@ export async function auditRoutes(app: FastifyInstance) {
           ? sort
           : 'newest',
       page: q.page ? Number(q.page) : 1,
-      limit: q.limit ? Number(q.limit) : 100,
+      limit,
     });
   });
 }
 
 export function registerSecurityHeaders(app: FastifyInstance) {
+  // App-level headers (always set). Proxy / Cloud Run may also set HSTS + CSP;
+  // duplicates are fine — we set a full set here so a misconfigured proxy still
+  // gets baseline protection from the API process.
   app.addHook('onSend', async (_request: FastifyRequest, reply: FastifyReply) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       reply.header(name, value);

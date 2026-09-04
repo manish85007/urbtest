@@ -98,13 +98,14 @@ async function main() {
   await api('GET', '/reports/register/mrn?period=fy', { expect: [400, 403] });
 
   const subs = await api('GET', '/submissions');
-  assert('Submissions list', Array.isArray(subs.data) && subs.data.length > 0);
-  const sampleId = subs.data[0].id;
+  const subItems = Array.isArray(subs.data) ? subs.data : subs.data?.items ?? [];
+  assert('Submissions list', Array.isArray(subItems) && subItems.length > 0);
+  const sampleId = subItems[0].id;
   const detail = await api('GET', `/submissions/${sampleId}`);
   assert('Request detail loads', detail.data?.id === sampleId);
 
   let withDocs = null;
-  for (const s of subs.data.slice(0, 40)) {
+  for (const s of subItems.slice(0, 40)) {
     const d = await api('GET', `/submissions/${s.id}`);
     const inv = (d.data?.invoices || []).find((i) => i.recycling || (i.certificates || []).length);
     if (inv) {

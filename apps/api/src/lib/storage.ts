@@ -1,6 +1,11 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { S3Client, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
 import { Storage as GcsClient } from '@google-cloud/storage';
 import { AppError } from './errors.js';
 
@@ -13,9 +18,11 @@ export interface ObjectStorage {
   save(key: string, buffer: Buffer): Promise<void>;
   read(key: string): Promise<StoredBlob>;
   delete(key: string): Promise<void>;
+  /** Optional pre-signed download URL (GCS / S3). */
+  signedUrl?(key: string, expiresSeconds?: number): Promise<string | null>;
 }
 
-/** Local disk storage for dev; swap to S3 pre-signed URLs in production. */
+/** Local disk storage for development. */
 export class LocalStorage implements ObjectStorage {
   constructor(private rootDir: string) {}
 
@@ -43,6 +50,10 @@ export class LocalStorage implements ObjectStorage {
   async delete(key: string): Promise<void> {
     await rm(this.pathForKey(key), { force: true });
   }
+
+  async signedUrl(): Promise<string | null> {
+    return null;
+  }
 }
 
 export class GcsStorage implements ObjectStorage {
@@ -68,6 +79,15 @@ export class GcsStorage implements ObjectStorage {
 
   async delete(key: string): Promise<void> {
     await this.bucket.file(key).delete({ ignoreNotFound: true });
+  }
+
+  async signedUrl(key: string, expiresSeconds = 300): Promise<string | null> {
+    const [url] = await this.bucket.file(key).getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + expiresSeconds * 1000,
+    });
+    return url;
   }
 }
 
@@ -108,6 +128,11 @@ export class S3Storage implements ObjectStorage {
         Key: key,
       }),
     );
+  }
+
+  async signedUrl(_key: string, _expiresSeconds = 300): Promise<string | null> {
+    // Prefer GCS in production. S3 signed URLs need @aws-sdk/s3-request-presigner.
+    return null;
   }
 }
 
