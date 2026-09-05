@@ -9,6 +9,7 @@ import {
 import { BarChart, DonutChart } from '../components/charts';
 import { StageBadge } from '../components/StageProgress';
 import { fmtDate, num } from '../lib/format';
+import { userCan } from '../lib/permissions';
 import { useAnimatedNumber } from '../lib/useAnimatedNumber';
 import { AdminDashboard } from './admin/AdminDashboard';
 
@@ -28,6 +29,7 @@ function ClientDashboard({
   onSite: (id: string) => void;
 }) {
   const nav = useNavigate();
+  const canCreate = userCan(user, 'raiseClientRequest');
   const first = user.name.split(' ')[0];
   const { impact } = report;
   const siteName = report.sites.find((s) => s.id === siteId)?.name;
@@ -61,9 +63,11 @@ function ClientDashboard({
           </div>
         </div>
         <div className="spacer" />
-        <Link to="/requests/new" className="btn bp">
-          + New Request
-        </Link>
+        {canCreate ? (
+          <Link to="/requests/new" className="btn bp">
+            + New Request
+          </Link>
+        ) : null}
       </div>
 
       {/* Site filter chips */}
@@ -241,9 +245,11 @@ function ClientDashboard({
         {requests.length === 0 ? (
           <div className="empty">
             <div className="empty-t">No requests yet</div>
-            <Link to="/requests/new" className="btn bp" style={{ marginTop: '.6rem' }}>
-              + New Request
-            </Link>
+            {canCreate ? (
+              <Link to="/requests/new" className="btn bp" style={{ marginTop: '.6rem' }}>
+                + New Request
+              </Link>
+            ) : null}
           </div>
         ) : (
           <div className="tw">
