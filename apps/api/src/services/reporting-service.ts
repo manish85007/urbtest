@@ -273,7 +273,7 @@ export async function getImpactReport(
   period?: ReportPeriod,
   clientId?: string,
 ) {
-  const scopedClientId = actor.role === 'client' ? actor.clientId : clientId;
+  const scopedClientId = isClientPortalRole(actor.role) ? actor.clientId : clientId;
   const baseScope = scopedClientId ? { clientId: scopedClientId } : clientScopeFilter(actor);
   const scope = siteId ? { ...baseScope, siteId } : baseScope;
   const resolved = period ?? parseReportPeriod({ period: 'fy' });
@@ -427,7 +427,7 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string, p
   if (actor.role === 'factory' && !factoryInScope(actor, factoryId)) {
     throw new AppError('Access denied for this factory.');
   }
-  if (actor.role === 'client') {
+  if (isClientPortalRole(actor.role)) {
     throw new AppError('Capacity reports are for Urbeno staff only.');
   }
 
@@ -525,7 +525,15 @@ export async function getHeroesReport(
   filters?: { clientId?: string },
 ) {
   if (actor.role === 'factory') throw new AppError('Recycling Heroes report is not available for factory accounts.');
-  if (!hasFeature(actor, 'reports.heroes')) throw new AppError('You do not have access to this report.', 403);
+  if (isClientPortalRole(actor.role)) {
+    // Portal clients (including Client Read Only) get Heroes unless both flags are explicitly off.
+    const fa = actor.featureAccess;
+    if (fa && fa['reports.heroes'] === false && fa['portal.heroes'] === false) {
+      throw new AppError('You do not have access to this report.', 403);
+    }
+  } else if (!hasFeature(actor, 'reports.heroes')) {
+    throw new AppError('You do not have access to this report.', 403);
+  }
   const resolved = period ?? parseReportPeriod({ period: 'fy' });
   const periodMeta = {
     fy: currentFY()?.label ?? '',
@@ -594,7 +602,7 @@ export async function getHeroesReport(
     };
   }
 
-  if (actor.role === 'client') {
+  if (isClientPortalRole(actor.role)) {
     if (!actor.clientId) throw new AppError('No organisation is linked to this account.');
     const client = await prisma.client.findUnique({ where: { id: actor.clientId }, select: { name: true } });
     const rows = forClient(actor.clientId);
@@ -761,7 +769,7 @@ export async function getRegisterReport(
       ? (await prisma.site.findUnique({ where: { id: siteId }, select: { name: true } }))?.name
       : null;
   const scopeParts = [
-    actor.role === 'client' ? clientName || 'Your organisation' : clientName || 'All clients',
+    isClientPortalRole(actor.role) ? clientName || 'Your organisation' : clientName || 'All clients',
     siteName || 'All sites',
   ];
 
@@ -1121,7 +1129,7 @@ export async function getRegisterReport(
     head = ['Client ID', 'Client', 'Site', 'Closed Invoices', 'Net kg', 'Tonnes', 'CO2e avoided kg', 'Landfill diverted kg', 'Tree equivalent', 'Water kL', 'Energy kWh'];
     const clients = clientId
       ? await prisma.client.findMany({ where: { id: clientId } })
-      : actor.role === 'client' && actor.clientId
+      : isClientPortalRole(actor.role) && actor.clientId
         ? await prisma.client.findMany({ where: { id: actor.clientId } })
         : await prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
     for (const c of clients) {
@@ -1145,7 +1153,7 @@ export async function getRegisterReport(
     head = ['Client', 'Tonnes (period)', 'Trees earned (period)', 'Trees planted (period)', 'Tonnes (lifetime)', 'Trees earned (lifetime)', 'Trees planted (lifetime)', 'Outstanding', 'Milestone'];
     const clients = clientId
       ? await prisma.client.findMany({ where: { id: clientId } })
-      : actor.role === 'client' && actor.clientId
+      : isClientPortalRole(actor.role) && actor.clientId
         ? await prisma.client.findMany({ where: { id: actor.clientId } })
         : await prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
     const plantings = await prisma.treePlanting.findMany({

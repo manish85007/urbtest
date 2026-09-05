@@ -4,6 +4,7 @@ import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
+import { isClientMutatorRole, isClientPortalRole } from '@urb-tectrack/shared';
 
 export type PlantingSource = 'urbeno' | 'client';
 
@@ -35,9 +36,12 @@ export async function recordTreePlanting(
   },
 ) {
   if (input.trees < 1) throw new AppError('Enter how many trees were planted.');
+  if (isClientPortalRole(actor.role) && !isClientMutatorRole(actor.role)) {
+    throw new AppError('Client Read Only users can view Recycling Heroes but cannot log plantings.', 403);
+  }
 
   let clientId = input.clientId ?? null;
-  if (actor.role === 'client') {
+  if (isClientPortalRole(actor.role)) {
     clientId = actor.clientId;
   }
   if (!clientId) throw new AppError('Select the organisation this planting belongs to.');
@@ -45,7 +49,7 @@ export async function recordTreePlanting(
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true, name: true } });
   if (!client) throw new AppError('Select the organisation this planting belongs to.');
 
-  const source: PlantingSource = actor.role === 'client' ? 'client' : input.source === 'client' ? 'client' : 'urbeno';
+  const source: PlantingSource = isClientPortalRole(actor.role) ? 'client' : input.source === 'client' ? 'client' : 'urbeno';
   const plantedAt = parsePlantingDate(input.plantedAt);
   const photoIds = input.photoFileId ? [input.photoFileId] : [];
 
@@ -98,7 +102,10 @@ export async function recordTreeProgress(
 ) {
   const planting = await prisma.treePlanting.findUnique({ where: { id: plantingId } });
   if (!planting) throw new AppError('Planting not found.', 404);
-  if (actor.role === 'client' && planting.clientId !== actor.clientId) {
+  if (isClientPortalRole(actor.role) && !isClientMutatorRole(actor.role)) {
+    throw new AppError('Client Read Only users can view Recycling Heroes but cannot add growth photos.', 403);
+  }
+  if (isClientPortalRole(actor.role) && planting.clientId !== actor.clientId) {
     throw new AppError('You can only add photos to your own plantings.', 403);
   }
   if (!input.photoFileId) throw new AppError('Attach the photo.');
@@ -126,7 +133,7 @@ export async function recordTreeProgress(
     entityId: plantingId,
   });
 
-  if (actor.role !== 'client' && planting.clientId) {
+  if (!isClientPortalRole(actor.role) && planting.clientId) {
     await notifyClientUsers(
       planting.clientId,
       'trees',

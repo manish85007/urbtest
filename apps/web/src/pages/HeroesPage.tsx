@@ -12,6 +12,7 @@ import {
 import { PeriodPicker } from '../components/PeriodPicker';
 import { BarChart } from '../components/charts';
 import { num } from '../lib/format';
+import { userCan } from '../lib/permissions';
 import { useAnimatedNumber } from '../lib/useAnimatedNumber';
 import { type ForestFilter, HeroesForest } from './heroes/HeroesForest';
 import { PlantModal } from './heroes/PlantModal';
@@ -28,6 +29,7 @@ export function HeroesPage({ user }: HeroesPageProps) {
 }
 
 function HeroesClient({ user }: { user: SessionUser }) {
+  const canMutate = userCan(user, 'raiseClientRequest');
   const [report, setReport] = useState<HeroesClientReport | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -43,7 +45,10 @@ function HeroesClient({ user }: { user: SessionUser }) {
       .heroes(period)
       .then((r) => {
         if (r.view !== 'client') setError('Recycling Heroes client view is available to client users.');
-        else setReport(r);
+        else {
+          setError('');
+          setReport(r);
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
   }
@@ -100,9 +105,11 @@ function HeroesClient({ user }: { user: SessionUser }) {
         <a className="btn bs" href={filesApi.pdf('/reports/methodology.pdf')} target="_blank" rel="noopener noreferrer">
           📄 Methodology
         </a>
-        <button type="button" className="btn bp" onClick={() => setPlantOpen(true)}>
-          + Log CSR Planting
-        </button>
+        {canMutate ? (
+          <button type="button" className="btn bp" onClick={() => setPlantOpen(true)}>
+            + Log CSR Planting
+          </button>
+        ) : null}
       </div>
       {error ? <p className="error">{error}</p> : null}
       {msg ? <p className="ok-msg">{msg}</p> : null}
@@ -171,7 +178,9 @@ function HeroesClient({ user }: { user: SessionUser }) {
         >
           <span className="heroes-metric-v">{growthPhotos}</span>
           <span className="heroes-metric-l">Growth photos</span>
-          <span className="heroes-metric-s">CSR audit trail — add more anytime</span>
+          <span className="heroes-metric-s">
+            {canMutate ? 'CSR audit trail — add more anytime' : 'CSR audit trail'}
+          </span>
         </button>
       </div>
 
@@ -257,7 +266,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
               <TreeCard
                 planting={t}
                 canEdit={false}
-                showClientCsrProgress
+                showClientCsrProgress={canMutate}
                 clientVariant
                 onAddProgress={setProgressFor}
               />
@@ -266,7 +275,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
         )}
       </div>
 
-      {plantOpen ? (
+      {plantOpen && canMutate ? (
         <PlantModal
           asClient
           clientId={user.clientId ?? undefined}
@@ -279,7 +288,7 @@ function HeroesClient({ user }: { user: SessionUser }) {
           }}
         />
       ) : null}
-      {progressFor ? (
+      {progressFor && canMutate ? (
         <ProgressModal
           planting={progressFor}
           onClose={() => setProgressFor(null)}

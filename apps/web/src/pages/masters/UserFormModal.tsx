@@ -10,7 +10,7 @@ const FEATURE_FLAGS: Array<{ id: string; label: string; roles: FormRole[] }> = [
   { id: 'reports.complete', label: 'Report: Complete Request Summary', roles: ['admin', 'operations', 'client', 'client_readonly', 'auditor'] },
   { id: 'reports.invoices', label: 'Report: Invoice Register', roles: ['admin', 'operations', 'auditor'] },
   { id: 'reports.sustain', label: 'Report: Sustainability', roles: ['admin', 'operations', 'auditor'] },
-  { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations', 'auditor'] },
+  { id: 'reports.heroes', label: 'Report: Recycling Heroes', roles: ['admin', 'operations', 'client', 'client_readonly', 'auditor'] },
   { id: 'reports.mrn', label: 'Report: MRN Register', roles: ['factory'] },
   { id: 'reports.form6', label: 'Report: Form 6 Log', roles: ['factory', 'client', 'client_readonly', 'auditor'] },
   { id: 'reports.serials', label: 'Report: Device Serials', roles: ['admin', 'operations', 'factory', 'client', 'client_readonly', 'auditor'] },
@@ -21,6 +21,7 @@ const FEATURE_FLAGS: Array<{ id: string; label: string; roles: FormRole[] }> = [
   { id: 'portal.requests', label: 'Portal: View requests', roles: ['client', 'client_readonly'] },
   { id: 'portal.invoices', label: 'Portal: View invoices', roles: ['client', 'client_readonly'] },
   { id: 'portal.reports', label: 'Portal: View reports', roles: ['client', 'client_readonly'] },
+  { id: 'portal.heroes', label: 'Portal: Recycling Heroes', roles: ['client', 'client_readonly'] },
 ];
 
 interface UserFormModalProps {
@@ -239,8 +240,8 @@ export function UserFormModal({
       ) : null}
       {role === 'client_readonly' ? (
         <p className="dim">
-          Client Read Only can view requests and download Form 6 / Certificate of Destruction. They cannot raise or close
-          requests and do not receive new-request email notifications.
+          Client Read Only can view requests, Recycling Heroes, and download Form 6 / Certificate of Destruction. They
+          cannot raise or close requests, log CSR plantings, or receive new-request email notifications.
         </p>
       ) : null}
       {role === 'auditor' ? (
