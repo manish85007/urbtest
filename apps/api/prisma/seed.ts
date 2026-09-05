@@ -48,7 +48,8 @@ async function main() {
   for (const f of factories) {
     await prisma.factorySite.upsert({
       where: { id: f.id },
-      update: f,
+      // Do not overwrite Masters edits on every UAT_SEED boot.
+      update: {},
       create: f,
     });
   }
@@ -269,6 +270,8 @@ async function main() {
     });
   }
 
+  await prisma.emailTemplate.deleteMany({ where: { key: 'admin_request_digest' } });
+
   const legalDocs = JSON.parse(
     readFileSync(join(here, 'data/legal-documents-seed.json'), 'utf8'),
   ) as Array<{
@@ -478,6 +481,17 @@ async function main() {
       reviewStatus: 'approved',
       reviewedAt: new Date(),
       reviewedBy: 'system-seed',
+      clientPublishedAt: new Date(),
+      clientPublishedBy: 'system-seed',
+    },
+  });
+
+  // Ensure any already-approved Form 6 rows are client-published for demo continuity.
+  await prisma.recycling.updateMany({
+    where: { reviewStatus: 'approved', clientPublishedAt: null },
+    data: {
+      clientPublishedAt: new Date(),
+      clientPublishedBy: 'system-seed',
     },
   });
 

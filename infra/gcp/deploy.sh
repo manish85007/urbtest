@@ -12,6 +12,7 @@ DB_USER="${GCP_DB_USER:-postgres}"
 SECRET_DB="${GCP_SECRET_DB:-tectrack-db-password}"
 SECRET_SESSION="${GCP_SECRET_SESSION:-tectrack-session-secret}"
 SECRET_SMTP="${GCP_SECRET_SMTP:-tectrack-smtp-pass}"
+SECRET_JOBS="${GCP_SECRET_JOBS:-tectrack-jobs-secret}"
 
 need() { command -v "$1" >/dev/null || { echo "Missing $1" >&2; exit 1; }; }
 need gcloud
@@ -51,6 +52,7 @@ gcloud services enable \
   storage.googleapis.com \
   cloudbuild.googleapis.com \
   iam.googleapis.com \
+  cloudscheduler.googleapis.com \
   --project "${PROJECT}"
 
 if ! gcloud artifacts repositories describe "${REPO}" --location="${REGION}" --project="${PROJECT}" >/dev/null 2>&1; then
@@ -94,6 +96,7 @@ ensure_secret() {
 
 DB_PASSWORD="$(ensure_secret "${SECRET_DB}")"
 SESSION_SECRET="$(ensure_secret "${SECRET_SESSION}")"
+JOBS_SECRET="$(ensure_secret "${SECRET_JOBS}")"
 
 # SMTP app password must already exist (do not auto-generate).
 if ! gcloud secrets describe "${SECRET_SMTP}" --project="${PROJECT}" >/dev/null 2>&1; then
@@ -156,7 +159,7 @@ gcloud run deploy "${SERVICE}" \
   --min-instances 1 \
   --max-instances 2 \
   --cpu-boost \
-  --set-secrets "DATABASE_PASSWORD=${SECRET_DB}:latest,SESSION_SECRET=${SECRET_SESSION}:latest,SMTP_PASS=${SECRET_SMTP}:latest" \
+  --set-secrets "DATABASE_PASSWORD=${SECRET_DB}:latest,SESSION_SECRET=${SECRET_SESSION}:latest,SMTP_PASS=${SECRET_SMTP}:latest,JOBS_SECRET=${SECRET_JOBS}:latest" \
   --set-env-vars "NODE_ENV=uat,UAT_SEED=true,API_HOST=0.0.0.0,WEB_DIST=/app/apps/web/dist,COOKIE_SECURE=true,ENABLE_JOBS=true,EMAIL_PROVIDER=smtp,SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_SECURE=false,SMTP_USER=noreply@urbeno.in,SMTP_FROM_NAME=Urb TecTrack,SMTP_FROM_EMAIL=noreply@urbeno.in,URBENO_EMAIL=info@urbeno.in,DATABASE_USER=${DB_USER},DATABASE_NAME=${DB_NAME},CLOUD_SQL_CONNECTION_NAME=${SQL_CONN},GCS_BUCKET=${BUCKET}" \
   --quiet
 

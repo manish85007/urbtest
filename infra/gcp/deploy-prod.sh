@@ -22,6 +22,7 @@ SECRET_DB="${GCP_SECRET_DB:-tectrack-prod-db-password}"
 SECRET_SESSION="${GCP_SECRET_SESSION:-tectrack-prod-session-secret}"
 SECRET_SMTP="${GCP_SECRET_SMTP:-tectrack-smtp-pass}"
 SECRET_ADMIN="${GCP_SECRET_ADMIN:-tectrack-prod-admin-password}"
+SECRET_JOBS="${GCP_SECRET_JOBS:-tectrack-prod-jobs-secret}"
 PORTAL_HOST="${GCP_PROD_HOST:-tectrack.urbeno.in}"
 PORTAL_URL="https://${PORTAL_HOST}"
 
@@ -67,6 +68,7 @@ gcloud services enable \
   cloudbuild.googleapis.com \
   iam.googleapis.com \
   compute.googleapis.com \
+  cloudscheduler.googleapis.com \
   --project "${PROJECT}"
 
 if ! gcloud artifacts repositories describe "${REPO}" --location="${REGION}" --project="${PROJECT}" >/dev/null 2>&1; then
@@ -112,6 +114,7 @@ ensure_secret() {
 
 DB_PASSWORD="$(ensure_secret "${SECRET_DB}")"
 SESSION_SECRET="$(ensure_secret "${SECRET_SESSION}")"
+JOBS_SECRET="$(ensure_secret "${SECRET_JOBS}")"
 
 ROTATE_ADMIN="${ROTATE_ADMIN_PASSWORD:-false}"
 FORCE_ADMIN_PASSWORD="false"
@@ -197,7 +200,7 @@ gcloud run deploy "${SERVICE}" \
   --min-instances 1 \
   --max-instances 4 \
   --cpu-boost \
-  --set-secrets "DATABASE_PASSWORD=${SECRET_DB}:latest,SESSION_SECRET=${SECRET_SESSION}:latest,SMTP_PASS=${SECRET_SMTP}:latest,ADMIN_BOOTSTRAP_PASSWORD=${SECRET_ADMIN}:latest" \
+  --set-secrets "DATABASE_PASSWORD=${SECRET_DB}:latest,SESSION_SECRET=${SECRET_SESSION}:latest,SMTP_PASS=${SECRET_SMTP}:latest,ADMIN_BOOTSTRAP_PASSWORD=${SECRET_ADMIN}:latest,JOBS_SECRET=${SECRET_JOBS}:latest" \
   --set-env-vars "NODE_ENV=production,PRODUCTION_SEED=true,ADMIN_BOOTSTRAP_FORCE_PASSWORD=${FORCE_ADMIN_PASSWORD},API_HOST=0.0.0.0,WEB_DIST=/app/apps/web/dist,COOKIE_SECURE=true,ENABLE_JOBS=true,EMAIL_PROVIDER=smtp,SMTP_HOST=smtp.gmail.com,SMTP_PORT=587,SMTP_SECURE=false,SMTP_USER=noreply@urbeno.in,SMTP_FROM_NAME=Urb TecTrack,SMTP_FROM_EMAIL=noreply@urbeno.in,URBENO_EMAIL=info@urbeno.in,DATABASE_USER=${DB_USER},DATABASE_NAME=${DB_NAME},CLOUD_SQL_CONNECTION_NAME=${SQL_CONN},GCS_BUCKET=${BUCKET},USE_SIGNED_URLS=true,PORTAL_URL=${PORTAL_URL},CORS_ORIGIN=${PORTAL_URL},ADMIN_BOOTSTRAP_EMAIL=manish@urbeno.in,ADMIN_BOOTSTRAP_NAME=Manish Jain" \
   --quiet
 

@@ -50,16 +50,8 @@ async function main() {
 
   await prisma.factorySite.upsert({
     where: { id: FACTORY_ID },
-    update: {
-      name: FACTORY_NAME,
-      address:
-        'KIADB Aerospace Park, Devanahalli, Bengaluru Rural, Karnataka 562110',
-      gstin: '29AABCU1234R1ZX',
-      kspcbConsent: 'KSPCB/HWM/AUTH/2024-27/1142',
-      cpcbEpr: 'CPCB/EPR/2022/KA/00817',
-      managerEmail: adminEmail,
-      active: true,
-    },
+    // Preserve Masters → Factory Sites edits across PRODUCTION_SEED restarts.
+    update: {},
     create: {
       id: FACTORY_ID,
       name: FACTORY_NAME,
@@ -180,6 +172,8 @@ async function main() {
       },
     });
   }
+
+  await prisma.emailTemplate.deleteMany({ where: { key: 'admin_request_digest' } });
 
   const legalDocs = JSON.parse(
     readFileSync(join(here, 'data/legal-documents-seed.json'), 'utf8'),

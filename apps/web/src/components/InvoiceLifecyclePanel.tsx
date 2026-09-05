@@ -123,6 +123,7 @@ export function InvoiceLifecyclePanel({
   const canCreateForm6 = perms.manageRecycling && !!invoice.mrn && !invoice.recycling && !invoice.closedAt;
   const form6Status = invoice.recycling?.reviewStatus ?? 'approved';
   const form6Approved = !invoice.recycling || form6Status === 'approved';
+  const compliancePublished = !!(invoice.recycling?.clientPublishedAt);
   const canEditForm6 =
     perms.manageRecycling &&
     !!invoice.recycling &&
@@ -131,6 +132,13 @@ export function InvoiceLifecyclePanel({
   const canUploadCod = perms.uploadCertificate && !!invoice.recycling && form6Approved && !invoice.closedAt;
   const canReviewForm6 =
     isAdmin && !!invoice.recycling && form6Status === 'pending_review' && !invoice.closedAt;
+  const canCertifyCompliance =
+    isAdmin &&
+    !!invoice.recycling &&
+    form6Approved &&
+    invoice.certificates.length > 0 &&
+    !compliancePublished &&
+    !invoice.closedAt;
   const panelId =
     section === 'recycling' ? `inv-${invoice.id}-recy` : section === 'close' ? `inv-${invoice.id}-close` : `inv-${invoice.id}`;
 
@@ -424,13 +432,17 @@ export function InvoiceLifecyclePanel({
               canCreate={canCreateForm6}
               canEdit={canEditForm6}
               canReview={canReviewForm6}
+              canCertify={canCertifyCompliance}
               isStaff={isStaff}
               isAdmin={isAdmin}
               disabled={disabled}
               onCreateClick={() => setPanel('recy')}
               onEditClick={() => setPanel('recy')}
               onApprove={() =>
-                void run(() => lifecycleApi.approveRecycling(invoice.id), 'Form 6 approved — client notified.')
+                void run(
+                  () => lifecycleApi.approveRecycling(invoice.id),
+                  'Form 6 approved. Upload CoD, then certify to publish to the client portal.',
+                )
               }
               onReject={() => {
                 const note = window.prompt('Reason for returning Form 6 to the factory (optional):');
@@ -438,6 +450,19 @@ export function InvoiceLifecyclePanel({
                 void run(
                   () => lifecycleApi.rejectRecycling(invoice.id, { note: note.trim() || undefined }),
                   'Form 6 returned to factory for revision.',
+                );
+              }}
+              onCertify={() => {
+                const ok = window.confirm(
+                  'Acknowledge Form 6 and CoD details and publish them to the client portal?\n\nThe client will be notified by email and can download both documents.',
+                );
+                if (!ok) return;
+                void run(
+                  () =>
+                    lifecycleApi.certifyCompliance(invoice.id, {
+                      acknowledged: true,
+                    }),
+                  'Form 6 & CoD certified and published to the client portal.',
                 );
               }}
             />
@@ -452,6 +477,63 @@ export function InvoiceLifecyclePanel({
                     </button>
                   ) : null}
                 </div>
+                {canCertifyCompliance ? (
+                  <div
+                    className="card"
+                    style={{
+                      marginBottom: '.65rem',
+                      background: 'var(--am2)',
+                      borderColor: '#fcd34d',
+                      padding: '.75rem',
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: 'var(--g2)', marginBottom: '.35rem' }}>
+                      Super Admin certify — Form 6 &amp; CoD Review
+                    </div>
+                    <p className="dim" style={{ fontSize: '.82rem', margin: '0 0 .65rem' }}>
+                      Review the uploaded Form 6 and Certificate of Destruction. Acknowledge and certify to publish
+                      both documents on the client portal and notify the client. They remain internal until you
+                      certify.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn bp bsm"
+                      disabled={disabled}
+                      onClick={() => {
+                        const ok = window.confirm(
+                          'Acknowledge Form 6 and CoD details and publish them to the client portal?\n\nThe client will be notified by email and can download both documents.',
+                        );
+                        if (!ok) return;
+                        void run(
+                          () =>
+                            lifecycleApi.certifyCompliance(invoice.id, {
+                              acknowledged: true,
+                            }),
+                          'Form 6 & CoD certified and published to the client portal.',
+                        );
+                      }}
+                    >
+                      Acknowledge &amp; Certify for Client Portal
+                    </button>
+                  </div>
+                ) : null}
+                {form6Approved && invoice.certificates.length > 0 && compliancePublished ? (
+                  <div className="note-box" style={{ marginBottom: '.65rem' }}>
+                    Published to client portal
+                    {invoice.recycling.clientPublishedBy
+                      ? ` by ${invoice.recycling.clientPublishedBy}`
+                      : ''}
+                    {invoice.recycling.clientPublishedAt
+                      ? ` on ${fmtDate(invoice.recycling.clientPublishedAt)}`
+                      : ''}
+                    .
+                  </div>
+                ) : null}
+                {form6Approved && invoice.certificates.length > 0 && !compliancePublished && isStaff && !isAdmin ? (
+                  <div className="note-box" style={{ marginBottom: '.65rem' }}>
+                    Form 6 and CoD are waiting for Super Admin certification before the client can see them.
+                  </div>
+                ) : null}
                 {invoice.certificates.length ? (
                   <div className="tw">
                     <table>
@@ -460,6 +542,7 @@ export function InvoiceLifecyclePanel({
                           <th>Certificate</th>
                           <th>Department / Scope</th>
                           <th>Issued</th>
+                          <th>Portal</th>
                           <th>Emailed</th>
                           <th></th>
                         </tr>
@@ -477,6 +560,13 @@ export function InvoiceLifecyclePanel({
                             </td>
                             <td>{c.department || <span className="dim">whole invoice</span>}</td>
                             <td className="dim">{fmtDate(c.certDate)}</td>
+                            <td>
+                              {compliancePublished ? (
+                                <span className="badge bg-g">published</span>
+                              ) : (
+                                <span className="badge bg-am">awaiting certify</span>
+                              )}
+                            </td>
                             <td>{c.mailedAt ? <span className="badge bg-g">sent</span> : '—'}</td>
                             <td>
                               {c.fileId ? (
@@ -501,7 +591,7 @@ export function InvoiceLifecyclePanel({
                   <div className="dim" style={{ fontSize: '.83rem' }}>
                     {invoice.recycling.reviewStatus && invoice.recycling.reviewStatus !== 'approved'
                       ? 'Admin must approve Form 6 before the Certificate of Destruction can be uploaded.'
-                      : `Form 6 ${invoice.recycling.form6No} is on file. Upload the signed certificate PDF when ready.`}
+                      : `Form 6 ${invoice.recycling.form6No} is on file. Upload the signed certificate PDF, then Super Admin certifies to publish.`}
                   </div>
                 )}
               </div>
@@ -528,11 +618,13 @@ export function InvoiceLifecyclePanel({
       {section === 'close' ? (
         invoice.closedAt ? (
           <p className="ok-msg sm">Closed {invoice.closedAt.slice(0, 10)}</p>
-        ) : !invoice.certificates.length ? (
+        ) : !invoice.certificates.length || !invoice.recycling?.clientPublishedAt ? (
           <div className="card" style={{ marginBottom: '.6rem' }}>
             <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
             <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
-              Upload the Certificate of Destruction before this invoice can be closed.
+              {!invoice.certificates.length
+                ? 'Upload the Certificate of Destruction before this invoice can be closed.'
+                : 'Super Admin must certify Form 6 & CoD for the client portal before this invoice can be closed.'}
             </p>
           </div>
         ) : (isClient || isAdmin) && isPaid ? (
@@ -767,7 +859,10 @@ export function InvoiceLifecyclePanel({
             disabled={disabled}
             canBackdate={canBackdate}
             onSubmit={(body) =>
-              run(() => lifecycleApi.uploadCertificate(invoice.id, body), 'Certificate uploaded.')
+              run(
+                () => lifecycleApi.uploadCertificate(invoice.id, body),
+                'Certificate uploaded — certify to publish to the client portal.',
+              )
             }
           />
         </Modal>
@@ -1027,6 +1122,7 @@ function RecyclingCard({
   canCreate,
   canEdit,
   canReview,
+  canCertify,
   isStaff,
   isAdmin,
   disabled,
@@ -1034,11 +1130,13 @@ function RecyclingCard({
   onEditClick,
   onApprove,
   onReject,
+  onCertify,
 }: {
   invoice: InvoiceDetail;
   canCreate: boolean;
   canEdit?: boolean;
   canReview?: boolean;
+  canCertify?: boolean;
   isStaff: boolean;
   isAdmin?: boolean;
   disabled?: boolean;
@@ -1046,12 +1144,14 @@ function RecyclingCard({
   onEditClick?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
+  onCertify?: () => void;
 }) {
   const r = invoice.recycling;
   const status = r?.reviewStatus ?? (r ? 'approved' : undefined);
   const approved = status === 'approved';
   const pending = status === 'pending_review';
   const rejected = status === 'rejected';
+  const published = !!r?.clientPublishedAt;
   const cats = r?.categories ?? [];
   const serials = r?.serials ?? [];
   const destroyed = serials.filter((s) => s.dcodNo).length;
@@ -1067,6 +1167,8 @@ function RecyclingCard({
     <span className="badge bg-am">Awaiting admin review</span>
   ) : rejected ? (
     <span className="badge bg-rd">Returned for revision</span>
+  ) : !published ? (
+    <span className="badge bg-am">Approved — awaiting certify</span>
   ) : (
     <span className="badge bg-g mono">{r.form6No}</span>
   );
@@ -1095,9 +1197,9 @@ function RecyclingCard({
                 Edit Form 6
               </button>
             ) : null}
-            {(approved || isStaff) ? (
+            {(published || isStaff) ? (
               <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noopener noreferrer">
-                ⬇ Form 6{approved ? '' : ' (preview)'}
+                ⬇ Form 6{published ? '' : ' (preview)'}
               </a>
             ) : null}
           </>
@@ -1131,8 +1233,8 @@ function RecyclingCard({
                 Admin review — Form 6 {r.form6No}
               </div>
               <p className="dim" style={{ fontSize: '.82rem', margin: '0 0 .65rem' }}>
-                The factory has completed entry. Approve to generate the client-facing Form 6, email the client,
-                and show it on their portal. Return it if revisions are needed.
+                The factory has completed entry. Approve to unlock CoD upload. Form 6 stays internal until you
+                certify Form 6 &amp; CoD together for the client portal.
               </p>
               {r.reviewNote ? (
                 <p className="dim" style={{ fontSize: '.8rem', marginBottom: '.5rem' }}>
@@ -1141,7 +1243,7 @@ function RecyclingCard({
               ) : null}
               <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap' }}>
                 <button type="button" className="btn bp bsm" disabled={disabled} onClick={onApprove}>
-                  Approve &amp; release Form 6
+                  Approve Form 6
                 </button>
                 <button type="button" className="btn bs bsm" disabled={disabled} onClick={onReject}>
                   Return to factory
@@ -1149,9 +1251,40 @@ function RecyclingCard({
               </div>
             </div>
           ) : null}
+          {approved && !published && canCertify && onCertify ? (
+            <div
+              className="card"
+              style={{
+                marginBottom: '.75rem',
+                background: 'var(--am2)',
+                borderColor: '#fcd34d',
+                padding: '.75rem',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: 'var(--g2)', marginBottom: '.35rem' }}>
+                Form 6 &amp; CoD Review — certify to publish
+              </div>
+              <p className="dim" style={{ fontSize: '.82rem', margin: '0 0 .65rem' }}>
+                {invoice.certificates.length
+                  ? 'Acknowledge the Form 6 and uploaded CoD, then certify to publish both on the client portal.'
+                  : 'Upload the Certificate of Destruction below, then return here to certify and publish.'}
+              </p>
+              {invoice.certificates.length ? (
+                <button type="button" className="btn bp bsm" disabled={disabled} onClick={onCertify}>
+                  Acknowledge &amp; Certify for Client Portal
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {pending && !canReview && isStaff ? (
             <div className="note-box" style={{ marginBottom: '.65rem' }}>
-              Form 6 {r.form6No} is waiting for admin approval before the client is notified.
+              Form 6 {r.form6No} is waiting for admin approval before CoD upload and client publish.
+            </div>
+          ) : null}
+          {approved && !published && !canCertify && isStaff ? (
+            <div className="note-box" style={{ marginBottom: '.65rem' }}>
+              Form 6 {r.form6No} is approved but not yet published to the client portal
+              {invoice.certificates.length ? ' — awaiting Super Admin certify.' : ' — CoD upload required first.'}
             </div>
           ) : null}
           {rejected ? (
@@ -1180,7 +1313,15 @@ function RecyclingCard({
             <div className="tile">
               <div className="tile-l">Review</div>
               <div className="tile-v">
-                {approved ? 'Approved' : pending ? 'Pending admin' : rejected ? 'Returned' : status}
+                {approved
+                  ? published
+                    ? 'Published'
+                    : 'Approved — awaiting certify'
+                  : pending
+                    ? 'Pending admin'
+                    : rejected
+                      ? 'Returned'
+                      : status}
               </div>
             </div>
             <div className="tile">

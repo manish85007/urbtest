@@ -59,7 +59,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
     { label: 'Awaiting Recycling', value: report.queues.awaitingRecycling.length, color: '#3b82f6' },
     ...(isAdminVariant
       ? [
-          { label: 'Awaiting CoD', value: report.queues.awaitingCod.length, color: '#a855f7' },
+          { label: 'Awaiting CoD / Publish', value: report.queues.awaitingCod.length, color: '#a855f7' },
           { label: 'Awaiting Client Close', value: report.queues.awaitingClose.length, color: '#22c55e' },
         ]
       : []),
@@ -315,7 +315,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
             <AdminQueueCard title="♻️ Awaiting Recycling" items={report.queues.awaitingRecycling} act="Process" cls="bg-bl" />
             {isAdminVariant ? (
               <>
-                <AdminQueueCard title="🏅 Awaiting CoD" items={report.queues.awaitingCod} act="Upload" cls="bg-pu" />
+                <AdminQueueCard title="🏅 Awaiting CoD / Publish" items={report.queues.awaitingCod} act="Certify" cls="bg-pu" />
                 <AdminQueueCard title="🎉 Awaiting Client Close" items={report.queues.awaitingClose} act="With client" cls="bg-g" />
               </>
             ) : null}

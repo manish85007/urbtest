@@ -203,7 +203,7 @@ function FactoryModal({
         CPCB / EPR Authorisation Number
         <input className="mono" value={cpcb} onChange={(e) => setCpcb(e.target.value)} placeholder="CPCB/EPR/RECYCLER/2025/KA/00000" />
         <div className="dim" style={{ fontSize: '.71rem', marginTop: '.2rem' }}>
-          Printed on Form 6 and the MRN issued from this facility
+          Fallback only — Masters → Company CPCB / State PCB is printed first on Form 6 and MRN
         </div>
       </label>
       <label>

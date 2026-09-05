@@ -276,7 +276,34 @@ class Painter {
       if (lh.docNo) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 20, lh.docNo, GREEN_DARK, 'r');
       if (lh.docLabel) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 34, lh.docLabel, GREEN, 'r');
       if (lh.docDate) this.text('F1', 7.5, PAGE_W - MARGIN_X, PAGE_H - 46, lh.docDate, MUTED, 'r');
-      const ruleY = PAGE_H - Math.max(logoH + 24, 58);
+
+      // Statutory lines under the logo (Masters → Company profile).
+      let metaY = PAGE_H - Math.max(logoH + 22, 54);
+      if (lh.address) {
+        this.text('F1', 7.2, MARGIN_X, metaY, lh.address.slice(0, 110), MUTED);
+        metaY -= 11;
+      }
+      const ids = [
+        lh.gst ? `GSTIN ${lh.gst}` : '',
+        lh.cin ? `CIN ${lh.cin}` : '',
+        lh.phone ? `Ph ${lh.phone}` : '',
+        lh.email || '',
+      ]
+        .filter(Boolean)
+        .join('  ·  ');
+      if (ids) {
+        this.text('F1', 7, MARGIN_X, metaY, ids.slice(0, 118), MUTED);
+        metaY -= 11;
+      }
+      const certs = [lh.cpcb ? `CPCB ${lh.cpcb}` : '', lh.kspcb ? `State PCB ${lh.kspcb}` : '']
+        .filter(Boolean)
+        .join('  ·  ');
+      if (certs) {
+        this.text('F1', 7, MARGIN_X, metaY, certs.slice(0, 118), GREEN_DARK);
+        metaY -= 12;
+      }
+
+      const ruleY = Math.min(metaY - 2, PAGE_H - Math.max(logoH + 24, 58));
       this.fillRect(MARGIN_X, ruleY, CONTENT_W, 1.5, GREEN);
       this.text('F2', 13, PAGE_W / 2, ruleY - 18, this.title, GREEN_DARK, 'c');
       if (this.subtitle) this.text('F1', 8.5, PAGE_W / 2, ruleY - 32, this.subtitle, MUTED, 'c');

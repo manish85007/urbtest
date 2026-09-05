@@ -983,14 +983,11 @@ export async function createRecycling(
   });
 
   if (autoApprove) {
-    await notifyClientUsers(
-      invoice.submission.clientId,
-      'recy.done',
-      `${invoice.invoiceNo} processed — Form 6 ${recycling.form6No} issued`,
+    await notifyAdmins(
+      'form6.review',
+      `Form 6 ${recycling.form6No} for ${invoice.invoiceNo} approved — upload CoD then certify to publish`,
       invoice.submissionId,
     );
-    const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-    await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
   } else {
     await notifyAdmins(
       'form6.review',
@@ -1209,14 +1206,11 @@ export async function approveRecycling(actor: SessionUser, invoiceId: string) {
     details: { submissionId: invoice.submissionId, invNo: invoice.invoiceNo },
   });
 
-  await notifyClientUsers(
-    invoice.submission.clientId,
-    'recy.done',
-    `${invoice.invoiceNo} processed — Form 6 ${recycling.form6No} issued`,
+  await notifyAdmins(
+    'form6.review',
+    `Form 6 ${recycling.form6No} for ${invoice.invoiceNo} approved — upload CoD then certify to publish`,
     invoice.submissionId,
   );
-  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
 
   return recycling;
 }
@@ -1311,10 +1305,83 @@ export async function uploadCertificate(
     },
   });
 
-  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
-  await emailCodGenerated(refreshed, invoice.invoiceNo, certificate.certNo, certificate.certDate);
+  const alreadyPublished = !!invoice.recycling.clientPublishedAt;
+  if (alreadyPublished) {
+    const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+    await emailCodGenerated(refreshed, invoice.invoiceNo, certificate.certNo, certificate.certDate);
+  } else {
+    await notifyAdmins(
+      'form6.review',
+      `CoD ${certificate.certNo} uploaded for ${invoice.invoiceNo} — certify to publish Form 6 & CoD to client`,
+      invoice.submissionId,
+    );
+  }
 
   return certificate;
+}
+
+export async function certifyCompliancePublish(
+  actor: SessionUser,
+  invoiceId: string,
+  input: { acknowledged?: boolean; note?: string } = {},
+) {
+  requireAdmin(actor);
+  if (!input.acknowledged) {
+    throw new AppError('Acknowledge the Form 6 and CoD details before certifying for the client portal.');
+  }
+
+  const invoice = await loadInvoiceForActor(invoiceId, actor);
+  assertLifecycleOpen(invoice);
+  const existing = invoice.recycling;
+  if (!existing) throw new AppError('Issue Form 6 before certifying compliance documents.');
+  if (existing.reviewStatus !== 'approved') {
+    throw new AppError('Approve Form 6 before certifying it for the client portal.');
+  }
+  if (!invoice.certificates.length) {
+    throw new AppError('Upload the Certificate of Destruction before certifying for the client portal.');
+  }
+  if (existing.clientPublishedAt) {
+    throw new AppError('These compliance documents are already published to the client portal.');
+  }
+
+  const note = input.note?.trim() || null;
+  const recycling = await prisma.recycling.update({
+    where: { id: existing.id },
+    data: {
+      clientPublishedAt: new Date(),
+      clientPublishedBy: actor.email,
+      clientPublishNote: note,
+    },
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'compliance.certify',
+    entity: 'recycling',
+    entityId: recycling.form6No,
+    details: {
+      submissionId: invoice.submissionId,
+      invNo: invoice.invoiceNo,
+      certNos: invoice.certificates.map((c) => c.certNo),
+      note,
+    },
+  });
+
+  await notifyClientUsers(
+    invoice.submission.clientId,
+    'recy.done',
+    `${invoice.invoiceNo} — Form 6 ${recycling.form6No} and Certificate of Destruction published`,
+    invoice.submissionId,
+  );
+
+  const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);
+  await emailRecyclingForm6(refreshed, invoice.invoiceNo, recycling.form6No);
+  for (const cert of invoice.certificates) {
+    await emailCodGenerated(refreshed, invoice.invoiceNo, cert.certNo, cert.certDate);
+  }
+
+  return recycling;
 }
 
 function firstCertificateAt(invoice: Awaited<ReturnType<typeof loadInvoiceForActor>>) {
@@ -1335,6 +1402,9 @@ export async function closeInvoice(
   if (invoice.closedAt) throw new AppError('This invoice is already closed.');
   if (!invoice.certificates.length) {
     throw new AppError('No Certificate of Destruction has been uploaded yet.');
+  }
+  if (!invoice.recycling?.clientPublishedAt) {
+    throw new AppError('Super Admin must certify Form 6 & CoD before this invoice can be closed.');
   }
   if (stage < 8) {
     throw new AppError('Upload a certificate before closing this invoice.');

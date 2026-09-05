@@ -258,6 +258,8 @@ export async function seedLifecycleSamples(
         reviewStatus: 'approved',
         reviewedAt: recyAt,
         reviewedBy: 'admin@urbeno.in',
+        clientPublishedAt: recyAt,
+        clientPublishedBy: 'admin@urbeno.in',
         categories: {
           create: [
             {

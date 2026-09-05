@@ -129,6 +129,25 @@ export async function assertFileAccess(
     for (const subId of submissionIds) {
       await loadSubmissionForActor(subId, actor);
     }
+
+    // CoD files stay private until Super Admin certifies the compliance package
+    if (file.kind === 'certificate') {
+      const unpublished = await prisma.certificate.findFirst({
+        where: {
+          fileId: file.id,
+          OR: [
+            { invoice: { recycling: null } },
+            { invoice: { recycling: { clientPublishedAt: null } } },
+            { invoice: { recycling: { reviewStatus: { not: 'approved' } } } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (unpublished) {
+        throw new AppError('This certificate is awaiting Super Admin certification.', 403);
+      }
+    }
+
     return;
   }
 

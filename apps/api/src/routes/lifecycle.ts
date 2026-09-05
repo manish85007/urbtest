@@ -15,6 +15,7 @@ import {
   updatePayment,
   deletePayment,
   approveRecycling,
+  certifyCompliancePublish,
   closeInvoice,
   createInvoice,
   createMrn,
@@ -462,6 +463,21 @@ export async function lifecycleRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ note: z.string().optional() }).parse(request.body ?? {});
       return await rejectRecycling(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.post('/invoices/:id/compliance/certify', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z
+        .object({
+          acknowledged: z.boolean(),
+          note: z.string().optional(),
+        })
+        .parse(request.body ?? {});
+      return await certifyCompliancePublish(request.user!, id, body);
     } catch (err) {
       return handleServiceError(err, reply);
     }

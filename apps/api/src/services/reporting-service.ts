@@ -25,7 +25,7 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { clientScopeFilter, factoryInScope, hasFeature, isStaff } from '../lib/auth-context.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
-import { deriveSubmissionStage, recyclingApproved } from '../lib/stage-mapper.js';
+import { deriveSubmissionStage, recyclingApproved, recyclingClientPublished } from '../lib/stage-mapper.js';
 import { AppError } from '../lib/errors.js';
 import { requireAdmin } from '../lib/access.js';
 import { sendTransactionalEmail } from './email.js';
@@ -66,7 +66,7 @@ function invoiceStage(inv: {
 }): number {
   return invStage({
     closedAt: inv.closedAt,
-    hasCertificate: inv.certificates.length > 0,
+    hasCertificate: inv.certificates.length > 0 && recyclingClientPublished(inv.recycling),
     hasRecycling: recyclingApproved(inv.recycling),
     hasMrn: !!inv.mrn,
   });
@@ -844,7 +844,7 @@ export async function getRegisterReport(
         const paid = settledPaise(inv.payments);
         const pay = getPayStatus(inv.totalPaise, paid);
         const showMrn = isStaff(actor);
-        const showForm6 = isStaff(actor) || recyclingApproved(inv.recycling);
+        const showForm6 = isStaff(actor) || recyclingClientPublished(inv.recycling);
         const form6Rec = showForm6 ? inv.recycling : null;
         const cats = form6Rec?.categories ?? [];
         const catLabels = cats.map((c) => c.entryId).join(' / ');
@@ -946,7 +946,7 @@ export async function getRegisterReport(
     const recys = await prisma.recycling.findMany({
       where: {
         invoice: { submission: scope },
-        ...(actor.role === 'client' ? { reviewStatus: 'approved' } : {}),
+        ...(actor.role === 'client' ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
       },
       include: {
         factory: true,
@@ -998,7 +998,7 @@ export async function getRegisterReport(
       where: {
         recycling: {
           invoice: { submission: scope },
-          ...(actor.role === 'client' ? { reviewStatus: 'approved' } : {}),
+          ...(actor.role === 'client' ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
         },
       },
       include: {
@@ -1020,7 +1020,7 @@ export async function getRegisterReport(
       .filter((s) => {
         const rec = s.recycling;
         if (actor.role === 'factory' && !factoryInScope(actor, rec.factoryId)) return false;
-        if (actor.role === 'client' && !recyclingApproved(rec)) return false;
+        if (actor.role === 'client' && !recyclingClientPublished(rec)) return false;
         const periodDate = s.destroyedAt ?? rec.processedAt;
         return inP(periodDate);
       })
@@ -1067,15 +1067,15 @@ export async function getRegisterReport(
     });
     rows = certs
       .filter((c) => inP(c.certDate))
-      .filter((c) => actor.role !== 'client' || recyclingApproved(c.invoice.recycling))
+      .filter((c) => actor.role !== 'client' || recyclingClientPublished(c.invoice.recycling))
       .map((c) => [
-      c.certNo,
-      fmtDate(c.certDate),
-      c.department || '',
-      c.invoice.invoiceNo,
-      c.invoice.submissionId,
-      c.invoice.submission.client.name,
-      recyclingApproved(c.invoice.recycling) || isStaff(actor) ? c.invoice.recycling?.form6No || '' : '',
+        c.certNo,
+        fmtDate(c.certDate),
+        c.department || '',
+        c.invoice.invoiceNo,
+        c.invoice.submissionId,
+        c.invoice.submission.client.name,
+      recyclingClientPublished(c.invoice.recycling) || isStaff(actor) ? c.invoice.recycling?.form6No || '' : '',
       fmtTs(c.uploadedAt),
       c.mailedAt ? 'Yes' : 'No',
       c.invoice.closedBy || '',

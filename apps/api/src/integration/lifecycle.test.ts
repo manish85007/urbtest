@@ -10,6 +10,7 @@ import { createSubmission, acknowledgeSubmission } from '../services/submission-
 import {
   addPayment,
   approveRecycling,
+  certifyCompliancePublish,
   closeInvoice,
   createInvoice,
   createMrn,
@@ -262,6 +263,12 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
       certDate: today,
       fileId: certFile.id,
     });
+
+    await expect(
+      closeInvoice(client, invoiceId, { rating: 5, note: 'too early' }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/certificate|stage|Upload/i) });
+
+    await certifyCompliancePublish(admin, invoiceId, { acknowledged: true });
 
     const invoice = await prisma.invoice.findUniqueOrThrow({
       where: { id: invoiceId },

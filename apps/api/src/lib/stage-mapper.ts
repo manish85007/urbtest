@@ -5,7 +5,14 @@ function recyclingApproved(recycling: { reviewStatus?: string } | null | undefin
   return !!recycling && recycling.reviewStatus === 'approved';
 }
 
-export { recyclingApproved };
+/** Form 6 + CoD package published to the client portal after Super Admin certify. */
+function recyclingClientPublished(
+  recycling: { reviewStatus?: string; clientPublishedAt?: Date | string | null } | null | undefined,
+): boolean {
+  return recyclingApproved(recycling) && !!recycling?.clientPublishedAt;
+}
+
+export { recyclingApproved, recyclingClientPublished };
 
 export function deriveSubmissionStage(sub: SubmissionFull): number {
   return subStage({
@@ -15,7 +22,7 @@ export function deriveSubmissionStage(sub: SubmissionFull): number {
     loadingCompleted: !!sub.loadingCompletedAt,
     invoices: sub.invoices.map((inv) => ({
       closedAt: inv.closedAt,
-      hasCertificate: inv.certificates.length > 0,
+      hasCertificate: inv.certificates.length > 0 && recyclingClientPublished(inv.recycling),
       hasRecycling: recyclingApproved(inv.recycling),
       hasMrn: !!inv.mrn,
     })),
@@ -25,12 +32,12 @@ export function deriveSubmissionStage(sub: SubmissionFull): number {
 export function deriveInvoiceStage(inv: {
   closedAt: Date | string | null;
   certificates: unknown[];
-  recycling: { reviewStatus?: string } | null;
+  recycling: { reviewStatus?: string; clientPublishedAt?: Date | string | null } | null;
   mrn: unknown | null;
 }): number {
   return invStage({
     closedAt: inv.closedAt,
-    hasCertificate: inv.certificates.length > 0,
+    hasCertificate: inv.certificates.length > 0 && recyclingClientPublished(inv.recycling),
     hasRecycling: recyclingApproved(inv.recycling),
     hasMrn: !!inv.mrn,
   });

@@ -48,7 +48,7 @@ export function CompanyTab({ onChanged }: Props) {
     try {
       const saved = await dataApi.saveCompany(form);
       setForm(saved);
-      onChanged('Urbeno statutory / letterhead profile saved. Form 6 and MRN use these details.');
+      onChanged('Urbeno statutory / letterhead profile saved. Form 6 and MRN print these CPCB / State PCB details.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save.');
     } finally {

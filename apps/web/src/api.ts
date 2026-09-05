@@ -466,6 +466,9 @@ export interface InvoiceDetail {
     reviewedAt?: string | null;
     reviewedBy?: string | null;
     reviewNote?: string | null;
+    clientPublishedAt?: string | null;
+    clientPublishedBy?: string | null;
+    clientPublishNote?: string | null;
     categories?: Array<{
       entryId: string;
       groupCode: string;
@@ -1278,6 +1281,7 @@ export const lifecycleApi = {
       tare?: number;
       net?: number;
       slipNumber?: string;
+      method?: string;
       reason?: string;
       weighedAt: string;
       slipPhotoIds?: string[];
@@ -1466,6 +1470,12 @@ export const lifecycleApi = {
     api<{ form6No: string; reviewStatus: string }>(`/invoices/${invoiceId}/recycling/reject`, {
       method: 'POST',
       body: JSON.stringify(body ?? {}),
+    }),
+
+  certifyCompliance: (invoiceId: string, body: { acknowledged: boolean; note?: string }) =>
+    api<{ form6No: string; clientPublishedAt: string | null }>(`/invoices/${invoiceId}/compliance/certify`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
 
   uploadCertificate: (

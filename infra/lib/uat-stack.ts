@@ -73,6 +73,14 @@ export class UrbTecTrackUatStack extends cdk.Stack {
       },
     });
 
+    const jobsSecret = new secretsmanager.Secret(this, 'JobsSecret', {
+      description: 'Urb TecTrack UAT Bearer token for /internal/jobs/*',
+      generateSecretString: {
+        passwordLength: 48,
+        excludePunctuation: true,
+      },
+    });
+
     // App password for noreply@urbeno.in — value created outside git (see infra/README.md).
     const smtpPassSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
@@ -127,6 +135,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
           SMTP_FROM_NAME: 'Urb TecTrack',
           SMTP_FROM_EMAIL: 'noreply@urbeno.in',
           URBENO_EMAIL: 'info@urbeno.in',
+          // In-process admin digest after 07:00 Asia/Kolkata (desiredCount ≥ 1).
           ENABLE_JOBS: 'true',
           BACKUP_AUTOMATED: 'true',
           AWS_S3_BUCKET: uploads.bucketName,
@@ -138,6 +147,7 @@ export class UrbTecTrackUatStack extends cdk.Stack {
           DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(db.secret!, 'password'),
           SESSION_SECRET: ecs.Secret.fromSecretsManager(sessionSecret, 'secret'),
           SMTP_PASS: ecs.Secret.fromSecretsManager(smtpPassSecret),
+          JOBS_SECRET: ecs.Secret.fromSecretsManager(jobsSecret),
         },
       },
     });

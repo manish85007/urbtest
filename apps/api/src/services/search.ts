@@ -72,7 +72,8 @@ export async function searchPortal(actor: SessionUser, qRaw: string): Promise<Se
       }
       if (
         inv.recycling?.form6No.toLowerCase().includes(q) &&
-        (isStaff(actor) || inv.recycling.reviewStatus === 'approved')
+        (isStaff(actor) ||
+          (inv.recycling.reviewStatus === 'approved' && inv.recycling.clientPublishedAt))
       ) {
         push({
           grp: 'Form 6',
@@ -82,7 +83,11 @@ export async function searchPortal(actor: SessionUser, qRaw: string): Promise<Se
         });
       }
       for (const cd of inv.certificates) {
-        if (cd.certNo.toLowerCase().includes(q)) {
+        if (
+          cd.certNo.toLowerCase().includes(q) &&
+          (isStaff(actor) ||
+            (inv.recycling?.reviewStatus === 'approved' && inv.recycling?.clientPublishedAt))
+        ) {
           push({
             grp: 'Certificates',
             label: cd.certNo,

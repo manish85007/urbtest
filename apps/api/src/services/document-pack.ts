@@ -4,7 +4,7 @@ import { clientScopeFilter, factoryInScope, hasFeature, isStaff } from '../lib/a
 import { AppError } from '../lib/errors.js';
 import { buildZip } from '../lib/zip.js';
 import { prisma } from '../lib/prisma.js';
-import { recyclingApproved } from '../lib/stage-mapper.js';
+import { recyclingClientPublished } from '../lib/stage-mapper.js';
 import { readFileBlob } from './file-service.js';
 import { form6Pdf } from './pdf.js';
 
@@ -84,7 +84,7 @@ export async function documentsZip(
       (c) =>
         !!c.fileId &&
         inP(c.certDate) &&
-        (actor.role !== 'client' || recyclingApproved(c.invoice.recycling)),
+        (actor.role !== 'client' || recyclingClientPublished(c.invoice.recycling)),
     );
     for (const c of filtered) {
       try {
@@ -102,7 +102,7 @@ export async function documentsZip(
     const recys = await prisma.recycling.findMany({
       where: {
         invoice: { submission: scope },
-        ...(actor.role === 'client' ? { reviewStatus: 'approved' } : {}),
+        ...(actor.role === 'client' ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
       },
       include: {
         factory: true,
@@ -113,7 +113,9 @@ export async function documentsZip(
     });
     const filtered = recys.filter(
       (r) =>
-        (actor.role !== 'factory' || factoryInScope(actor, r.factoryId)) && inP(r.processedAt),
+        (actor.role !== 'factory' || factoryInScope(actor, r.factoryId)) &&
+        inP(r.processedAt) &&
+        (actor.role !== 'client' || recyclingClientPublished(r)),
     );
     for (const r of filtered) {
       try {

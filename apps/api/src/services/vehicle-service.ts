@@ -215,6 +215,10 @@ export async function recordWeighment(
         'Record why the weighbridge was not used — this is what makes the manual figure auditable.',
       );
     }
+    const method = (input.method || '').trim();
+    if (!method) {
+      throw new AppError('Select the weighing method used for this manual weighment.');
+    }
     if (!input.pickupPhotoIds?.length) {
       throw new AppError('At least one pickup photo is still required for a manual weighment.');
     }
@@ -225,7 +229,7 @@ export async function recordWeighment(
       tareKg: null,
       netKg: roundKg(net),
       slipNumber: null,
-      method: (input.method || 'Floor scale').trim(),
+      method,
       reason: input.reason.trim(),
       weighedAt: new Date(input.weighedAt),
       slipPhotoIds: [],

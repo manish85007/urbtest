@@ -28,12 +28,28 @@ function bundledUrbenoLogoJpeg(): Buffer | undefined {
 }
 
 function applyBrandLetterhead(letterhead: PdfLetterhead) {
-  const logo = bundledUrbenoLogoJpeg();
-  if (!logo) return;
-  letterhead.logoJpeg = logo;
+  // Prefer Masters company logo when uploaded; otherwise use the bundled Urbeno mark.
+  if (!letterhead.logoJpeg) {
+    const logo = bundledUrbenoLogoJpeg();
+    if (logo) letterhead.logoJpeg = logo;
+  }
   letterhead.variant = 'document';
   letterhead.logoMaxWidth = 155;
   letterhead.logoMaxHeight = 38;
+}
+
+/**
+ * Masters → Company profile is the source of truth for corporate CPCB / State PCB
+ * numbers printed on Form 6 and MRN. Factory-site values are a fallback only.
+ */
+function recyclerLicenses(
+  co: { cpcb: string; kspcb: string },
+  factory: { cpcbEpr?: string | null; kspcbConsent?: string | null } | null,
+) {
+  return {
+    cpcb: (co.cpcb || factory?.cpcbEpr || '').trim() || '—',
+    kspcb: (co.kspcb || factory?.kspcbConsent || '').trim() || '—',
+  };
 }
 
 async function letterheadFromProfile(): Promise<{ co: Awaited<ReturnType<typeof getCompanyProfile>>; letterhead: PdfLetterhead }> {
@@ -82,38 +98,50 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
   letterhead.docNo = mrn.mrnNo;
   letterhead.docLabel = `Invoice ${invoice.invoiceNo}`;
   letterhead.docDate = fmt(mrn.receivedAt);
+  const licenses = recyclerLicenses(co, factory);
   const mats = Array.isArray(mrn.materials)
     ? (mrn.materials as Array<{ n?: string; q?: number; w?: number }>)
     : [];
 
   const receivedKg = mats.reduce((s, m) => s + Number(m.w ?? 0), 0);
+  const receivedQty = mats.reduce((s, m) => s + Number(m.q ?? 0), 0);
+  const netTotal = vehs.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
+  const facilityLine = [factory?.name ?? mrn.factoryId, factory?.address].filter(Boolean).join(' · ');
 
   const buffer = buildTextPdf(
     'MATERIAL RECEIPT NOTE',
-    `Linked to invoice ${invoice.invoiceNo} · Request ${sub.id} · one MRN per invoice`,
+    `Receiving facility: ${facilityLine}`.slice(0, 120),
     [
       {
         heading: 'REFERENCE',
         pairs: [
           ['Request ID', sub.id, 'Client PO / Ref', sub.ref || '—'],
           ['Invoice Number', invoice.invoiceNo, 'Invoice Date', fmt(invoice.invoiceDate)],
-          ['Invoice billing weight', `${num(invoice.billingWeight.toString())} kg`, 'Material received', `${num(receivedKg)} kg`],
-          ['MRN Number', mrn.mrnNo, 'Receiving facility', factory?.name ?? mrn.factoryId],
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'E-way Bill Date', fmt(invoice.ewayBillDate)],
-          ['Client', `${sub.client.name} (${sub.clientId})`, 'Origin Site', sub.site.name],
-          ['Received On', fmt(mrn.receivedAt), 'Condition', mrn.condition],
+          ['Client', `${sub.client.name} (${sub.clientId})`, 'Client GST', sub.site.gstin || '—'],
+          ['Origin Site', sub.site.name, 'Received On', fmt(mrn.receivedAt)],
+          ['MRN Number', mrn.mrnNo, 'Invoice billing weight', `${num(invoice.billingWeight.toString())} kg`],
+          ['Material received', `${num(receivedKg)} kg`, 'Condition on Arrival', mrn.condition || 'Good'],
+          ['Facility Authorisation (CPCB)', licenses.cpcb, 'State PCB Consent', licenses.kspcb],
         ],
       },
       {
         heading: 'VEHICLES & WEIGHMENT',
         table: {
-          headers: ['Vehicle', 'Driver', 'Net kg', 'Slip'],
-          rows: vehs.map((v) => [
-            v.registration,
-            v.driverName,
-            v.weighment ? num(v.weighment.netKg.toString()) : '—',
-            v.weighment?.slipNumber || '—',
-          ]),
+          headers: ['Vehicle', 'Driver', 'Phone', 'Gross', 'Tare', 'Net kg', 'Slip'],
+          rows: vehs.length
+            ? vehs.map((v) => [
+                v.registration,
+                v.driverName,
+                v.driverPhone || '—',
+                v.weighment?.grossKg != null ? num(v.weighment.grossKg.toString()) : '—',
+                v.weighment?.tareKg != null ? num(v.weighment.tareKg.toString()) : '—',
+                v.weighment ? num(v.weighment.netKg.toString()) : '—',
+                v.weighment?.slipNumber || '—',
+              ])
+            : [['—', '—', '—', '—', '—', '—', '—']],
+          total: ['TOTAL', '', '', '', '', num(netTotal), ''],
+          aligns: ['l', 'l', 'l', 'r', 'r', 'r', 'l'],
         },
       },
       {
@@ -123,27 +151,29 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
           rows: mats.length
             ? mats.map((m) => [String(m.n || '—'), String(m.q ?? 0), num(m.w)])
             : [['—', '—', '—']],
-          total: ['TOTAL RECEIVED', '', num(receivedKg)],
+          total: ['TOTAL RECEIVED', String(receivedQty), num(receivedKg)],
           aligns: ['l', 'r', 'r'],
         },
       },
       {
         heading: 'GATE SIGNATURES',
         pairs: [
-          ['Driver', mrn.driverSign || '—', 'Factory Manager', mrn.managerSign || '—'],
-          ['Security Officer', mrn.securitySign || '—', '', ''],
+          ['Driver', mrn.driverSign || '—', 'Vehicle', vehs[0]?.registration || '—'],
+          ['Factory Manager', mrn.managerSign || '—', 'Facility', factory?.id ?? mrn.factoryId],
+          ['Security Officer', mrn.securitySign || '—', 'Gate', 'In'],
         ],
       },
       {
         heading: 'NOTES',
         lines: [
-          mrn.note || 'No remarks.',
-          'Classification into authorised e-waste categories is recorded on the Form 6 manifest after segregation.',
-          'Retain for a minimum of five years per Rule 12(4), E-Waste (Management) Rules, 2022.',
+          mrn.note ? `Remarks: ${mrn.note}` : 'No remarks.',
+          'Certified that the materials described above were received at the facility named, in the quantities and condition recorded.',
+          'Classification into authorised e-waste categories is carried out after segregation and is recorded on the Form 6 manifest.',
+          'This note is to be filed at the security gate. Retain for a minimum of five years per Rule 12(4), E-Waste (Management) Rules, 2022.',
         ],
       },
     ],
-    `${mrn.mrnNo} · Invoice ${invoice.invoiceNo} · ${co.name} · ${factory?.kspcbConsent || co.kspcb}`,
+    `${mrn.mrnNo} · Invoice ${invoice.invoiceNo} · ${co.name} · ${licenses.kspcb}`,
     letterhead,
   );
 
@@ -163,8 +193,13 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const invoice = await loadInvoiceForActor(invoiceId, actor);
   const recy = invoice.recycling;
   if (!recy) throw new AppError('This invoice has not been processed yet.');
-  if (isClientPortalRole(actor.role) && recy.reviewStatus !== 'approved') {
-    throw new AppError('Form 6 is awaiting admin approval and is not available yet.');
+  if (isClientPortalRole(actor.role)) {
+    if (recy.reviewStatus !== 'approved') {
+      throw new AppError('Form 6 is awaiting admin approval and is not available yet.');
+    }
+    if (!recy.clientPublishedAt) {
+      throw new AppError('Form 6 is awaiting Super Admin certification and is not available yet.');
+    }
   }
 
   const factory = await prisma.factorySite.findUnique({ where: { id: recy.factoryId } });
@@ -180,6 +215,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   letterhead.docNo = recy.form6No;
   letterhead.docLabel = `Invoice ${invoice.invoiceNo}`;
   letterhead.docDate = fmt(recy.processedAt);
+  const licenses = recyclerLicenses(co, factory);
 
   const formVehicles = sub.vehicles.filter((v) =>
     recy.vehicleIds?.length
@@ -189,6 +225,11 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const invoiceQty = Array.isArray(invoice.mrn?.materials)
     ? (invoice.mrn!.materials as Array<{ q?: number }>).reduce((s, m) => s + Number(m.q ?? 0), 0)
     : 0;
+  const siteAddr =
+    [sub.site.address, [sub.site.city, sub.site.pin].filter(Boolean).join(' ')].filter(Boolean).join(', ') ||
+    sub.location ||
+    '—';
+  const catTotal = cats.reduce((a, c) => a + Number(c.weightKg), 0);
 
   const buffer = buildTextPdf(
     'FORM 6 — MANIFEST FOR E-WASTE',
@@ -199,48 +240,65 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
         pairs: [
           ['Manifest Number', recy.form6No, 'Processing Date', fmt(recy.processedAt)],
           ['Request ID', sub.id, 'Invoice Number', invoice.invoiceNo],
-          ['E-way Bill Number', invoice.ewayBillNo || '—', 'MRN Reference', invoice.mrn?.mrnNo || '—'],
-          ['Invoice billed weight', `${num(invoice.billingWeight.toString())} kg`, 'Invoice quantity', String(invoiceQty || recy.devicesDestroyed || '—')],
+          ['E-way Bill Number', invoice.ewayBillNo || '—', 'E-way Bill Date', fmt(invoice.ewayBillDate)],
+          ['MRN Reference', invoice.mrn?.mrnNo || '—', 'Received On', fmt(invoice.mrn?.receivedAt)],
+          [
+            'Invoice billed weight',
+            `${num(invoice.billingWeight.toString())} kg`,
+            'Invoice quantity',
+            String(invoiceQty || recy.devicesDestroyed || '—'),
+          ],
           ['Devices destroyed', String(recy.devicesDestroyed ?? 0), 'Serial records', String(recy.serials.length)],
         ],
       },
       {
-        heading: 'VEHICLES ON THIS MANIFEST',
-        table: {
-          headers: ['Vehicle', 'Driver', 'Net kg', 'Slip'],
-          rows: formVehicles.length
-            ? formVehicles.map((v) => [
-                v.registration,
-                v.driverName,
-                v.weighment ? num(v.weighment.netKg.toString()) : '—',
-                v.weighment?.slipNumber || '—',
-              ])
-            : [['—', '—', '—', '—']],
-        },
-      },
-      {
-        heading: 'SENDER — BULK CONSUMER',
+        heading: 'SENDER — BULK CONSUMER / WASTE GENERATOR',
         pairs: [
           ['Name', sub.client.name, 'Client Code', sub.clientId],
           ['Site', sub.site.name, 'GST', sub.site.gstin || '—'],
+          ['Address', siteAddr, 'Pickup location', sub.location || '—'],
         ],
       },
       {
         heading: 'RECEIVER — AUTHORIZED RECYCLER',
         pairs: [
+          ['Company', co.name, 'Brand', co.brand || '—'],
           ['Facility', factory?.name || co.name, 'Facility Code', recy.factoryId],
-          ['CPCB / EPR', factory?.cpcbEpr || co.cpcb, 'KSPCB Consent', factory?.kspcbConsent || co.kspcb],
-          ['GST', factory?.gstin || co.gst, 'CIN', co.cin || '—'],
-          ['Phone', co.phone, 'Email', co.email],
+          ['Facility address', factory?.address || co.address || '—', 'Facility GST', factory?.gstin || co.gst || '—'],
+          ['CPCB / EPR Authorisation', licenses.cpcb, 'State PCB Consent', licenses.kspcb],
+          ['Company GSTIN', co.gst || '—', 'CIN', co.cin || '—'],
+          ['R2 certificate', co.r2 || '—', 'PAN', co.pan || '—'],
+          ['Phone', co.phone || '—', 'Email', co.email || '—'],
         ],
+      },
+      {
+        heading: 'TRANSPORTER / VEHICLES ON THIS MANIFEST',
+        table: {
+          headers: ['Vehicle', 'Driver', 'Phone', 'Net kg', 'Slip'],
+          rows: formVehicles.length
+            ? formVehicles.map((v) => [
+                v.registration,
+                v.driverName,
+                v.driverPhone || '—',
+                v.weighment ? num(v.weighment.netKg.toString()) : '—',
+                v.weighment?.slipNumber || '—',
+              ])
+            : [['—', '—', '—', '—', '—']],
+          aligns: ['l', 'l', 'l', 'r', 'l'],
+        },
       },
       {
         heading: 'E-WASTE CATEGORIES PROCESSED (SCHEDULE I)',
         table: {
-          headers: ['Entry', 'Group', 'Weight (kg)'],
-          rows: cats.map((c) => [c.entryId, c.groupCode, num(c.weightKg.toString())]),
-          total: ['TOTAL', '', num(cats.reduce((a, c) => a + Number(c.weightKg), 0))],
-          aligns: ['l', 'l', 'r'],
+          headers: ['Entry', 'Description', 'Group', 'Weight (kg)'],
+          rows: cats.map((c) => [
+            c.entryId,
+            (c.category?.description || '').slice(0, 48) || '—',
+            c.groupCode,
+            num(c.weightKg.toString()),
+          ]),
+          total: ['TOTAL', '', '', num(catTotal)],
+          aligns: ['l', 'l', 'l', 'r'],
         },
       },
       {
@@ -253,6 +311,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
             ['Plastics', num(pl), sum ? `${((pl / sum) * 100).toFixed(1)}%` : '—'],
             ['Printed circuit boards', num(pcb), sum ? `${((pcb / sum) * 100).toFixed(1)}%` : '—'],
           ],
+          total: ['TOTAL RECOVERED', num(sum), sum ? '100.0%' : '—'],
           aligns: ['l', 'r', 'r'],
         },
       },
@@ -263,7 +322,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
         ],
       },
     ],
-    `Form 6 manifest ${recy.form6No} · Invoice ${invoice.invoiceNo} · ${co.name}`,
+    `Form 6 manifest ${recy.form6No} · Invoice ${invoice.invoiceNo} · ${co.name} · ${licenses.cpcb}`,
     letterhead,
   );
 

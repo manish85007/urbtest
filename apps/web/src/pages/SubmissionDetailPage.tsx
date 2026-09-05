@@ -1348,7 +1348,7 @@ function ComplianceCard({
         internal: true,
       });
     }
-    if (inv.recycling && (inv.recycling.reviewStatus === 'approved' || !inv.recycling.reviewStatus)) {
+    if (inv.recycling && inv.recycling.clientPublishedAt && (inv.recycling.reviewStatus === 'approved' || !inv.recycling.reviewStatus)) {
       docs.push({
         key: `form6:${inv.id}`,
         kind: 'Form 6',
@@ -2011,18 +2011,44 @@ function WeighForm({
     tare?: number;
     net?: number;
     slipNumber?: string;
+    method?: string;
     reason?: string;
     slipPhotoIds: string[];
     pickupPhotoIds: string[];
   }) => void;
 }) {
   const existing = vehicle.weighment;
+  const METHOD_OPTIONS = [
+    'Floor scale',
+    'Platform scale',
+    'Crane scale',
+    'Counted and weighed by unit',
+    'Client-supplied figure',
+  ] as const;
+  function initialMethod(): string {
+    const stored = (existing?.method || '').trim();
+    if (stored && (METHOD_OPTIONS as readonly string[]).includes(stored)) return stored;
+    // Legacy buggy saves stuffed "Method: …" into reason
+    const reason = existing?.reason || '';
+    const m = reason.match(/^Method:\s*([^|]+)/i);
+    if (m && (METHOD_OPTIONS as readonly string[]).includes(m[1].trim())) return m[1].trim();
+    return 'Floor scale';
+  }
+  function initialReason(): string {
+    const reason = existing?.reason || '';
+    if (/^Method:\s*/i.test(reason)) {
+      const parts = reason.split('|');
+      return parts.length > 1 ? parts.slice(1).join('|').trim() : '';
+    }
+    return reason;
+  }
   const [manual, setManual] = useState(Boolean(existing?.manual));
   const [gross, setGross] = useState(existing?.grossKg ? String(existing.grossKg) : '');
   const [tare, setTare] = useState(existing?.tareKg ? String(existing.tareKg) : '');
   const [manualNet, setManualNet] = useState(existing?.manual ? String(existing?.netKg ?? '') : '');
   const [slip, setSlip] = useState(existing?.slipNumber ?? '');
-  const [reason, setReason] = useState(existing?.reason ?? '');
+  const [method, setMethod] = useState(initialMethod);
+  const [reason, setReason] = useState(initialReason);
   const [slipPhotos, setSlipPhotos] = useState<string[]>(existing?.slipPhotoIds ?? []);
   const [pickupPhotos, setPickupPhotos] = useState<string[]>(existing?.pickupPhotoIds ?? []);
   const [formError, setFormError] = useState('');
@@ -2060,11 +2086,20 @@ function WeighForm({
             window.alert(msg);
             return;
           }
+          if (!method.trim()) {
+            setFormError('Select the weighing method used.');
+            return;
+          }
+          if (!reason.trim()) {
+            setFormError('Record why the weighbridge was not used.');
+            return;
+          }
           onWeigh({
             weighedAt,
             manual: true,
             net: Number(manualNet),
-            reason,
+            method: method.trim(),
+            reason: reason.trim(),
             pickupPhotoIds: pickupPhotos,
             slipPhotoIds: [],
           });
@@ -2114,16 +2149,24 @@ function WeighForm({
             </div>
             <div className="fg">
               <label>Method used *</label>
-              <select value={reason.startsWith('Method:') ? reason.split('|')[0].replace('Method:', '').trim() : ''} onChange={(e) => setReason(`Method: ${e.target.value}`)}>
-                {['Floor scale', 'Platform scale', 'Crane scale', 'Counted and weighed by unit', 'Client-supplied figure'].map((m) => (
-                  <option key={m} value={m}>{m}</option>
+              <select value={method} onChange={(e) => setMethod(e.target.value)} required>
+                {METHOD_OPTIONS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
           <div className="fg">
             <label>Why the weighbridge was not used *</label>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} required rows={2} placeholder="e.g. Client site does not permit vehicles on the weighbridge; 42 kg weighed on the floor scale." />
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              required
+              rows={2}
+              placeholder="e.g. Client site does not permit vehicles on the weighbridge; 42 kg weighed on the floor scale."
+            />
           </div>
         </>
       ) : (

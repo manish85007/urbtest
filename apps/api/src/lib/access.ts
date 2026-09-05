@@ -75,23 +75,29 @@ export function requireFactory(actor: SessionUser, factoryId: string) {
 }
 
 /** Rule R4 — clients never see MRN documents, but keep hasMrn for lifecycle UI.
- *  Form 6 is hidden from clients until admin approval (reviewStatus === 'approved'). */
+ *  Form 6 + CoD are hidden until Super Admin certifies (clientPublishedAt). */
 export function redactSubmissionForActor<T extends {
   invoices: Array<{
     mrn: unknown;
     hasMrn?: boolean;
-    recycling?: { reviewStatus?: string } | null;
+    recycling?: { reviewStatus?: string; clientPublishedAt?: Date | string | null } | null;
+    certificates?: unknown[];
   }>;
 }>(sub: T, actor: SessionUser): T {
   if (isStaff(actor) || actor.role === 'auditor') return sub;
   return {
     ...sub,
-    invoices: sub.invoices.map((inv) => ({
-      ...inv,
-      hasMrn: inv.hasMrn ?? !!inv.mrn,
-      mrn: null,
-      recycling: inv.recycling?.reviewStatus === 'approved' ? inv.recycling : null,
-    })),
+    invoices: sub.invoices.map((inv) => {
+      const published =
+        inv.recycling?.reviewStatus === 'approved' && !!inv.recycling?.clientPublishedAt;
+      return {
+        ...inv,
+        hasMrn: inv.hasMrn ?? !!inv.mrn,
+        mrn: null,
+        recycling: published ? inv.recycling : null,
+        certificates: published ? (inv.certificates ?? []) : [],
+      };
+    }),
   };
 }
 

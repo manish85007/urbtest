@@ -408,11 +408,15 @@ model Recycling {
   photoIds     String[] @default([]) @map("photo_ids")
   reportIds    String[] @default([]) @map("report_ids")
   vehicleIds   String[] @default([]) @map("vehicle_ids")
-  /** pending_review | approved | rejected — clients only see approved Form 6. */
+  /** pending_review | approved | rejected — Form 6 QA by Super Admin. */
   reviewStatus String   @default("pending_review") @map("review_status") @db.VarChar(24)
   reviewedAt   DateTime? @map("reviewed_at")
   reviewedBy   String?  @map("reviewed_by")
   reviewNote   String?  @map("review_note")
+  /** Super Admin certify — Form 6 + CoD visible on client portal only after this. */
+  clientPublishedAt DateTime? @map("client_published_at")
+  clientPublishedBy String?  @map("client_published_by")
+  clientPublishNote String?  @map("client_publish_note")
   createdBy    String   @map("created_by")
   createdAt    DateTime @default(now()) @map("created_at")
 

@@ -43,9 +43,20 @@ export async function sendComplianceDocuments(
     if (inv.recycling.reviewStatus !== 'approved') {
       throw new AppError(`Form 6 ${inv.recycling.form6No} must be approved before it can be emailed.`);
     }
+    if (!inv.recycling.clientPublishedAt) {
+      throw new AppError(
+        `Form 6 ${inv.recycling.form6No} must be certified for the client portal before it can be emailed.`,
+      );
+    }
   }
 
   for (const c of certs) {
+    const inv = sub.invoices.find((i) => i.id === c.invoiceId);
+    if (!inv?.recycling?.clientPublishedAt) {
+      throw new AppError(
+        `Certificate ${c.certNo} must be certified for the client portal before it can be emailed.`,
+      );
+    }
     lines.push(
       `  • Certificate ${c.certNo} (${c.invoice.invoiceNo})${c.department ? ` — ${c.department}` : ''}`,
     );

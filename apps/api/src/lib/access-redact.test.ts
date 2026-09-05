@@ -28,7 +28,12 @@ type Inv = {
   invoiceNo: string;
   hasMrn?: boolean;
   mrn: { mrnNo: string } | null;
-  recycling?: { form6No: string; reviewStatus?: string } | null;
+  recycling?: {
+    form6No: string;
+    reviewStatus?: string;
+    clientPublishedAt?: string | null;
+  } | null;
+  certificates?: Array<{ certNo: string }>;
 };
 
 describe('redactSubmissionForActor', () => {
@@ -40,7 +45,12 @@ describe('redactSubmissionForActor', () => {
           invoiceNo: 'INV-1',
           hasMrn: true,
           mrn: { mrnNo: 'MRN/URB-BLR/2627/0001' },
-          recycling: { form6No: 'F6/1', reviewStatus: 'approved' },
+          recycling: {
+            form6No: 'F6/1',
+            reviewStatus: 'approved',
+            clientPublishedAt: '2026-09-01T00:00:00.000Z',
+          },
+          certificates: [{ certNo: 'COD-1' }],
         },
       ] satisfies Inv[],
     };
@@ -48,7 +58,12 @@ describe('redactSubmissionForActor', () => {
     const redacted = redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].mrn).toBeNull();
     expect(redacted.invoices[0].hasMrn).toBe(true);
-    expect(redacted.invoices[0].recycling).toEqual({ form6No: 'F6/1', reviewStatus: 'approved' });
+    expect(redacted.invoices[0].recycling).toEqual({
+      form6No: 'F6/1',
+      reviewStatus: 'approved',
+      clientPublishedAt: '2026-09-01T00:00:00.000Z',
+    });
+    expect(redacted.invoices[0].certificates).toEqual([{ certNo: 'COD-1' }]);
   });
 
   it('hides Form 6 from clients until admin approval', () => {
@@ -60,11 +75,31 @@ describe('redactSubmissionForActor', () => {
           hasMrn: true,
           mrn: { mrnNo: 'MRN/1' },
           recycling: { form6No: 'F6/1', reviewStatus: 'pending_review' },
+          certificates: [],
         },
       ] satisfies Inv[],
     };
     const redacted = redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].recycling).toBeNull();
+    expect(redacted.invoices[0].certificates).toEqual([]);
+  });
+
+  it('hides approved Form 6 and CoD from clients until Super Admin certify', () => {
+    const sub = {
+      id: 'REQ-00090',
+      invoices: [
+        {
+          invoiceNo: 'INV-1',
+          hasMrn: true,
+          mrn: { mrnNo: 'MRN/1' },
+          recycling: { form6No: 'F6/1', reviewStatus: 'approved', clientPublishedAt: null },
+          certificates: [{ certNo: 'COD-1' }],
+        },
+      ] satisfies Inv[],
+    };
+    const redacted = redactSubmissionForActor(sub, client);
+    expect(redacted.invoices[0].recycling).toBeNull();
+    expect(redacted.invoices[0].certificates).toEqual([]);
   });
 
   it('infers hasMrn from mrn when flag was not pre-set', () => {
