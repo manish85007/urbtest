@@ -384,6 +384,8 @@ model Mrn {
   note         String?
   gatePhotoIds     String[] @default([]) @map("gate_photo_ids")
   materialPhotoIds String[] @default([]) @map("material_photo_ids")
+  /** Company + factory letterhead frozen at MRN issue time. */
+  letterheadSnapshot Json?  @map("letterhead_snapshot")
   createdAt    DateTime @default(now()) @map("created_at")
 
   invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -417,6 +419,8 @@ model Recycling {
   clientPublishedAt DateTime? @map("client_published_at")
   clientPublishedBy String?  @map("client_published_by")
   clientPublishNote String?  @map("client_publish_note")
+  /** Company + factory letterhead frozen when Form 6 is issued / re-issued. */
+  letterheadSnapshot Json?  @map("letterhead_snapshot")
   createdBy    String   @map("created_by")
   createdAt    DateTime @default(now()) @map("created_at")
 

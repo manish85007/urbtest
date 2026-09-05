@@ -12,6 +12,11 @@ import { auditLog } from './audit.js';
 import { getImpactReport, getRegisterReport, type RegisterType } from './reporting-service.js';
 import { getCompanyProfile } from './settings.js';
 import { readStoredFileSilent } from './file-service.js';
+import {
+  parseLetterheadSnapshot,
+  type LetterheadCompanyView,
+  type LetterheadFactoryView,
+} from './letterhead-snapshot.js';
 
 function bundledUrbenoLogoJpeg(): Buffer | undefined {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -52,8 +57,9 @@ function recyclerLicenses(
   };
 }
 
-async function letterheadFromProfile(): Promise<{ co: Awaited<ReturnType<typeof getCompanyProfile>>; letterhead: PdfLetterhead }> {
-  const co = await getCompanyProfile();
+async function letterheadFromCompany(
+  co: LetterheadCompanyView,
+): Promise<{ co: LetterheadCompanyView; letterhead: PdfLetterhead }> {
   const letterhead: PdfLetterhead = {
     name: co.name,
     brand: co.brand,
@@ -76,6 +82,45 @@ async function letterheadFromProfile(): Promise<{ co: Awaited<ReturnType<typeof 
   return { co, letterhead };
 }
 
+async function letterheadFromProfile(): Promise<{ co: LetterheadCompanyView; letterhead: PdfLetterhead }> {
+  return letterheadFromCompany(await getCompanyProfile());
+}
+
+async function resolveDocumentLetterhead(
+  snapshotRaw: unknown,
+  factoryId: string,
+): Promise<{
+  co: LetterheadCompanyView;
+  factory: LetterheadFactoryView | null;
+  letterhead: PdfLetterhead;
+  fromSnapshot: boolean;
+}> {
+  const snap = parseLetterheadSnapshot(snapshotRaw);
+  if (snap) {
+    const { co, letterhead } = await letterheadFromCompany(snap.company);
+    return { co, factory: snap.factory, letterhead, fromSnapshot: true };
+  }
+  const [{ co, letterhead }, factory] = await Promise.all([
+    letterheadFromProfile(),
+    prisma.factorySite.findUnique({ where: { id: factoryId } }),
+  ]);
+  return {
+    co,
+    factory: factory
+      ? {
+          id: factory.id,
+          name: factory.name,
+          address: factory.address,
+          gstin: factory.gstin,
+          kspcbConsent: factory.kspcbConsent,
+          cpcbEpr: factory.cpcbEpr,
+        }
+      : null,
+    letterhead,
+    fromSnapshot: false,
+  };
+}
+
 function fmt(d: Date | null | undefined): string {
   return d ? d.toISOString().slice(0, 10) : '—';
 }
@@ -90,10 +135,12 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
   const mrn = invoice.mrn;
   if (!mrn) throw new AppError('No MRN on this invoice yet.');
 
-  const factory = await prisma.factorySite.findUnique({ where: { id: mrn.factoryId } });
   const sub = invoice.submission;
   const vehs = sub.vehicles.filter((v) => invoice.vehicleIds.includes(v.id) || !invoice.vehicleIds.length);
-  const { co, letterhead } = await letterheadFromProfile();
+  const { co, factory, letterhead } = await resolveDocumentLetterhead(
+    (mrn as { letterheadSnapshot?: unknown }).letterheadSnapshot,
+    mrn.factoryId,
+  );
   applyBrandLetterhead(letterhead);
   letterhead.docNo = mrn.mrnNo;
   letterhead.docLabel = `Invoice ${invoice.invoiceNo}`;
@@ -210,12 +257,18 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
   const pl = Number(recy.recoveryPl);
   const pcb = Number(recy.recoveryPcb);
   const sum = fe + nfe + pl + pcb;
-  const { co, letterhead } = await letterheadFromProfile();
+  const resolved = await resolveDocumentLetterhead(
+    (recy as { letterheadSnapshot?: unknown }).letterheadSnapshot,
+    recy.factoryId,
+  );
+  const co = resolved.co;
+  const snapFactory = resolved.factory ?? factory;
+  const { letterhead } = resolved;
   applyBrandLetterhead(letterhead);
   letterhead.docNo = recy.form6No;
   letterhead.docLabel = `Invoice ${invoice.invoiceNo}`;
   letterhead.docDate = fmt(recy.processedAt);
-  const licenses = recyclerLicenses(co, factory);
+  const licenses = recyclerLicenses(co, snapFactory);
 
   const formVehicles = sub.vehicles.filter((v) =>
     recy.vehicleIds?.length
@@ -263,8 +316,13 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
         heading: 'RECEIVER — AUTHORIZED RECYCLER',
         pairs: [
           ['Company', co.name, 'Brand', co.brand || '—'],
-          ['Facility', factory?.name || co.name, 'Facility Code', recy.factoryId],
-          ['Facility address', factory?.address || co.address || '—', 'Facility GST', factory?.gstin || co.gst || '—'],
+          ['Facility', snapFactory?.name || co.name, 'Facility Code', recy.factoryId],
+          [
+            'Facility address',
+            snapFactory?.address || co.address || '—',
+            'Facility GST',
+            snapFactory?.gstin || co.gst || '—',
+          ],
           ['CPCB / EPR Authorisation', licenses.cpcb, 'State PCB Consent', licenses.kspcb],
           ['Company GSTIN', co.gst || '—', 'CIN', co.cin || '—'],
           ['R2 certificate', co.r2 || '—', 'PAN', co.pan || '—'],

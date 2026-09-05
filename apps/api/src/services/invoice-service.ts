@@ -36,6 +36,10 @@ import { assertCategoryCapacityOrOverride } from './category-capacity.js';
 import { assertClientInvoiceNoUnique, assertClientSerialsUnique } from './duplicate-service.js';
 import { notifyClient } from './submission-notify.js';
 import { notifyAdmins, notifyClientUsers } from './notifications.js';
+import {
+  captureLetterheadSnapshot,
+  letterheadSnapshotJson,
+} from './letterhead-snapshot.js';
 
 async function emailInvoiceGenerated(
   sub: Awaited<ReturnType<typeof loadSubmissionForActor>>,
@@ -706,6 +710,7 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
 
   assertRecordedDate(actor, input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
+  const letterheadSnapshot = letterheadSnapshotJson(await captureLetterheadSnapshot(input.factoryId));
 
   const mrn = await prisma.$transaction(async (tx) => {
     const { mrnNo } = await allocateMrnInTx(tx, input.factoryId, receivedAt);
@@ -725,6 +730,7 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
         note: input.note?.trim() || null,
         gatePhotoIds,
         materialPhotoIds,
+        letterheadSnapshot,
       },
     });
   });
@@ -927,6 +933,7 @@ export async function createRecycling(
   assertRecordedDate(actor, input.processedAt, 'Processing date');
   const processedAt = new Date(input.processedAt);
   const autoApprove = actor.role === 'admin';
+  const letterheadSnapshot = letterheadSnapshotJson(await captureLetterheadSnapshot(factoryId));
 
   const recycling = await prisma.$transaction(async (tx) => {
     const form6No = await allocateForm6InTx(tx, processedAt);
@@ -951,6 +958,7 @@ export async function createRecycling(
         reviewedAt: autoApprove ? new Date() : null,
         reviewedBy: autoApprove ? actor.email : null,
         reviewNote: null,
+        letterheadSnapshot,
         createdBy: actor.email,
         categories: { create: categoryRows },
         serials: input.serials?.length
@@ -1123,6 +1131,12 @@ export async function updateRecycling(
   const recycling = await prisma.$transaction(async (tx) => {
     await tx.recyclingCategory.deleteMany({ where: { recyclingId: existing.id } });
     const needsReReview = existing.reviewStatus !== 'pending_review' && actor.role !== 'admin';
+    const resetReview = needsReReview || existing.reviewStatus === 'rejected';
+    // Re-capture letterhead when Form 6 is re-issued for review (or still missing on legacy rows).
+    const letterheadSnapshot =
+      resetReview || !existing.letterheadSnapshot
+        ? letterheadSnapshotJson(await captureLetterheadSnapshot(factoryId))
+        : undefined;
     return tx.recycling.update({
       where: { id: existing.id },
       data: {
@@ -1138,7 +1152,8 @@ export async function updateRecycling(
         reportIds,
         serialFileId: input.serialFileId ?? existing.serialFileId,
         vehicleIds,
-        ...(needsReReview || existing.reviewStatus === 'rejected'
+        ...(letterheadSnapshot ? { letterheadSnapshot } : {}),
+        ...(resetReview
           ? {
               reviewStatus: 'pending_review',
               reviewedAt: null,
