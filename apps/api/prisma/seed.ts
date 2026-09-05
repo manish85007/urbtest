@@ -171,15 +171,8 @@ async function main() {
   for (const u of users) {
     await prisma.user.upsert({
       where: { email: u.email },
-      update: {
-        name: u.name,
-        role: u.role,
-        clientId: u.clientId ?? null,
-        factoryIds: u.factoryIds ?? [],
-        siteIds: u.siteIds ?? [],
-        passwordHash,
-        active: true,
-      },
+      // Preserve Masters → Users edits (name, role, scope, password) across UAT_SEED boots.
+      update: {},
       create: {
         email: u.email,
         name: u.name,
@@ -247,13 +240,8 @@ async function main() {
   for (const t of emailTemplates) {
     await prisma.emailTemplate.upsert({
       where: { key: t.key },
-      update: {
-        name: t.name,
-        subject: t.subject,
-        body: t.body,
-        variables: t.variables,
-        editable: false,
-      },
+      // Preserve Masters → Email template edits across UAT_SEED boots.
+      update: {},
       create: {
         key: t.key,
         name: t.name,
@@ -280,12 +268,8 @@ async function main() {
   for (const doc of legalDocs) {
     await prisma.legalDocument.upsert({
       where: { key: doc.key },
-      update: {
-        version: doc.version,
-        title: doc.title,
-        body: doc.body,
-        effectiveDate: new Date(doc.effectiveDate),
-      },
+      // Preserve legal document edits across UAT_SEED boots.
+      update: {},
       create: {
         key: doc.key,
         version: doc.version,
@@ -496,15 +480,7 @@ async function main() {
 
   await prisma.treePlanting.upsert({
     where: { id: 'seed-plant-1' },
-    update: {
-      trees: 5,
-      plantedAt: new Date('2025-12-15'),
-      location: 'Hesaraghatta',
-      state: 'Karnataka',
-      partner: 'Say Trees Foundation',
-      species: 'Ficus religiosa, Neem',
-      source: 'urbeno',
-    },
+    update: {},
     create: {
       id: 'seed-plant-1',
       clientId: 'TCPL',

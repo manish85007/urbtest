@@ -125,9 +125,10 @@ async function main() {
     });
     await prisma.session.deleteMany({ where: { userId: existingAdmin.id } });
   } else {
+    // Preserve Masters → Users edits; only ensure the bootstrap admin stays active.
     await prisma.user.update({
       where: { email: adminEmail },
-      data: { name: adminName, role: UserRole.admin, active: true },
+      data: { active: true },
     });
   }
 

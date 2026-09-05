@@ -60,8 +60,15 @@ export function toLookupRow(r: { id: string; category: string; data: unknown; ac
 }
 
 export async function listLookups(category: string, includeInactive = false): Promise<LookupRow[]> {
+  const canonical = canonicalLookupCategory(category.trim());
+  const aliases = Object.entries(LOOKUP_CATEGORY_ALIAS)
+    .filter(([, to]) => to === canonical)
+    .map(([from]) => from);
   const rows = await prisma.lookupMaster.findMany({
-    where: { category, ...(includeInactive ? {} : { active: true }) },
+    where: {
+      category: { in: [canonical, ...aliases] },
+      ...(includeInactive ? {} : { active: true }),
+    },
     orderBy: { id: 'asc' },
   });
   return rows.map(toLookupRow);
@@ -80,6 +87,18 @@ function nextLookupId(category: string) {
   return `${prefix}${Date.now().toString(36).slice(-4).toUpperCase()}`;
 }
 
+/** Prototype category keys → current Masters keys. */
+const LOOKUP_CATEGORY_ALIAS: Record<string, string> = {
+  vehTypes: 'vehicleType',
+  teamRoles: 'teamRole',
+  payModes: 'paymentMode',
+  taxRates: 'taxRate',
+};
+
+function canonicalLookupCategory(category: string): string {
+  return LOOKUP_CATEGORY_ALIAS[category] ?? category;
+}
+
 export async function upsertLookup(input: {
   category: string;
   id?: string;
@@ -96,8 +115,9 @@ export async function upsertLookup(input: {
   gst?: number;
   data?: Record<string, unknown>;
 }) {
-  const category = input.category.trim();
-  if (!category) throw new AppError('Lookup category is required.');
+  const rawCategory = input.category.trim();
+  if (!rawCategory) throw new AppError('Lookup category is required.');
+  const category = canonicalLookupCategory(rawCategory);
 
   let id = input.id?.trim().toUpperCase() || '';
   const existing = id
@@ -128,7 +148,7 @@ export async function upsertLookup(input: {
     ...(input.gst !== undefined ? { gst: input.gst } : {}),
   };
 
-  return prisma.lookupMaster.upsert({
+  const row = await prisma.lookupMaster.upsert({
     where: { category_id: { category, id } },
     create: {
       id,
@@ -141,6 +161,7 @@ export async function upsertLookup(input: {
       ...(input.active !== undefined ? { active: input.active } : {}),
     },
   });
+  return toLookupRow(row);
 }
 
 export const LOOKUP_SEED: Array<{
@@ -272,17 +293,44 @@ const RETIRED_LOOKUPS = [
 
 export async function seedLookups() {
   for (const row of LOOKUP_SEED) {
-    const existing = await prisma.lookupMaster.findUnique({
-      where: { category_id: { category: row.category, id: row.id } },
+    const data: Record<string, unknown> = {
+      label: row.label,
+      ...(row.rate !== undefined ? { rate: row.rate } : {}),
+      ...(row.description !== undefined ? { description: row.description } : {}),
+      ...(row.days !== undefined ? { days: row.days } : {}),
+      ...(row.code !== undefined ? { code: row.code } : {}),
+      ...(row.phone !== undefined ? { phone: row.phone } : {}),
+      ...(row.gstin !== undefined ? { gstin: row.gstin } : {}),
+      ...(row.transporterId !== undefined ? { transporterId: row.transporterId } : {}),
+      ...(row.address !== undefined ? { address: row.address } : {}),
+      ...(row.gst !== undefined ? { gst: row.gst } : {}),
+    };
+    // Create-only — never overwrite Masters → Lookup Lists edits on boot.
+    await prisma.lookupMaster.createMany({
+      data: [
+        {
+          id: row.id,
+          category: row.category,
+          data: data as Prisma.InputJsonValue,
+          active: true,
+        },
+      ],
+      skipDuplicates: true,
     });
-    // Create-only — Masters edits to seeded lookup IDs must survive restarts.
-    if (existing) continue;
-    await upsertLookup(row);
   }
+  // Obsolete IDs: insert inactive stubs if missing. Do not force-deactivate rows
+  // an admin has reactivated in Masters.
   for (const row of RETIRED_LOOKUPS) {
-    await prisma.lookupMaster.updateMany({
-      where: { category: row.category, id: row.id },
-      data: { active: false },
+    await prisma.lookupMaster.createMany({
+      data: [
+        {
+          id: row.id,
+          category: row.category,
+          data: { label: row.id },
+          active: false,
+        },
+      ],
+      skipDuplicates: true,
     });
   }
 }
