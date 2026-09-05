@@ -51,20 +51,47 @@ export function pdfString(text: string): string {
 }
 
 function wrapLine(text: string, max = 92): string[] {
-  const words = String(text ?? '').split(/\s+/);
+  const raw = String(text ?? '').trim() || '—';
+  const words = raw.split(/\s+/);
   const lines: string[] = [];
   let cur = '';
+
+  const pushChunk = (chunk: string) => {
+    if (!chunk) return;
+    if (chunk.length <= max) {
+      if (cur) lines.push(cur);
+      cur = chunk;
+      return;
+    }
+    if (cur) {
+      lines.push(cur);
+      cur = '';
+    }
+    for (let i = 0; i < chunk.length; i += max) {
+      lines.push(chunk.slice(i, i + max));
+    }
+  };
+
   for (const w of words) {
     const next = cur ? `${cur} ${w}` : w;
     if (next.length > max) {
-      if (cur) lines.push(cur);
-      cur = w;
+      if (cur) {
+        lines.push(cur);
+        cur = '';
+      }
+      if (w.length > max) pushChunk(w);
+      else cur = w;
     } else {
       cur = next;
     }
   }
   if (cur) lines.push(cur);
-  return lines.length ? lines : [''];
+  return lines.length ? lines : ['—'];
+}
+
+function charsForWidth(widthPt: number, fontSize: number): number {
+  // Helvetica average glyph ≈ 0.5em; leave a small gutter.
+  return Math.max(12, Math.floor(widthPt / (fontSize * 0.52)));
 }
 
 function textWidth(text: string, size: number): number {
@@ -279,9 +306,12 @@ class Painter {
 
       // Statutory lines under the logo (Masters → Company profile).
       let metaY = PAGE_H - Math.max(logoH + 22, 54);
+      const metaMax = charsForWidth(CONTENT_W - 160, 7.2); // leave room for doc meta on the right
       if (lh.address) {
-        this.text('F1', 7.2, MARGIN_X, metaY, lh.address.slice(0, 110), MUTED);
-        metaY -= 11;
+        for (const line of wrapLine(lh.address, metaMax)) {
+          this.text('F1', 7.2, MARGIN_X, metaY, line, MUTED);
+          metaY -= 10;
+        }
       }
       const ids = [
         lh.gst ? `GSTIN ${lh.gst}` : '',
@@ -292,22 +322,36 @@ class Painter {
         .filter(Boolean)
         .join('  ·  ');
       if (ids) {
-        this.text('F1', 7, MARGIN_X, metaY, ids.slice(0, 118), MUTED);
-        metaY -= 11;
+        for (const line of wrapLine(ids, metaMax)) {
+          this.text('F1', 7, MARGIN_X, metaY, line, MUTED);
+          metaY -= 10;
+        }
       }
       const certs = [lh.cpcb ? `CPCB ${lh.cpcb}` : '', lh.kspcb ? `State PCB ${lh.kspcb}` : '']
         .filter(Boolean)
         .join('  ·  ');
       if (certs) {
-        this.text('F1', 7, MARGIN_X, metaY, certs.slice(0, 118), GREEN_DARK);
-        metaY -= 12;
+        for (const line of wrapLine(certs, metaMax)) {
+          this.text('F1', 7, MARGIN_X, metaY, line, GREEN_DARK);
+          metaY -= 10;
+        }
       }
+      metaY -= 2;
 
       const ruleY = Math.min(metaY - 2, PAGE_H - Math.max(logoH + 24, 58));
       this.fillRect(MARGIN_X, ruleY, CONTENT_W, 1.5, GREEN);
       this.text('F2', 13, PAGE_W / 2, ruleY - 18, this.title, GREEN_DARK, 'c');
-      if (this.subtitle) this.text('F1', 8.5, PAGE_W / 2, ruleY - 32, this.subtitle, MUTED, 'c');
-      this.y = ruleY - 48;
+      if (this.subtitle) {
+        const subLines = wrapLine(this.subtitle, charsForWidth(CONTENT_W, 8.5));
+        let sy = ruleY - 32;
+        for (const line of subLines.slice(0, 2)) {
+          this.text('F1', 8.5, PAGE_W / 2, sy, line, MUTED, 'c');
+          sy -= 11;
+        }
+        this.y = sy - 14;
+      } else {
+        this.y = ruleY - 48;
+      }
     } else {
       if (!this.jpeg) this.text('F2', 10, MARGIN_X, PAGE_H - 18, lh.name, GREEN_DARK);
       if (lh.docNo) this.text('F1', 8, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, GREEN_DARK, 'r');
@@ -336,17 +380,44 @@ class Painter {
   }
 
   pair(l1: string, v1: string, l2?: string, v2?: string) {
-    this.ensure(32);
-    this.text('F2', 6.8, MARGIN_X, this.y, l1.toUpperCase(), LABEL);
-    if (l2) this.text('F2', 6.8, COL2_X, this.y, l2.toUpperCase(), LABEL);
-    this.y -= 12;
-    this.text('F1', 9.5, MARGIN_X, this.y, String(v1 ?? '-').slice(0, 52));
-    if (l2) this.text('F1', 9.5, COL2_X, this.y, String(v2 ?? '-').slice(0, 52));
-    this.y -= 16;
+    const dual = Boolean(l2);
+    const gutter = 14;
+    const leftW = dual ? COL2_X - MARGIN_X - gutter : CONTENT_W;
+    const rightW = PAGE_W - MARGIN_X - COL2_X;
+    const valueSize = 9;
+    const labelSize = 6.8;
+    const leftMax = charsForWidth(leftW, valueSize);
+    const rightMax = charsForWidth(rightW, valueSize);
+    const labelMax = charsForWidth(dual ? leftW : CONTENT_W, labelSize);
+
+    const leftLines = wrapLine(String(v1 ?? '—'), leftMax);
+    const rightLines = dual ? wrapLine(String(v2 ?? '—'), rightMax) : [];
+    const rows = Math.max(leftLines.length, rightLines.length, 1);
+
+    this.ensure(18 + rows * 12);
+    this.text('F2', labelSize, MARGIN_X, this.y, String(l1 ?? '').toUpperCase().slice(0, labelMax), LABEL);
+    if (dual) {
+      this.text(
+        'F2',
+        labelSize,
+        COL2_X,
+        this.y,
+        String(l2 ?? '').toUpperCase().slice(0, charsForWidth(rightW, labelSize)),
+        LABEL,
+      );
+    }
+    this.y -= 11;
+    for (let i = 0; i < rows; i++) {
+      this.ensure(14);
+      if (leftLines[i]) this.text('F1', valueSize, MARGIN_X, this.y, leftLines[i]);
+      if (dual && rightLines[i]) this.text('F1', valueSize, COL2_X, this.y, rightLines[i]);
+      this.y -= 12;
+    }
+    this.y -= 6;
   }
 
   paragraph(line: string) {
-    for (const wrapped of wrapLine(line, 96)) {
+    for (const wrapped of wrapLine(line, charsForWidth(CONTENT_W, 9))) {
       this.ensure(16);
       this.text('F1', 9, MARGIN_X, this.y, wrapped);
       this.y -= 13;
@@ -356,35 +427,58 @@ class Painter {
   table(table: NonNullable<PdfSection['table']>) {
     const cols = table.headers.length;
     const widths = table.headers.map((_, i) => {
-      const weight = Math.max(table.headers[i].length, ...table.rows.map((r) => String(r[i] ?? '').length), 6);
+      const weight = Math.max(
+        table.headers[i].length,
+        ...table.rows.map((r) => String(r[i] ?? '').length),
+        // Prefer readable description / vehicle columns over tiny numeric ones.
+        i === 0 || /desc|name|vehicle|driver|fraction/i.test(table.headers[i]) ? 18 : 6,
+      );
       return weight;
     });
     const sumW = widths.reduce((a, b) => a + b, 0) || 1;
     const colW = widths.map((w) => (w / sumW) * CONTENT_W);
     const aligns = table.aligns ?? table.headers.map((_, i) => (i === cols - 1 ? 'r' : 'l'));
+    const cellSize = 7.4;
 
-    this.ensure(28 + table.rows.length * 14);
+    const rowLineCounts = table.rows.map((row) =>
+      Math.max(
+        1,
+        ...row.map((cell, i) => wrapLine(String(cell ?? '—'), charsForWidth(colW[i] - 8, cellSize)).length),
+      ),
+    );
+    const approxH = 28 + rowLineCounts.reduce((a, n) => a + n * 11, 0);
+    this.ensure(Math.min(approxH, 120));
     this.y -= 4;
     this.fillRect(MARGIN_X, this.y - 4, CONTENT_W, 16, GREEN);
     let x = MARGIN_X;
     table.headers.forEach((h, i) => {
       const ax = aligns[i] === 'r' ? x + colW[i] - 4 : x + 4;
-      this.text('F2', 7, ax, this.y, h.toUpperCase(), WHITE, aligns[i] === 'r' ? 'r' : 'l');
+      const headerMax = charsForWidth(colW[i] - 8, 7);
+      this.text('F2', 7, ax, this.y, h.toUpperCase().slice(0, headerMax), WHITE, aligns[i] === 'r' ? 'r' : 'l');
       x += colW[i];
     });
     this.y -= 16;
 
     table.rows.forEach((row, ri) => {
-      this.ensure(18);
-      if (ri % 2) this.fillRect(MARGIN_X, this.y - 4, CONTENT_W, 14, [0.976, 0.976, 0.965]);
-      x = MARGIN_X;
-      row.forEach((cell, i) => {
-        const ax = aligns[i] === 'r' ? x + colW[i] - 4 : x + 4;
-        const maxChars = Math.max(6, Math.floor(colW[i] / 4.2));
-        this.text('F1', 7.6, ax, this.y, String(cell ?? '').slice(0, maxChars), BLACK, aligns[i] === 'r' ? 'r' : 'l');
-        x += colW[i];
-      });
-      this.y -= 14;
+      const cellLines = row.map((cell, i) =>
+        wrapLine(String(cell ?? '—'), charsForWidth(colW[i] - 8, cellSize)),
+      );
+      const lines = Math.max(1, ...cellLines.map((l) => l.length));
+      this.ensure(10 + lines * 11);
+      const rowH = lines * 11 + 2;
+      if (ri % 2) this.fillRect(MARGIN_X, this.y - 4 - (rowH - 14), CONTENT_W, rowH, [0.976, 0.976, 0.965]);
+      for (let li = 0; li < lines; li++) {
+        x = MARGIN_X;
+        cellLines.forEach((wrapped, i) => {
+          const ax = aligns[i] === 'r' ? x + colW[i] - 4 : x + 4;
+          if (wrapped[li]) {
+            this.text('F1', cellSize, ax, this.y, wrapped[li], BLACK, aligns[i] === 'r' ? 'r' : 'l');
+          }
+          x += colW[i];
+        });
+        this.y -= 11;
+      }
+      this.y -= 2;
     });
 
     if (table.total) {

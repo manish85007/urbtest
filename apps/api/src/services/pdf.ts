@@ -157,7 +157,7 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
 
   const buffer = buildTextPdf(
     'MATERIAL RECEIPT NOTE',
-    `Receiving facility: ${facilityLine}`.slice(0, 120),
+    `Receiving facility: ${facilityLine}`,
     [
       {
         heading: 'REFERENCE',
@@ -169,7 +169,16 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
           ['Origin Site', sub.site.name, 'Received On', fmt(mrn.receivedAt)],
           ['MRN Number', mrn.mrnNo, 'Invoice billing weight', `${num(invoice.billingWeight.toString())} kg`],
           ['Material received', `${num(receivedKg)} kg`, 'Condition on Arrival', mrn.condition || 'Good'],
-          ['Facility Authorisation (CPCB)', licenses.cpcb, 'State PCB Consent', licenses.kspcb],
+        ],
+      },
+      {
+        heading: 'RECEIVING FACILITY',
+        pairs: [
+          ['Facility', factory?.name ?? mrn.factoryId, 'Facility Code', mrn.factoryId],
+          ['Facility address', factory?.address || '—'],
+          ['Facility GST', factory?.gstin || co.gst || '—'],
+          ['CPCB / EPR Authorisation', licenses.cpcb],
+          ['State PCB Consent', licenses.kspcb],
         ],
       },
       {
@@ -206,7 +215,7 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
         heading: 'GATE SIGNATURES',
         pairs: [
           ['Driver', mrn.driverSign || '—', 'Vehicle', vehs[0]?.registration || '—'],
-          ['Factory Manager', mrn.managerSign || '—', 'Facility', factory?.id ?? mrn.factoryId],
+          ['Factory Manager', mrn.managerSign || '—', 'Facility', factory?.name ?? mrn.factoryId],
           ['Security Officer', mrn.securitySign || '—', 'Gate', 'In'],
         ],
       },
@@ -309,7 +318,8 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
         pairs: [
           ['Name', sub.client.name, 'Client Code', sub.clientId],
           ['Site', sub.site.name, 'GST', sub.site.gstin || '—'],
-          ['Address', siteAddr, 'Pickup location', sub.location || '—'],
+          ['Address', siteAddr],
+          ['Pickup location', sub.location || '—'],
         ],
       },
       {
@@ -317,15 +327,12 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
         pairs: [
           ['Company', co.name, 'Brand', co.brand || '—'],
           ['Facility', snapFactory?.name || co.name, 'Facility Code', recy.factoryId],
-          [
-            'Facility address',
-            snapFactory?.address || co.address || '—',
-            'Facility GST',
-            snapFactory?.gstin || co.gst || '—',
-          ],
-          ['CPCB / EPR Authorisation', licenses.cpcb, 'State PCB Consent', licenses.kspcb],
-          ['Company GSTIN', co.gst || '—', 'CIN', co.cin || '—'],
-          ['R2 certificate', co.r2 || '—', 'PAN', co.pan || '—'],
+          ['Facility address', snapFactory?.address || co.address || '—'],
+          ['Facility GST', snapFactory?.gstin || co.gst || '—', 'Company GSTIN', co.gst || '—'],
+          ['CPCB / EPR Authorisation', licenses.cpcb],
+          ['State PCB Consent', licenses.kspcb],
+          ['CIN', co.cin || '—', 'PAN', co.pan || '—'],
+          ['R2 certificate', co.r2 || '—'],
           ['Phone', co.phone || '—', 'Email', co.email || '—'],
         ],
       },
@@ -351,7 +358,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           headers: ['Entry', 'Description', 'Group', 'Weight (kg)'],
           rows: cats.map((c) => [
             c.entryId,
-            (c.category?.description || '').slice(0, 48) || '—',
+            c.category?.description || '—',
             c.groupCode,
             num(c.weightKg.toString()),
           ]),
