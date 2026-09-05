@@ -7,12 +7,37 @@ import {
   getLegalStatus,
   listLegalDocuments,
 } from '../services/legal.js';
+import { getCompanyProfile } from '../services/settings.js';
 import { listAudit } from '../services/audit.js';
 import { HSTS_HEADER, SECURITY_HEADERS, isSecureDeployment } from '../lib/http-headers.js';
 import { bumpRateLimit } from '../lib/rate-limit-store.js';
 import { isAppError } from '../lib/errors.js';
 
 export async function legalRoutes(app: FastifyInstance) {
+  // Public contact for Support / footer — Masters → Company & Letterhead.
+  app.get('/public/company-contact', async (request, reply) => {
+    try {
+      await bumpRateLimit(
+        `company-contact:${request.ip}`,
+        60_000,
+        60,
+        'Too many requests for company contact. Try again shortly.',
+      );
+      const co = await getCompanyProfile();
+      return {
+        name: co.name,
+        phone: co.phone,
+        email: co.email,
+        wa: co.wa,
+      };
+    } catch (err) {
+      if (isAppError(err) && err.statusCode === 429) {
+        return reply.status(429).send({ message: err.message, error: 'Too Many Requests', statusCode: 429 });
+      }
+      throw err;
+    }
+  });
+
   // Public legal catalogue — rate-limited to deter scraping.
   app.get('/legal-documents', async (request, reply) => {
     try {

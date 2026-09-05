@@ -246,6 +246,7 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     });
     expect(edited.devicesDestroyed).toBe(11);
     expect(edited.reviewStatus).toBe('pending_review');
+    expect(edited.clientPublishedAt).toBeNull();
 
     await expect(
       uploadCertificate(admin, invoiceId, {

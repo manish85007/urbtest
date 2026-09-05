@@ -164,7 +164,7 @@ export const DEFAULT_COMPANY: CompanyProfile = {
   gst: process.env.URBENO_GST ?? '29AABCU1234R1ZW',
   pan: process.env.URBENO_PAN ?? 'AABCU1234R',
   cin: process.env.URBENO_CIN ?? '',
-  phone: process.env.URBENO_PHONE ?? '1800-123-4567',
+  phone: process.env.URBENO_PHONE ?? '+91 99022 99007',
   email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
   wa: process.env.URBENO_WA ?? '919902299007',
   cpcb: process.env.URBENO_CPCB ?? 'CPCB/EPR/2022/KA/00817',

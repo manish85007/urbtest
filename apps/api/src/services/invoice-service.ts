@@ -1144,6 +1144,10 @@ export async function updateRecycling(
               reviewedAt: null,
               reviewedBy: null,
               reviewNote: null,
+              // Require Super Admin re-certify after factory revises Form 6.
+              clientPublishedAt: null,
+              clientPublishedBy: null,
+              clientPublishNote: null,
             }
           : {}),
         categories: { create: categoryRows },

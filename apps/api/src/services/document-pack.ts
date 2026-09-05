@@ -1,4 +1,4 @@
-import { dateInPeriod, periodLabel, type ReportPeriod } from '@urb-tectrack/shared';
+import { dateInPeriod, isClientPortalRole, periodLabel, type ReportPeriod } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { clientScopeFilter, factoryInScope, hasFeature, isStaff } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
@@ -102,7 +102,7 @@ export async function documentsZip(
     const recys = await prisma.recycling.findMany({
       where: {
         invoice: { submission: scope },
-        ...(actor.role === 'client' ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
+        ...(isClientPortalRole(actor.role) ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
       },
       include: {
         factory: true,

@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { authApi, filesApi, announcementsApi, type SessionUser, type AnnouncementRow } from '../api';
+import { authApi, filesApi, announcementsApi, legalApi, type SessionUser, type AnnouncementRow } from '../api';
 import { navItems } from '../lib/nav';
 import { isClientPortalRole } from '@urb-tectrack/shared';
 import { portalSubtitle } from '../lib/roles';
 import { LogoIcon } from './BrandMark';
 import { GlobalSearch } from './GlobalSearch';
 import { NotificationBell } from './NotificationBell';
-import { COMPANY } from '../lib/company';
+import { COMPANY, waMeUrl } from '../lib/company';
 
 const NARROW_MQ = '(max-width: 820px)';
 const FOCUSABLE =
@@ -38,6 +38,7 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
   const [navOpen, setNavOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
+  const [waUrl, setWaUrl] = useState<string>(COMPANY.waUrl);
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(NARROW_MQ).matches,
   );
@@ -79,6 +80,13 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
     load();
     const t = setInterval(load, 5 * 60 * 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    legalApi
+      .companyContact()
+      .then((c) => setWaUrl(waMeUrl(c.wa || COMPANY.wa)))
+      .catch(() => setWaUrl(COMPANY.waUrl));
   }, []);
 
   // Keep closed mobile drawer out of the a11y / tab tree
@@ -312,7 +320,7 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
               </span>
             </div>
             <div className="foot-r">
-              <a href={COMPANY.waUrl} target="_blank" rel="noopener noreferrer">
+              <a href={waUrl} target="_blank" rel="noopener noreferrer">
                 WhatsApp
               </a>
               <Link to="/legal/terms">Terms of Use</Link>

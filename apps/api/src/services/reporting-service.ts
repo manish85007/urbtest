@@ -9,6 +9,7 @@ import {
   inFiscalYear,
   invStage,
   invoiceDue,
+  isClientPortalRole,
   parseReportPeriod,
   paymentTermsLabel,
   periodLabel,
@@ -946,7 +947,7 @@ export async function getRegisterReport(
     const recys = await prisma.recycling.findMany({
       where: {
         invoice: { submission: scope },
-        ...(actor.role === 'client' ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
+        ...(isClientPortalRole(actor.role) ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
       },
       include: {
         factory: true,
@@ -998,7 +999,7 @@ export async function getRegisterReport(
       where: {
         recycling: {
           invoice: { submission: scope },
-          ...(actor.role === 'client' ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
+          ...(isClientPortalRole(actor.role) ? { reviewStatus: 'approved', clientPublishedAt: { not: null } } : {}),
         },
       },
       include: {
@@ -1020,7 +1021,7 @@ export async function getRegisterReport(
       .filter((s) => {
         const rec = s.recycling;
         if (actor.role === 'factory' && !factoryInScope(actor, rec.factoryId)) return false;
-        if (actor.role === 'client' && !recyclingClientPublished(rec)) return false;
+        if (isClientPortalRole(actor.role) && !recyclingClientPublished(rec)) return false;
         const periodDate = s.destroyedAt ?? rec.processedAt;
         return inP(periodDate);
       })

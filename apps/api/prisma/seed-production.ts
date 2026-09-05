@@ -81,13 +81,8 @@ async function main() {
     tpa += c.capacityTPA;
     await prisma.categoryMaster.upsert({
       where: { factoryId_entryId: { factoryId: FACTORY_ID, entryId: c.entryId } },
-      update: {
-        description: c.desc,
-        groupCode: c.groupCode,
-        activity: c.activity,
-        capacityTpa: c.capacityTPA,
-        active: c.active,
-      },
+      // Preserve Masters → Categories edits across PRODUCTION_SEED restarts.
+      update: {},
       create: {
         factoryId: FACTORY_ID,
         entryId: c.entryId,

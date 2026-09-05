@@ -798,6 +798,8 @@ function qs(params: Record<string, string | undefined>): string {
 }
 
 export const legalApi = {
+  companyContact: () =>
+    api<{ name: string; phone: string; email: string; wa: string }>('/public/company-contact'),
   list: () =>
     api<Array<{ key: string; version: string; title: string; effectiveDate: string }>>('/legal-documents'),
   document: (key: string) =>

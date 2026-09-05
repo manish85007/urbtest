@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi, dataApi, filesApi, type CompanyProfile, type SessionUser } from '../api';
-import { COMPANY } from '../lib/company';
+import { COMPANY, mailtoHref, phoneTelHref, waMeUrl } from '../lib/company';
 import { roleLabel } from '../lib/roles';
 
 interface ProfilePageProps {
@@ -20,10 +20,6 @@ const ROLE_LABEL: Record<SessionUser['role'], string> = {
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '--';
-}
-
-function phoneTel(phone: string) {
-  return phone.replace(/[^\d+]/g, '');
 }
 
 export function ProfilePage({ user }: ProfilePageProps) {
@@ -192,16 +188,24 @@ export function ProfilePage({ user }: ProfilePageProps) {
               {user.role !== 'admin' && support.cin ? <div>CIN {support.cin}</div> : null}
               <div>
                 📞{' '}
-                <a href={`tel:${phoneTel(support.phone)}`} style={{ color: 'var(--g)' }}>
+                <a href={`tel:${phoneTelHref(support.phone)}`} style={{ color: 'var(--g)' }}>
                   {support.phone}
                 </a>
               </div>
               <div>
                 ✉️{' '}
-                <a href={`mailto:${support.email}`} style={{ color: 'var(--g)' }}>
+                <a href={mailtoHref(support.email)} style={{ color: 'var(--g)' }}>
                   {support.email}
                 </a>
               </div>
+              {support.wa ? (
+                <div>
+                  WhatsApp{' '}
+                  <a href={waMeUrl(support.wa)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--g)' }}>
+                    Chat on WhatsApp
+                  </a>
+                </div>
+              ) : null}
             </div>
           </div>
 

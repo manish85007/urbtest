@@ -272,6 +272,11 @@ const RETIRED_LOOKUPS = [
 
 export async function seedLookups() {
   for (const row of LOOKUP_SEED) {
+    const existing = await prisma.lookupMaster.findUnique({
+      where: { category_id: { category: row.category, id: row.id } },
+    });
+    // Create-only — Masters edits to seeded lookup IDs must survive restarts.
+    if (existing) continue;
     await upsertLookup(row);
   }
   for (const row of RETIRED_LOOKUPS) {

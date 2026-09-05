@@ -1,10 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { legalApi } from '../api';
-import { COMPANY } from '../lib/company';
+import { COMPANY, mailtoHref, phoneTelHref, waMeUrl } from '../lib/company';
 
 interface LegalPageProps {
   standalone?: boolean;
+}
+
+interface SupportContact {
+  phone: string;
+  email: string;
+  wa: string;
 }
 
 const SECTION_RE = /^(?:\d+\.\s+.+|[A-Z][A-Za-z &/()]{2,80})$/;
@@ -68,26 +74,78 @@ function renderLegalBody(body: string): ReactNode {
   });
 }
 
+function SupportArticle({ contact }: { contact: SupportContact }) {
+  const phone = contact.phone || COMPANY.phone;
+  const email = contact.email || COMPANY.email;
+  const wa = contact.wa || COMPANY.wa;
+  const linkStyle = { color: 'var(--g)' as const };
+
+  return (
+    <article className="card legal-doc">
+      <h1 className="h1">Support</h1>
+      <p className="muted">Contact details from Masters → Company &amp; Letterhead</p>
+      <div className="legal-body legal">
+        <h4>Getting help</h4>
+        <p>
+          For anything relating to a consignment — a pickup, a document, an invoice — raise a query
+          directly on the request concerned. It reaches the team handling that consignment and stays
+          attached to the record.
+        </p>
+        <h4>Contact</h4>
+        <ul>
+          <li>
+            Phone —{' '}
+            <a href={`tel:${phoneTelHref(phone)}`} style={linkStyle}>
+              {phone}
+            </a>
+          </li>
+          <li>
+            Email —{' '}
+            <a href={mailtoHref(email)} style={linkStyle}>
+              {email}
+            </a>
+          </li>
+          <li>
+            WhatsApp —{' '}
+            <a href={waMeUrl(wa)} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+              Chat on WhatsApp
+            </a>
+          </li>
+        </ul>
+        <h4>Account problems</h4>
+        <p>
+          If you cannot sign in, use Forgot password on the login screen for a six-digit code by
+          email, then change your password from Profile.
+        </p>
+      </div>
+    </article>
+  );
+}
+
 export function LegalPage({ standalone = false }: LegalPageProps) {
   const { key } = useParams<{ key: string }>();
   const [doc, setDoc] = useState<{ title: string; version: string; body: string; effectiveDate: string } | null>(
     null,
   );
+  const [support, setSupport] = useState<SupportContact | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!key) return;
+    setError('');
+    setDoc(null);
+    setSupport(null);
+
     if (key === 'support') {
-      setDoc({
-        title: 'Support',
-        version: '1.0',
-        effectiveDate: '2026-04-01',
-        body:
-          `Getting help\nFor anything relating to a consignment — a pickup, a document, an invoice — raise a query directly on the request concerned. It reaches the team handling that consignment and stays attached to the record.\n\nContact\n• Phone — ${COMPANY.phone}\n• Email — ${COMPANY.email}\n• WhatsApp — ${COMPANY.waUrl}\n\nAccount problems\nIf you cannot sign in, use Forgot password on the login screen for a six-digit code by email, then change your password from Profile.`,
-      });
-      setError('');
+      legalApi
+        .companyContact()
+        .then((c) => setSupport({ phone: c.phone, email: c.email, wa: c.wa }))
+        .catch(() =>
+          setSupport({ phone: COMPANY.phone, email: COMPANY.email, wa: COMPANY.wa }),
+        );
       return;
     }
+
     legalApi
       .document(key)
       .then(setDoc)
@@ -100,7 +158,13 @@ export function LegalPage({ standalone = false }: LegalPageProps) {
         <Link to="/">{standalone ? '← Sign in' : '← Dashboard'}</Link>
       </p>
       {error ? <p className="error">{error}</p> : null}
-      {!doc ? (
+      {key === 'support' ? (
+        support ? (
+          <SupportArticle contact={support} />
+        ) : (
+          <p className="muted">Loading…</p>
+        )
+      ) : !doc ? (
         <p className="muted">Loading…</p>
       ) : (
         <article className="card legal-doc">

@@ -209,13 +209,8 @@ async function main() {
       where: {
         factoryId_entryId: { factoryId: c.facId, entryId: c.entryId },
       },
-      update: {
-        description: c.desc,
-        groupCode: c.groupCode,
-        activity: c.activity,
-        capacityTpa: c.capacityTPA,
-        active: c.active,
-      },
+      // Do not overwrite Masters → Categories edits on every UAT_SEED boot.
+      update: {},
       create: {
         factoryId: c.facId,
         entryId: c.entryId,
