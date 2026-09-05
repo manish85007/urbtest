@@ -20,6 +20,25 @@ export function roleLabel(role: SessionUser['role'] | string): string {
   }
 }
 
+/** Badge colour classes for Masters → Users (and similar). */
+export function roleBadgeClass(role: SessionUser['role'] | string): string {
+  switch (role) {
+    case 'admin':
+      return 'bg-g';
+    case 'operations':
+      return 'bg-te';
+    case 'factory':
+      return 'bg-pu';
+    case 'auditor':
+      return 'bg-am';
+    case 'client':
+    case 'client_readonly':
+      return 'bg-bl';
+    default:
+      return 'bg-gy';
+  }
+}
+
 export function portalSubtitle(role: SessionUser['role'], factoryIds: string[] = []): string {
   if (role === 'client' || role === 'client_readonly') return 'Client portal';
   if (role === 'operations') return 'Urbeno · Operations';

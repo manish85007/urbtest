@@ -3,6 +3,7 @@
   --bd:#e2e6dd; --mu:#7d857a; --tx:#1c1b18; --bg:#f8faf7; --cd:#ffffff;
   --am:#b45309; --am2:#fef3c7; --rd:#b91c1c; --rd2:#fee2e2;
   --bl:#1d6fa4; --bl2:#dbeafe; --pu:#6d28d9; --pu2:#ede9fe;
+  --te:#0f766e; --te2:#ccfbf1;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{height:100%;-webkit-text-size-adjust:100%}
@@ -219,6 +220,7 @@ tbody tr:last-child td{border-bottom:none}
 .bg-rd{background:var(--rd2);color:var(--rd)}
 .bg-bl{background:var(--bl2);color:var(--bl)}
 .bg-pu{background:var(--pu2);color:var(--pu)}
+.bg-te{background:var(--te2);color:var(--te)}
 .bg-gy{background:#f0efe9;color:var(--mu)}
 
 /* BUTTONS */

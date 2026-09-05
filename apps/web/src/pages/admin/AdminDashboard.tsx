@@ -164,7 +164,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
         <Link to="/requests" className="card admin-chart-card admin-cap-card">
           <h3>Request pipeline</h3>
           <div className="admin-chart-row">
-            <DonutChart slices={reqSlices.length ? reqSlices : [{ value: 1, color: '#e5e7eb', label: 'Empty' }]} size={160} centerLabel="requests" />
+            <DonutChart slices={reqSlices} size={160} centerLabel="requests" />
             <div className="admin-chart-legend">
               {reqSlices.map((s) => (
                 <div key={s.label} className="admin-legend-row">

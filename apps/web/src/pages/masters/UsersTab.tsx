@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ClientSummary, FactorySummary, UserRow } from '../../api';
-import { roleLabel } from '../../lib/roles';
+import { roleBadgeClass, roleLabel } from '../../lib/roles';
 import { UserFormModal } from './UserFormModal';
 
 interface UsersTabProps {
@@ -55,9 +55,7 @@ export function UsersTab({ users, clients, factories, onChanged }: UsersTabProps
                   </td>
                   <td className="dim">{u.email}</td>
                   <td>
-                    <span
-                      className={`badge ${u.role === 'admin' ? 'bg-g' : u.role === 'operations' ? 'bg-te' : u.role === 'factory' ? 'bg-pu' : 'bg-bl'}`}
-                    >
+                    <span className={`badge ${roleBadgeClass(u.role)}`}>
                       {roleLabel(u.role)}
                     </span>
                   </td>

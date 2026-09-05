@@ -1,5 +1,31 @@
 import { num } from '../lib/format';
 
+/** Build an SVG pie-slice path; splits full circles into two arcs (SVG cannot draw a 360° arc). */
+export function pieSlicePath(
+  cx: number,
+  cy: number,
+  r: number,
+  startAngle: number,
+  sweep: number,
+): string {
+  if (sweep <= 0) return '';
+  if (sweep >= 2 * Math.PI - 1e-6) {
+    const mid = startAngle + Math.PI;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(mid);
+    const y2 = cy + r * Math.sin(mid);
+    return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 1 1 ${x2} ${y2} A ${r} ${r} 0 1 1 ${x1} ${y1} Z`;
+  }
+  const endAngle = startAngle + sweep;
+  const x1 = cx + r * Math.cos(startAngle);
+  const y1 = cy + r * Math.sin(startAngle);
+  const x2 = cx + r * Math.cos(endAngle);
+  const y2 = cy + r * Math.sin(endAngle);
+  const largeArc = sweep > Math.PI ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+}
+
 /** Animated SVG donut chart. */
 export function DonutChart({
   slices,
@@ -27,19 +53,15 @@ export function DonutChart({
     );
   }
 
-  const paths = slices.map((sl) => {
-    const pct = sl.value / total;
-    const sweep = 2 * Math.PI * pct;
-    const endAngle = startAngle + sweep;
-    const x1 = cx + r * Math.cos(startAngle);
-    const y1 = cy + r * Math.sin(startAngle);
-    const x2 = cx + r * Math.cos(endAngle);
-    const y2 = cy + r * Math.sin(endAngle);
-    const largeArc = sweep > Math.PI ? 1 : 0;
-    const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-    startAngle = endAngle;
-    return { d, color: sl.color, label: sl.label, pct, value: sl.value };
-  });
+  const paths = slices
+    .filter((sl) => sl.value > 0)
+    .map((sl) => {
+      const pct = sl.value / total;
+      const sweep = 2 * Math.PI * pct;
+      const d = pieSlicePath(cx, cy, r, startAngle, sweep);
+      startAngle += sweep;
+      return { d, color: sl.color, label: sl.label, pct, value: sl.value };
+    });
 
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" className="client-chart-pie-wrap chart-pie-wrap">
