@@ -94,8 +94,9 @@ function charsForWidth(widthPt: number, fontSize: number): number {
   return Math.max(12, Math.floor(widthPt / (fontSize * 0.52)));
 }
 
-function textWidth(text: string, size: number): number {
-  return String(text ?? '').length * size * 0.5;
+function textWidth(text: string, size: number, bold = false): number {
+  // Helvetica averages ~0.5em; Bold runs a touch wider.
+  return String(text ?? '').length * size * (bold ? 0.56 : 0.5);
 }
 
 function rgb(c: [number, number, number]): string {
@@ -125,7 +126,14 @@ export interface PdfSection {
   heading?: string;
   lines?: string[];
   pairs?: Array<[string, string, string?, string?]>;
-  table?: { headers: string[]; rows: string[][]; total?: string[]; aligns?: Array<'l' | 'r'> };
+  table?: {
+    headers: string[];
+    rows: string[][];
+    total?: string[];
+    aligns?: Array<'l' | 'r'>;
+    /** Relative column weights — preferred over auto sizing for Form 6 / MRN tables. */
+    colWeights?: number[];
+  };
 }
 
 export interface PdfLetterhead {
@@ -372,11 +380,16 @@ class Painter {
   }
 
   band(label: string) {
-    this.ensure(28);
+    const lines = wrapLine(String(label ?? '').toUpperCase(), charsForWidth(CONTENT_W - 16, 8.5));
+    const bandH = 10 + lines.length * 11;
+    this.ensure(bandH + 12);
     this.y -= 6;
-    this.fillRect(MARGIN_X, this.y - 4, CONTENT_W, 16, BAND);
-    this.text('F2', 8.5, MARGIN_X + 6, this.y, label.toUpperCase(), GREEN_DARK);
-    this.y -= 22;
+    this.fillRect(MARGIN_X, this.y - 4 - (bandH - 16), CONTENT_W, bandH, BAND);
+    for (const line of lines) {
+      this.text('F2', 8.5, MARGIN_X + 6, this.y, line, GREEN_DARK);
+      this.y -= 11;
+    }
+    this.y -= 8;
   }
 
   pair(l1: string, v1: string, l2?: string, v2?: string) {
@@ -426,51 +439,114 @@ class Painter {
 
   table(table: NonNullable<PdfSection['table']>) {
     const cols = table.headers.length;
-    const widths = table.headers.map((_, i) => {
-      const weight = Math.max(
-        table.headers[i].length,
-        ...table.rows.map((r) => String(r[i] ?? '').length),
-        // Prefer readable description / vehicle columns over tiny numeric ones.
-        i === 0 || /desc|name|vehicle|driver|fraction/i.test(table.headers[i]) ? 18 : 6,
-      );
-      return weight;
-    });
-    const sumW = widths.reduce((a, b) => a + b, 0) || 1;
-    const colW = widths.map((w) => (w / sumW) * CONTENT_W);
     const aligns = table.aligns ?? table.headers.map((_, i) => (i === cols - 1 ? 'r' : 'l'));
+    const headerSize = 7;
     const cellSize = 7.4;
+    const pad = 10;
 
-    const rowLineCounts = table.rows.map((row) =>
-      Math.max(
-        1,
-        ...row.map((cell, i) => wrapLine(String(cell ?? '—'), charsForWidth(colW[i] - 8, cellSize)).length),
-      ),
+    const headerMin = table.headers.map(
+      (h) => textWidth(h.toUpperCase(), headerSize, true) + pad + 4,
     );
-    const approxH = 28 + rowLineCounts.reduce((a, n) => a + n * 11, 0);
-    this.ensure(Math.min(approxH, 120));
-    this.y -= 4;
-    this.fillRect(MARGIN_X, this.y - 4, CONTENT_W, 16, GREEN);
-    let x = MARGIN_X;
-    table.headers.forEach((h, i) => {
-      const ax = aligns[i] === 'r' ? x + colW[i] - 4 : x + 4;
-      const headerMax = charsForWidth(colW[i] - 8, 7);
-      this.text('F2', 7, ax, this.y, h.toUpperCase().slice(0, headerMax), WHITE, aligns[i] === 'r' ? 'r' : 'l');
-      x += colW[i];
+
+    let colW: number[];
+    if (table.colWeights && table.colWeights.length === cols) {
+      const sum = table.colWeights.reduce((a, b) => a + b, 0) || 1;
+      colW = table.colWeights.map((w) => (w / sum) * CONTENT_W);
+      // Guarantee every header fits — borrow from the widest spare column.
+      for (let i = 0; i < cols; i++) {
+        if (colW[i] + 0.01 >= headerMin[i]) continue;
+        const need = headerMin[i] - colW[i];
+        let donor = -1;
+        let donorSpare = 0;
+        for (let j = 0; j < cols; j++) {
+          if (j === i) continue;
+          const spare = colW[j] - headerMin[j];
+          if (spare > donorSpare) {
+            donorSpare = spare;
+            donor = j;
+          }
+        }
+        if (donor >= 0 && donorSpare > 0) {
+          const take = Math.min(need, donorSpare);
+          colW[i] += take;
+          colW[donor] -= take;
+        } else {
+          colW[i] = headerMin[i];
+        }
+      }
+      const total = colW.reduce((a, b) => a + b, 0) || 1;
+      colW = colW.map((w) => (w / total) * CONTENT_W);
+    } else {
+      const isFlex = (header: string, i: number) =>
+        i === 0 || /desc|name|vehicle|driver|fraction|address|phone/i.test(header);
+      const minW = table.headers.map((h, i) => {
+        const dataNeed = isFlex(h, i)
+          ? 64
+          : Math.min(
+              110,
+              Math.max(
+                ...table.rows.map((r) => textWidth(String(r[i] ?? '—'), cellSize) + pad),
+                headerMin[i],
+              ),
+            );
+        return Math.max(headerMin[i], dataNeed, 48);
+      });
+      const sumMin = minW.reduce((a, b) => a + b, 0);
+      if (sumMin > CONTENT_W) {
+        colW = minW.map((w) => (w / sumMin) * CONTENT_W);
+      } else {
+        colW = [...minW];
+        const extra = CONTENT_W - sumMin;
+        const flexIdx = table.headers.map((h, i) => (isFlex(h, i) ? i : -1)).filter((i) => i >= 0);
+        const targets = flexIdx.length ? flexIdx : table.headers.map((_, i) => i);
+        const each = extra / targets.length;
+        for (const i of targets) colW[i] += each;
+      }
+    }
+
+    // Prefer single-line headers; only wrap if the column is still too narrow after weighting.
+    const headerLines = table.headers.map((h, i) => {
+      const max = charsForWidth(Math.max(16, colW[i] - pad), headerSize);
+      const upper = h.toUpperCase();
+      if (upper.length <= max) return [upper];
+      return wrapLine(upper, max);
     });
-    this.y -= 16;
+    const headerRowLines = Math.max(1, ...headerLines.map((l) => l.length));
+    const headerBandH = 12 + headerRowLines * 10;
+
+    this.ensure(headerBandH + 24);
+    this.y -= 4;
+    this.fillRect(MARGIN_X, this.y - 4 - (headerBandH - 16), CONTENT_W, headerBandH, GREEN);
+
+    for (let li = 0; li < headerRowLines; li++) {
+      let x = MARGIN_X;
+      headerLines.forEach((lines, i) => {
+        const ax = aligns[i] === 'r' ? x + colW[i] - 5 : x + 5;
+        if (lines[li]) {
+          this.text('F2', headerSize, ax, this.y, lines[li], WHITE, aligns[i] === 'r' ? 'r' : 'l');
+        }
+        x += colW[i];
+      });
+      this.y -= 10;
+    }
+    this.y -= 6;
 
     table.rows.forEach((row, ri) => {
-      const cellLines = row.map((cell, i) =>
-        wrapLine(String(cell ?? '—'), charsForWidth(colW[i] - 8, cellSize)),
-      );
+      const cellLines = row.map((cell, i) => {
+        const raw = String(cell ?? '—');
+        const max = charsForWidth(Math.max(14, colW[i] - pad), cellSize);
+        // Keep compact tokens (phones, slip nos, codes) on one line when possible.
+        if (raw.length <= max) return [raw];
+        return wrapLine(raw, max);
+      });
       const lines = Math.max(1, ...cellLines.map((l) => l.length));
       this.ensure(10 + lines * 11);
       const rowH = lines * 11 + 2;
       if (ri % 2) this.fillRect(MARGIN_X, this.y - 4 - (rowH - 14), CONTENT_W, rowH, [0.976, 0.976, 0.965]);
       for (let li = 0; li < lines; li++) {
-        x = MARGIN_X;
+        let x = MARGIN_X;
         cellLines.forEach((wrapped, i) => {
-          const ax = aligns[i] === 'r' ? x + colW[i] - 4 : x + 4;
+          const ax = aligns[i] === 'r' ? x + colW[i] - 5 : x + 5;
           if (wrapped[li]) {
             this.text('F1', cellSize, ax, this.y, wrapped[li], BLACK, aligns[i] === 'r' ? 'r' : 'l');
           }
@@ -484,10 +560,15 @@ class Painter {
     if (table.total) {
       this.ensure(18);
       this.strokeLine(MARGIN_X, this.y + 8, MARGIN_X + CONTENT_W, this.y + 8);
-      x = MARGIN_X;
+      let x = MARGIN_X;
       table.total.forEach((cell, i) => {
-        const ax = aligns[i] === 'r' ? x + colW[i] - 4 : x + 4;
-        if (cell) this.text('F2', 8, ax, this.y, String(cell), BLACK, aligns[i] === 'r' ? 'r' : 'l');
+        const ax = aligns[i] === 'r' ? x + colW[i] - 5 : x + 5;
+        const label = String(cell ?? '');
+        if (label) {
+          const max = charsForWidth(Math.max(14, colW[i] - pad), 8);
+          const shown = label.length <= max ? label : wrapLine(label, max)[0];
+          this.text('F2', 8, ax, this.y, shown, BLACK, aligns[i] === 'r' ? 'r' : 'l');
+        }
         x += colW[i];
       });
       this.y -= 16;

@@ -184,7 +184,7 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
       {
         heading: 'VEHICLES & WEIGHMENT',
         table: {
-          headers: ['Vehicle', 'Driver', 'Phone', 'Gross', 'Tare', 'Net kg', 'Slip'],
+          headers: ['Vehicle', 'Driver', 'Phone', 'Gross', 'Tare', 'Net', 'Slip No.'],
           rows: vehs.length
             ? vehs.map((v) => [
                 v.registration,
@@ -198,17 +198,19 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
             : [['—', '—', '—', '—', '—', '—', '—']],
           total: ['TOTAL', '', '', '', '', num(netTotal), ''],
           aligns: ['l', 'l', 'l', 'r', 'r', 'r', 'l'],
+          colWeights: [1.05, 1.25, 1.25, 0.7, 0.7, 0.7, 1.05],
         },
       },
       {
         heading: 'MATERIALS RECEIVED',
         table: {
-          headers: ['Description', 'Qty', 'Weight kg'],
+          headers: ['Description', 'Qty', 'Wt (kg)'],
           rows: mats.length
             ? mats.map((m) => [String(m.n || '—'), String(m.q ?? 0), num(m.w)])
             : [['—', '—', '—']],
           total: ['TOTAL RECEIVED', String(receivedQty), num(receivedKg)],
           aligns: ['l', 'r', 'r'],
+          colWeights: [3.2, 0.7, 1.0],
         },
       },
       {
@@ -339,7 +341,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
       {
         heading: 'TRANSPORTER / VEHICLES ON THIS MANIFEST',
         table: {
-          headers: ['Vehicle', 'Driver', 'Phone', 'Net kg', 'Slip'],
+          headers: ['Vehicle', 'Driver', 'Phone', 'Net (kg)', 'Slip No.'],
           rows: formVehicles.length
             ? formVehicles.map((v) => [
                 v.registration,
@@ -350,12 +352,13 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
               ])
             : [['—', '—', '—', '—', '—']],
           aligns: ['l', 'l', 'l', 'r', 'l'],
+          colWeights: [1.15, 1.35, 1.35, 0.85, 1.1],
         },
       },
       {
         heading: 'E-WASTE CATEGORIES PROCESSED (SCHEDULE I)',
         table: {
-          headers: ['Entry', 'Description', 'Group', 'Weight (kg)'],
+          headers: ['Entry ID', 'Description', 'Group', 'Wt (kg)'],
           rows: cats.map((c) => [
             c.entryId,
             c.category?.description || '—',
@@ -364,12 +367,13 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ]),
           total: ['TOTAL', '', '', num(catTotal)],
           aligns: ['l', 'l', 'l', 'r'],
+          colWeights: [1.05, 2.55, 0.7, 0.9],
         },
       },
       {
         heading: 'MATERIAL RECOVERY',
         table: {
-          headers: ['Fraction', 'Weight (kg)', 'Share'],
+          headers: ['Fraction', 'Wt (kg)', 'Share %'],
           rows: [
             ['Ferrous metals', num(fe), sum ? `${((fe / sum) * 100).toFixed(1)}%` : '—'],
             ['Non-ferrous metals', num(nfe), sum ? `${((nfe / sum) * 100).toFixed(1)}%` : '—'],
@@ -378,6 +382,7 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ],
           total: ['TOTAL RECOVERED', num(sum), sum ? '100.0%' : '—'],
           aligns: ['l', 'r', 'r'],
+          colWeights: [2.6, 1.1, 1.0],
         },
       },
       {
