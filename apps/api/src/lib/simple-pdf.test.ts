@@ -139,37 +139,28 @@ describe('simple-pdf', () => {
     expect(texts).toContain('TOTAL RECOVERED');
   });
 
-  it('wraps long pair values instead of truncating at 52 characters', () => {
-    const longAddr =
-      'Plot 47, KIADB Aerospace Park, Devanahalli, Bengaluru Rural, Karnataka 562110, India — Gate B';
+  it('prints MRN facility name once in the subtitle (address only in body)', () => {
+    const addr = 'KIADB Aerospace Park, Devanahalli, Bengaluru Rural, Karnataka 562110';
     const buf = buildTextPdf(
       'MATERIAL RECEIPT NOTE',
-      'Receiving facility test',
+      'Receiving facility: KIADB Aerospace Park',
       [
         {
           heading: 'RECEIVING FACILITY',
           pairs: [
-            ['Facility address', longAddr],
-            [
-              'CPCB / EPR Authorisation',
-              'CPCB/EPR/2022/KA/00817',
-              'State PCB Consent',
-              'KSPCB/HWM/AUTH/2024-27/1142',
-            ],
+            ['Facility', 'KIADB Aerospace Park', 'Facility Code', 'URB-ASP1'],
+            ['Facility address', addr],
           ],
         },
       ],
-      'MRN test footer',
-      {
-        name: 'Urbeno Private Limited',
-        address: longAddr,
-        variant: 'document',
-      },
+      'footer',
+      { name: 'Urbeno Private Limited', variant: 'document' },
     );
-
-    const latin1 = buf.toString('latin1');
-    expect(latin1).toContain('Devanahalli');
-    expect(latin1).toContain('562110');
-    expect(latin1).toContain('Gate B');
+    const texts = pdfTexts(buf);
+    const subtitleHits = texts.filter((t) => t.includes('Receiving facility:'));
+    expect(subtitleHits).toHaveLength(1);
+    expect(subtitleHits[0]).toBe('Receiving facility: KIADB Aerospace Park');
+    expect(subtitleHits[0]).not.toContain('Devanahalli');
+    expect(texts.filter((t) => t.includes('Devanahalli')).length).toBeGreaterThanOrEqual(1);
   });
 });

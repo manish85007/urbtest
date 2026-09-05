@@ -290,31 +290,34 @@ class Painter {
 
   drawDocumentLetterhead(first: boolean) {
     const lh = this.letterhead!;
-    const maxH = first ? (lh.logoMaxHeight ?? 36) : 20;
-    const maxW = first ? (lh.logoMaxWidth ?? 150) : 90;
-    let logoH = 0;
-    if (this.jpeg) {
-      const scale = Math.min(maxH / this.jpeg.h, maxW / this.jpeg.w, 1);
-      const w = this.jpeg.w * scale;
-      const h = this.jpeg.h * scale;
-      logoH = h;
-      const x = MARGIN_X;
-      const y = PAGE_H - 16 - h;
-      this.ops.push('q', `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm`, '/Im1 Do', 'Q');
-    } else if (first) {
-      this.text('F2', 14, MARGIN_X, PAGE_H - 22, lh.name, GREEN_DARK);
-      if (lh.brand) this.text('F1', 8, MARGIN_X, PAGE_H - 34, lh.brand, MUTED);
-      logoH = 28;
-    }
 
     if (first) {
+      const maxH = lh.logoMaxHeight ?? 36;
+      const maxW = lh.logoMaxWidth ?? 150;
+      let logoH = 0;
+      if (this.jpeg) {
+        const scale = Math.min(maxH / this.jpeg.h, maxW / this.jpeg.w, 1);
+        const w = this.jpeg.w * scale;
+        const h = this.jpeg.h * scale;
+        logoH = h;
+        this.ops.push(
+          'q',
+          `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${MARGIN_X.toFixed(2)} ${(PAGE_H - 16 - h).toFixed(2)} cm`,
+          '/Im1 Do',
+          'Q',
+        );
+      } else {
+        this.text('F2', 14, MARGIN_X, PAGE_H - 22, lh.name, GREEN_DARK);
+        if (lh.brand) this.text('F1', 8, MARGIN_X, PAGE_H - 34, lh.brand, MUTED);
+        logoH = 28;
+      }
+
       if (lh.docNo) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 20, lh.docNo, GREEN_DARK, 'r');
       if (lh.docLabel) this.text('F2', 9, PAGE_W - MARGIN_X, PAGE_H - 34, lh.docLabel, GREEN, 'r');
       if (lh.docDate) this.text('F1', 7.5, PAGE_W - MARGIN_X, PAGE_H - 46, lh.docDate, MUTED, 'r');
 
-      // Statutory lines under the logo (Masters → Company profile).
       let metaY = PAGE_H - Math.max(logoH + 22, 54);
-      const metaMax = charsForWidth(CONTENT_W - 160, 7.2); // leave room for doc meta on the right
+      const metaMax = charsForWidth(CONTENT_W - 160, 7.2);
       if (lh.address) {
         for (const line of wrapLine(lh.address, metaMax)) {
           this.text('F1', 7.2, MARGIN_X, metaY, line, MUTED);
@@ -360,13 +363,30 @@ class Painter {
       } else {
         this.y = ruleY - 48;
       }
-    } else {
-      if (!this.jpeg) this.text('F2', 10, MARGIN_X, PAGE_H - 18, lh.name, GREEN_DARK);
-      if (lh.docNo) this.text('F1', 8, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, GREEN_DARK, 'r');
-      const ruleY = PAGE_H - Math.max(logoH + 20, 36);
-      this.fillRect(MARGIN_X, ruleY, CONTENT_W, 1, GREEN);
-      this.y = ruleY - 16;
+      return;
     }
+
+    // Continuation pages — compact header and generous gap before body content.
+    let headerBottom = PAGE_H - 36;
+    if (this.jpeg) {
+      const maxH = 20;
+      const maxW = 90;
+      const scale = Math.min(maxH / this.jpeg.h, maxW / this.jpeg.w, 1);
+      const w = this.jpeg.w * scale;
+      const h = this.jpeg.h * scale;
+      this.ops.push(
+        'q',
+        `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${MARGIN_X.toFixed(2)} ${(PAGE_H - 14 - h).toFixed(2)} cm`,
+        '/Im1 Do',
+        'Q',
+      );
+      headerBottom = PAGE_H - h - 24;
+    } else {
+      this.text('F2', 10, MARGIN_X, PAGE_H - 18, lh.name, GREEN_DARK);
+    }
+    if (lh.docNo) this.text('F1', 8, PAGE_W - MARGIN_X, PAGE_H - 18, lh.docNo, GREEN_DARK, 'r');
+    this.fillRect(MARGIN_X, headerBottom, CONTENT_W, 1, GREEN);
+    this.y = headerBottom - 22;
   }
 
   drawPlainTitle() {
@@ -381,15 +401,21 @@ class Painter {
 
   band(label: string) {
     const lines = wrapLine(String(label ?? '').toUpperCase(), charsForWidth(CONTENT_W - 16, 8.5));
-    const bandH = 10 + lines.length * 11;
-    this.ensure(bandH + 12);
-    this.y -= 6;
-    this.fillRect(MARGIN_X, this.y - 4 - (bandH - 16), CONTENT_W, bandH, BAND);
+    const lineH = 11;
+    const padY = 5;
+    const bandH = padY + lines.length * lineH + padY;
+    this.ensure(bandH + 20);
+    this.y -= 10;
+    const top = this.y;
+    const bottom = top - bandH;
+    this.fillRect(MARGIN_X, bottom, CONTENT_W, bandH, BAND);
+    let ty = top - padY - 8;
     for (const line of lines) {
-      this.text('F2', 8.5, MARGIN_X + 6, this.y, line, GREEN_DARK);
-      this.y -= 11;
+      this.text('F2', 8.5, MARGIN_X + 6, ty, line, GREEN_DARK);
+      ty -= lineH;
     }
-    this.y -= 8;
+    // Clear gap under the section band before pairs/tables.
+    this.y = bottom - 12;
   }
 
   pair(l1: string, v1: string, l2?: string, v2?: string) {
@@ -407,7 +433,7 @@ class Painter {
     const rightLines = dual ? wrapLine(String(v2 ?? '—'), rightMax) : [];
     const rows = Math.max(leftLines.length, rightLines.length, 1);
 
-    this.ensure(18 + rows * 12);
+    this.ensure(20 + rows * 12);
     this.text('F2', labelSize, MARGIN_X, this.y, String(l1 ?? '').toUpperCase().slice(0, labelMax), LABEL);
     if (dual) {
       this.text(
@@ -426,7 +452,7 @@ class Painter {
       if (dual && rightLines[i]) this.text('F1', valueSize, COL2_X, this.y, rightLines[i]);
       this.y -= 12;
     }
-    this.y -= 6;
+    this.y -= 8;
   }
 
   paragraph(line: string) {
@@ -452,7 +478,6 @@ class Painter {
     if (table.colWeights && table.colWeights.length === cols) {
       const sum = table.colWeights.reduce((a, b) => a + b, 0) || 1;
       colW = table.colWeights.map((w) => (w / sum) * CONTENT_W);
-      // Guarantee every header fits — borrow from the widest spare column.
       for (let i = 0; i < cols; i++) {
         if (colW[i] + 0.01 >= headerMin[i]) continue;
         const need = headerMin[i] - colW[i];
@@ -504,7 +529,6 @@ class Painter {
       }
     }
 
-    // Prefer single-line headers; only wrap if the column is still too narrow after weighting.
     const headerLines = table.headers.map((h, i) => {
       const max = charsForWidth(Math.max(16, colW[i] - pad), headerSize);
       const upper = h.toUpperCase();
@@ -512,54 +536,65 @@ class Painter {
       return wrapLine(upper, max);
     });
     const headerRowLines = Math.max(1, ...headerLines.map((l) => l.length));
-    const headerBandH = 12 + headerRowLines * 10;
+    const headerLineH = 10;
+    const headerPadY = 6;
+    const headerBandH = headerPadY + headerRowLines * headerLineH + headerPadY;
 
-    this.ensure(headerBandH + 24);
+    // Keep section table header + first data row together (avoids clipped page-2 starts).
+    this.ensure(headerBandH + 36);
     this.y -= 4;
-    this.fillRect(MARGIN_X, this.y - 4 - (headerBandH - 16), CONTENT_W, headerBandH, GREEN);
+    const headerTop = this.y;
+    const headerBottom = headerTop - headerBandH;
+    this.fillRect(MARGIN_X, headerBottom, CONTENT_W, headerBandH, GREEN);
 
+    let hy = headerTop - headerPadY - 7;
     for (let li = 0; li < headerRowLines; li++) {
       let x = MARGIN_X;
       headerLines.forEach((lines, i) => {
         const ax = aligns[i] === 'r' ? x + colW[i] - 5 : x + 5;
         if (lines[li]) {
-          this.text('F2', headerSize, ax, this.y, lines[li], WHITE, aligns[i] === 'r' ? 'r' : 'l');
+          this.text('F2', headerSize, ax, hy, lines[li], WHITE, aligns[i] === 'r' ? 'r' : 'l');
         }
         x += colW[i];
       });
-      this.y -= 10;
+      hy -= headerLineH;
     }
-    this.y -= 6;
+    // Start body clearly below the green header bar.
+    this.y = headerBottom - 14;
 
     table.rows.forEach((row, ri) => {
       const cellLines = row.map((cell, i) => {
         const raw = String(cell ?? '—');
         const max = charsForWidth(Math.max(14, colW[i] - pad), cellSize);
-        // Keep compact tokens (phones, slip nos, codes) on one line when possible.
         if (raw.length <= max) return [raw];
         return wrapLine(raw, max);
       });
       const lines = Math.max(1, ...cellLines.map((l) => l.length));
-      this.ensure(10 + lines * 11);
-      const rowH = lines * 11 + 2;
-      if (ri % 2) this.fillRect(MARGIN_X, this.y - 4 - (rowH - 14), CONTENT_W, rowH, [0.976, 0.976, 0.965]);
+      const rowH = lines * 12 + 4;
+      this.ensure(rowH + 8);
+      const rowTop = this.y;
+      const rowBottom = rowTop - rowH;
+      if (ri % 2) this.fillRect(MARGIN_X, rowBottom, CONTENT_W, rowH, [0.976, 0.976, 0.965]);
+      let ry = rowTop - 10;
       for (let li = 0; li < lines; li++) {
         let x = MARGIN_X;
         cellLines.forEach((wrapped, i) => {
           const ax = aligns[i] === 'r' ? x + colW[i] - 5 : x + 5;
           if (wrapped[li]) {
-            this.text('F1', cellSize, ax, this.y, wrapped[li], BLACK, aligns[i] === 'r' ? 'r' : 'l');
+            this.text('F1', cellSize, ax, ry, wrapped[li], BLACK, aligns[i] === 'r' ? 'r' : 'l');
           }
           x += colW[i];
         });
-        this.y -= 11;
+        ry -= 12;
       }
-      this.y -= 2;
+      this.y = rowBottom - 2;
     });
 
     if (table.total) {
-      this.ensure(18);
-      this.strokeLine(MARGIN_X, this.y + 8, MARGIN_X + CONTENT_W, this.y + 8);
+      this.ensure(22);
+      this.y -= 4;
+      this.strokeLine(MARGIN_X, this.y + 2, MARGIN_X + CONTENT_W, this.y + 2);
+      this.y -= 12;
       let x = MARGIN_X;
       table.total.forEach((cell, i) => {
         const ax = aligns[i] === 'r' ? x + colW[i] - 5 : x + 5;
@@ -573,7 +608,7 @@ class Painter {
       });
       this.y -= 16;
     }
-    this.y -= 4;
+    this.y -= 8;
   }
 }
 

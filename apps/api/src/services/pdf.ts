@@ -153,11 +153,12 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
   const receivedKg = mats.reduce((s, m) => s + Number(m.w ?? 0), 0);
   const receivedQty = mats.reduce((s, m) => s + Number(m.q ?? 0), 0);
   const netTotal = vehs.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
-  const facilityLine = [factory?.name ?? mrn.factoryId, factory?.address].filter(Boolean).join(' · ');
+  // Subtitle is facility name only — full address is printed once under RECEIVING FACILITY.
+  const facilityName = factory?.name ?? mrn.factoryId;
 
   const buffer = buildTextPdf(
     'MATERIAL RECEIPT NOTE',
-    `Receiving facility: ${facilityLine}`,
+    `Receiving facility: ${facilityName}`,
     [
       {
         heading: 'REFERENCE',
@@ -174,7 +175,7 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
       {
         heading: 'RECEIVING FACILITY',
         pairs: [
-          ['Facility', factory?.name ?? mrn.factoryId, 'Facility Code', mrn.factoryId],
+          ['Facility', facilityName, 'Facility Code', mrn.factoryId],
           ['Facility address', factory?.address || '—'],
           ['Facility GST', factory?.gstin || co.gst || '—'],
           ['CPCB / EPR Authorisation', licenses.cpcb],
