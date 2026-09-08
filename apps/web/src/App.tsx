@@ -217,7 +217,10 @@ export function App() {
             </AdminOrAuditor>
           }
         />
-        <Route path="/profile" element={<ProfilePage user={user} />} />
+        <Route
+          path="/profile"
+          element={<ProfilePage user={user} onUserUpdate={setUser} />}
+        />
         <Route path="/legal/:key" element={<LegalPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

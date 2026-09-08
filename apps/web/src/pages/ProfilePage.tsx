@@ -6,6 +6,7 @@ import { roleLabel } from '../lib/roles';
 
 interface ProfilePageProps {
   user: SessionUser;
+  onUserUpdate?: (user: SessionUser) => void;
 }
 
 const ROLE_LABEL: Record<SessionUser['role'], string> = {
@@ -17,22 +18,56 @@ const ROLE_LABEL: Record<SessionUser['role'], string> = {
   auditor: roleLabel('auditor'),
 };
 
+const EMAIL_PREF_OPTIONS: Array<{
+  value: NonNullable<SessionUser['emailNotifyMode']>;
+  title: string;
+  detail: string;
+}> = [
+  {
+    value: 'all',
+    title: 'All emails',
+    detail: 'Request updates, documents, impact shares, and announcements.',
+  },
+  {
+    value: 'important_only',
+    title: 'Important only',
+    detail:
+      'Acknowledgement, vehicle assignment, changes requested, Form 6, and Certificate of Destruction.',
+  },
+  {
+    value: 'none',
+    title: 'None (except sign-in & security)',
+    detail: 'Password reset and one-time codes still arrive. No request or document emails.',
+  },
+];
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '--';
 }
 
-export function ProfilePage({ user }: ProfilePageProps) {
+export function ProfilePage({ user, onUserUpdate }: ProfilePageProps) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [company, setCompany] = useState<CompanyProfile | null>(null);
+  const [emailMode, setEmailMode] = useState<NonNullable<SessionUser['emailNotifyMode']>>(
+    user.emailNotifyMode ?? 'all',
+  );
+  const [emailMsg, setEmailMsg] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
+  const isClientPortal = user.role === 'client' || user.role === 'client_readonly';
 
   useEffect(() => {
     dataApi.company().then(setCompany).catch(() => setCompany(null));
   }, []);
+
+  useEffect(() => {
+    setEmailMode(user.emailNotifyMode ?? 'all');
+  }, [user.emailNotifyMode]);
 
   const support = company ?? {
     name: COMPANY.name,
@@ -65,6 +100,23 @@ export function ProfilePage({ user }: ProfilePageProps) {
       setConfirm('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Password change failed');
+    }
+  }
+
+  async function saveEmailPrefs(mode: NonNullable<SessionUser['emailNotifyMode']>) {
+    setEmailMsg('');
+    setEmailError('');
+    setEmailSaving(true);
+    setEmailMode(mode);
+    try {
+      const res = await authApi.updateEmailPreferences(mode);
+      onUserUpdate?.(res.user);
+      setEmailMsg('Email preferences saved.');
+    } catch (err) {
+      setEmailMode(user.emailNotifyMode ?? 'all');
+      setEmailError(err instanceof Error ? err.message : 'Could not save preferences');
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -107,6 +159,60 @@ export function ProfilePage({ user }: ProfilePageProps) {
               ) : null}
             </div>
           </div>
+
+          {isClientPortal ? (
+            <div className="card">
+              <div className="card-ttl">Email notifications</div>
+              <p className="dim" style={{ fontSize: '.82rem', margin: '.35rem 0 .7rem' }}>
+                Choose which Urb TecTrack emails you receive. Sign-in codes and password resets are
+                always sent.
+              </p>
+              <div style={{ display: 'grid', gap: '.55rem' }}>
+                {EMAIL_PREF_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '.55rem',
+                      padding: '.55rem .65rem',
+                      border: '1px solid var(--line, #d8dde3)',
+                      borderRadius: 8,
+                      cursor: emailSaving ? 'wait' : 'pointer',
+                      background:
+                        emailMode === opt.value ? 'rgba(46, 125, 50, 0.06)' : 'transparent',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="emailNotifyMode"
+                      value={opt.value}
+                      checked={emailMode === opt.value}
+                      disabled={emailSaving}
+                      onChange={() => void saveEmailPrefs(opt.value)}
+                      style={{ flex: 'none', marginTop: '.2rem' }}
+                    />
+                    <span>
+                      <strong style={{ display: 'block', fontSize: '.9rem' }}>{opt.title}</strong>
+                      <span className="dim" style={{ fontSize: '.78rem' }}>
+                        {opt.detail}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {emailMsg ? (
+                <div className="ok-msg sm" style={{ marginTop: '.55rem' }}>
+                  {emailMsg}
+                </div>
+              ) : null}
+              {emailError ? (
+                <div className="err" style={{ marginTop: '.55rem' }}>
+                  {emailError}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {(user.role === 'admin' || user.role === 'operations' || user.role === 'factory') ? (
             <div className="card">

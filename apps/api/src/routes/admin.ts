@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { attachSession, requireAdmin } from '../middleware/session.js';
 import { runReminders } from '../services/reminders.js';
-import { processEmailQueue } from '../services/email.js';
+import { processEmailQueue, filterRecipientsByEmailPrefs } from '../services/email.js';
 import { prisma } from '../lib/prisma.js';
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -60,15 +60,21 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     if (sendEmail) {
-      // Fetch all active client users' emails
+      // Active client users — each person's emailNotifyMode is respected.
       const clients = await prisma.user.findMany({
-        where: { role: 'client' },
+        where: { role: 'client', active: true },
         select: { email: true, name: true },
       });
+      const { allowed } = await filterRecipientsByEmailPrefs(
+        'announcement',
+        clients.map((u) => u.email),
+      );
+      const allow = new Set(allowed.map((e) => e.toLowerCase()));
 
       const startStr = new Date(startsAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       const endStr = new Date(endsAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       for (const u of clients) {
+        if (!allow.has(u.email.toLowerCase())) continue;
         await prisma.emailOutbox.create({
           data: {
             templateKey: 'announcement',

@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import {
   MFA_GRACE_DAYS,
   PW_POLICY,
+  isClientPortalRole,
   mfaEnrolForced,
   mfaGraceDaysLeft,
   mfaRequired,
@@ -19,6 +20,7 @@ import { auditLog } from './audit.js';
 import { recordSecurityEvent } from './security-log.js';
 import type { SessionUser } from '../lib/auth-context.js';
 import { enrichSessionUser } from '../lib/auth-context.js';
+import type { EmailNotifyMode } from './email-preferences.js';
 import {
   emailOtpDue,
   issueLoginEmailOtp,
@@ -378,6 +380,25 @@ export async function changePassword(actor: SessionUser, current: string, next: 
   });
   await recordSecurityEvent('auth.password.changed', actor.email, {});
   return { ok: true };
+}
+
+export async function updateEmailNotifyMode(actor: SessionUser, mode: EmailNotifyMode) {
+  if (!isClientPortalRole(actor.role)) {
+    throw new AppError('Email preferences are only available for client portal users.');
+  }
+  const updated = await prisma.user.update({
+    where: { id: actor.id },
+    data: { emailNotifyMode: mode },
+  });
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'auth.email_prefs',
+    entity: 'user',
+    entityId: actor.email,
+    details: { emailNotifyMode: mode },
+  });
+  return { user: await enrichSessionUser(updated) };
 }
 
 export async function startMfaEnrol(actor: SessionUser, method: MfaMethod = 'totp') {

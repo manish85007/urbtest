@@ -3,11 +3,17 @@ import { mergeTemplate } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
 import { deliverEmail } from './email-provider.js';
+import {
+  ALWAYS_SEND_EMAIL_TEMPLATES,
+  allowsClientEmail,
+  type EmailNotifyMode,
+} from './email-preferences.js';
 
 const PORTAL_URL = process.env.PORTAL_URL ?? 'http://localhost:5173';
 const CONTACT_EMAIL = process.env.URBENO_EMAIL ?? 'info@urbeno.in';
 
 const STAFF_ALERT_TEMPLATES = new Set(['request_new_admin']);
+const CLIENT_PORTAL_ROLES = ['client', 'client_readonly'] as const;
 const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: string }> = {
   request_new_client: {
     name: 'New Request Confirmation',
@@ -156,6 +162,42 @@ async function resolveRecipients(templateKey: string, to: string[]): Promise<str
   return [];
 }
 
+/**
+ * Drop client portal recipients who opted out of this template.
+ * Non-portal addresses (site contacts, staff) are never filtered here.
+ */
+export async function filterRecipientsByEmailPrefs(
+  templateKey: string,
+  emails: string[],
+): Promise<{ allowed: string[]; skipped: string[] }> {
+  const unique = [...new Set(emails.map((e) => e.trim()).filter(Boolean))];
+  if (!unique.length) return { allowed: [], skipped: [] };
+  if (ALWAYS_SEND_EMAIL_TEMPLATES.has(templateKey)) {
+    return { allowed: unique, skipped: [] };
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      email: { in: unique, mode: 'insensitive' },
+      role: { in: [...CLIENT_PORTAL_ROLES] },
+      active: true,
+    },
+    select: { email: true, emailNotifyMode: true },
+  });
+  const byEmail = new Map(
+    users.map((u) => [u.email.toLowerCase(), u.emailNotifyMode as EmailNotifyMode]),
+  );
+
+  const allowed: string[] = [];
+  const skipped: string[] = [];
+  for (const email of unique) {
+    const mode = byEmail.get(email.toLowerCase());
+    if (!mode || allowsClientEmail(mode, templateKey)) allowed.push(email);
+    else skipped.push(email);
+  }
+  return { allowed, skipped };
+}
+
 /** Queue a transactional email — async delivery via processEmailQueue(). */
 export async function sendTransactionalEmail(
   templateKey: string,
@@ -178,7 +220,20 @@ export async function sendTransactionalEmail(
     return null;
   }
 
-  const recipients = await resolveRecipients(templateKey, to);
+  const resolved = await resolveRecipients(templateKey, to);
+  const { allowed: recipients, skipped } = await filterRecipientsByEmailPrefs(
+    templateKey,
+    resolved,
+  );
+  if (skipped.length) {
+    await auditLog({
+      actorEmail: 'system',
+      action: 'email.prefs_skipped',
+      entity: 'email',
+      entityId: templateKey,
+      details: { templateKey, skipped, kept: recipients },
+    });
+  }
   if (!recipients.length) return null;
 
   const mergedVars = {
@@ -207,7 +262,7 @@ export async function sendTransactionalEmail(
     action: 'email.queued',
     entity: 'email',
     entityId: record.id,
-    details: { templateKey, to: recipients, subject },
+    details: { templateKey, to: recipients, subject, skipped },
   });
 
   return record;

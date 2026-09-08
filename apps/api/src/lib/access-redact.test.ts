@@ -11,6 +11,7 @@ const client: SessionUser = {
   factoryIds: [],
   siteIds: [],
   featureAccess: null,
+  emailNotifyMode: 'all',
 };
 
 const admin: SessionUser = {
@@ -22,6 +23,7 @@ const admin: SessionUser = {
   factoryIds: [],
   siteIds: [],
   featureAccess: null,
+  emailNotifyMode: 'all',
 };
 
 type Inv = {

@@ -4,6 +4,7 @@ import {
   signIn,
   signOut,
   changePassword,
+  updateEmailNotifyMode,
   AuthError,
   startMfaEnrol,
   confirmMfaEnrol,
@@ -168,6 +169,19 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/auth/me', { preHandler: requireAuth }, async (request) => {
     const security = await securityStatusFor(request.user!);
     return { user: request.user, security };
+  });
+
+  app.patch('/auth/email-preferences', { preHandler: requireAuth }, async (request, reply) => {
+    const body = z
+      .object({
+        emailNotifyMode: z.enum(['all', 'important_only', 'none']),
+      })
+      .parse(request.body);
+    try {
+      return await updateEmailNotifyMode(request.user!, body.emailNotifyMode);
+    } catch (err) {
+      return reply.badRequest(err instanceof Error ? err.message : 'Could not update preferences');
+    }
   });
 
   app.post('/auth/change-password', { preHandler: requireAuth }, async (request, reply) => {

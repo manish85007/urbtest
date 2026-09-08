@@ -5,6 +5,7 @@ import {
   isStaffRole,
 } from '@urb-tectrack/shared';
 import { prisma } from './prisma.js';
+import type { EmailNotifyMode } from '../services/email-preferences.js';
 
 export interface SessionUser {
   id: string;
@@ -15,6 +16,7 @@ export interface SessionUser {
   factoryIds: string[];
   siteIds: string[];
   featureAccess: Record<string, boolean> | null;
+  emailNotifyMode: EmailNotifyMode;
   /** Client portal branding (client / client_readonly). */
   clientName?: string | null;
   clientLogoFileId?: string | null;
@@ -31,6 +33,7 @@ export function toSessionUser(user: User): SessionUser {
     factoryIds: user.factoryIds,
     siteIds: user.siteIds,
     featureAccess: (user.featureAccess as Record<string, boolean> | null) ?? null,
+    emailNotifyMode: (user.emailNotifyMode as EmailNotifyMode) ?? 'all',
   };
 }
 

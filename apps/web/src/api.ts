@@ -44,6 +44,8 @@ export interface SessionUser {
   factoryIds?: string[];
   siteIds?: string[];
   featureAccess?: Record<string, boolean> | null;
+  /** Client portal: all | important_only | none. Staff omit / ignore. */
+  emailNotifyMode?: 'all' | 'important_only' | 'none';
   clientName?: string | null;
   clientLogoFileId?: string | null;
   clientShowPortalLogo?: boolean;
@@ -733,6 +735,11 @@ export const authApi = {
     }),
   logout: () => api<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => api<{ user: SessionUser; security: SecurityStatus }>('/auth/me'),
+  updateEmailPreferences: (emailNotifyMode: 'all' | 'important_only' | 'none') =>
+    api<{ user: SessionUser }>('/auth/email-preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ emailNotifyMode }),
+    }),
   legalStatus: () =>
     api<{
       compliant: boolean;

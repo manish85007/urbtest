@@ -20,6 +20,13 @@ enum UserRole {
   auditor
 }
 
+/** Client portal email preference — security/auth mail always sends. */
+enum EmailNotifyMode {
+  all
+  important_only
+  none
+}
+
 enum FileKind {
   bom
   weighPhoto
@@ -119,6 +126,8 @@ model User {
   lockedUntil  DateTime? @map("locked_until")
   active       Boolean  @default(true)
   featureAccess Json?   @map("feature_access")
+  /** Portal users: which lifecycle emails to receive. Staff/auth ignore this. */
+  emailNotifyMode EmailNotifyMode @default(all) @map("email_notify_mode")
   createdAt    DateTime @default(now()) @map("created_at")
 
   client       Client?  @relation(fields: [clientId], references: [id])
