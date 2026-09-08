@@ -193,6 +193,26 @@ export function isAuditorRole(role: string): boolean {
   return role === 'auditor';
 }
 
+/** User-facing role title for portal display (no personal identity). */
+export function roleDisplayLabel(role: string): string {
+  switch (role) {
+    case 'admin':
+      return 'Super Admin';
+    case 'operations':
+      return 'Operations Manager';
+    case 'factory':
+      return 'Factory Manager';
+    case 'client':
+      return 'Client User';
+    case 'client_readonly':
+      return 'Client Read Only';
+    case 'auditor':
+      return 'Auditor';
+    default:
+      return 'Urbeno';
+  }
+}
+
 /** Urbeno mailbox required for internal roles (staff + auditor). */
 export function requiresUrbenoEmail(role: string): boolean {
   return isStaffRole(role) || isAuditorRole(role);
