@@ -69,25 +69,32 @@ const FALLBACK_TEMPLATES: Record<string, { name: string; subject: string; body: 
   },
   recycling_form6: {
     name: 'Recycling & Form 6',
-    subject: 'Form 6 {{form6_no}} issued for invoice {{invoice_no}}',
+    subject: 'Form 6 {{form6_no}} issued for invoice {{invoice_no}} — please close your request',
     body:
       'Dear {{contact_name}},\n\n' +
       'Recycling has been completed and Form 6 has been issued for request {{request_id}}.\n\n' +
       '  Form 6  : {{form6_no}}\n' +
       '  Invoice : {{invoice_no}}\n\n' +
-      '{{portal_url}}\n\nWarm regards,\nUrbeno Private Limited',
+      'Please review the documents and complete Review & Close for this request in your portal when ready:\n' +
+      '{{portal_url}}\n\n' +
+      'The request will auto-close on day 60 if it is not manually closed. Only closed requests generate Sustainability and Recycling Heroes credits for your organisation.\n\n' +
+      'Questions? {{contact_email}}\n\n' +
+      'Warm regards,\nUrbeno Private Limited\nRecycling Heroes™',
   },
   cod_generated: {
     name: 'Certificate of Destruction',
-    subject: 'Certificate {{cert_no}} issued for request {{request_id}}',
+    subject: 'Certificate {{cert_no}} issued for request {{request_id}} — please close your request',
     body:
       'Dear {{contact_name}},\n\n' +
       'The Certificate of Destruction has been uploaded for request {{request_id}}.\n\n' +
       '  Certificate : {{cert_no}}\n' +
       '  Invoice     : {{invoice_no}}\n' +
       '  Date        : {{cert_date}}\n\n' +
-      'Please review and acknowledge closure in your portal when ready:\n{{portal_url}}\n\n' +
-      'Warm regards,\nUrbeno Private Limited',
+      'Please review the certificate and complete Review & Close for this request in your portal when ready:\n' +
+      '{{portal_url}}\n\n' +
+      'The request will auto-close on day 60 if it is not manually closed. Only closed requests generate Sustainability and Recycling Heroes credits for your organisation.\n\n' +
+      'Questions? {{contact_email}}\n\n' +
+      'Warm regards,\nUrbeno Private Limited\nRecycling Heroes™',
   },
   request_closed: {
     name: 'Request Closed',

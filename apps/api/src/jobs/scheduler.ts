@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { processEmailQueue } from '../services/email.js';
 import { runRemindersIfDue } from '../services/reminders.js';
+import { runAutoCloseInvoices } from '../services/auto-close.js';
 import { purgeExpiredSessions } from '../services/legal.js';
 
 const EMAIL_POLL_MS = Number(process.env.EMAIL_POLL_MS ?? 30_000);
@@ -16,14 +17,22 @@ export function startScheduler(app: FastifyInstance) {
 
   const runDailyReminders = () => {
     runRemindersIfDue()
-      .then((r) => {
+      .then(async (r) => {
         if (!r.skipped && (r.sentPay > 0 || r.sentSla > 0)) {
           app.log.info(
             `Reminders sent — payment: ${r.sentPay}, SLA: ${r.sentSla}`,
           );
         }
+        if (!r.skipped) {
+          const auto = await runAutoCloseInvoices();
+          if (auto.closed > 0) {
+            app.log.info(
+              `Auto-closed ${auto.closed} invoice(s) after 60 days: ${auto.closedInvoiceNos.join(', ')}`,
+            );
+          }
+        }
       })
-      .catch((err) => app.log.error({ err }, 'Reminder job failed'));
+      .catch((err) => app.log.error({ err }, 'Reminder / auto-close job failed'));
   };
 
   const runSessionCleanup = () => {

@@ -216,6 +216,8 @@ export interface CloseInvoiceInput {
   rating?: number;
   note?: string;
   forced?: boolean;
+  /** Nightly job — same gates as admin force-close, recorded as auto-close. */
+  auto?: boolean;
 }
 
 function assertLifecycleDate(
@@ -1440,13 +1442,19 @@ export async function closeInvoice(
     ? (Date.now() - firstCert.getTime()) / 86400000
     : 0;
 
-  if (input.forced) {
+  if (input.forced || input.auto) {
     requireAdmin(actor);
     if (daysSinceCert < 60) {
-      throw new AppError('Admin force-close is only permitted 60 days after the first certificate.');
+      throw new AppError(
+        input.auto
+          ? 'Auto-close is only permitted 60 days after the first certificate.'
+          : 'Admin force-close is only permitted 60 days after the first certificate.',
+      );
     }
-    const conflicts = sodCheck('force-close', { invCreatedBy: invoice.createdBy }, actor.email);
-    await logSoD(actor, 'force-close', conflicts, invoice.invoiceNo);
+    if (!input.auto) {
+      const conflicts = sodCheck('force-close', { invCreatedBy: invoice.createdBy }, actor.email);
+      await logSoD(actor, 'force-close', conflicts, invoice.invoiceNo);
+    }
   } else if (isClientMutatorRole(actor.role)) {
     if (actor.clientId !== invoice.submission.clientId) {
       throw new AppError('You do not have permission to close this invoice.', 403);
@@ -1490,8 +1498,10 @@ export async function closeInvoice(
       closedAt: new Date(),
       closedBy: actor.email,
       closeRating: input.rating ?? null,
-      closeNote: input.note?.trim() || null,
-      forceClosed: !!input.forced,
+      closeNote:
+        input.note?.trim() ||
+        (input.auto ? 'Auto-closed after 60 days from first certificate.' : null),
+      forceClosed: !!(input.forced || input.auto),
     },
   });
 
@@ -1500,16 +1510,23 @@ export async function closeInvoice(
 
   await auditLog({
     actorEmail: actor.email,
-    actorId: actor.id,
-    action: 'inv.close',
+    actorId: actor.id === 'system-auto-close' ? undefined : actor.id,
+    action: input.auto ? 'inv.auto_close' : 'inv.close',
     entity: 'invoice',
     entityId: invoice.invoiceNo,
-    details: { submissionId: invoice.submissionId, forced: !!input.forced, rating: input.rating },
+    details: {
+      submissionId: invoice.submissionId,
+      forced: !!input.forced,
+      auto: !!input.auto,
+      rating: input.rating,
+    },
   });
 
   await notifyAdmins(
     'inv.closed',
-    `${invoice.invoiceNo} closed by ${actor.name}${input.rating ? ` — rated ${input.rating}/5` : ''}`,
+    input.auto
+      ? `${invoice.invoiceNo} auto-closed after 60 days from first certificate`
+      : `${invoice.invoiceNo} closed by ${actor.name}${input.rating ? ` — rated ${input.rating}/5` : ''}`,
     invoice.submissionId,
   );
   const refreshed = await loadSubmissionForActor(invoice.submissionId, actor);

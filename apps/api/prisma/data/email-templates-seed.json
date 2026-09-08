@@ -44,15 +44,15 @@
   {
     "key": "recycling_form6",
     "name": "Recycling & Form 6",
-    "subject": "Form 6 {{form6_no}} issued for invoice {{invoice_no}}",
-    "body": "Dear {{contact_name}},\n\nRecycling has been completed and Form 6 has been issued for request {{request_id}}.\n\n  Form 6  : {{form6_no}}\n  Invoice : {{invoice_no}}\n\nView documents: {{portal_url}}\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "subject": "Form 6 {{form6_no}} issued for invoice {{invoice_no}} — please close your request",
+    "body": "Dear {{contact_name}},\n\nRecycling has been completed and Form 6 has been issued for request {{request_id}}.\n\n  Form 6  : {{form6_no}}\n  Invoice : {{invoice_no}}\n\nPlease review the documents and complete Review & Close for this request in your portal when ready:\n{{portal_url}}\n\nThe request will auto-close on day 60 if it is not manually closed. Only closed requests generate Sustainability and Recycling Heroes credits for your organisation.\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
     "variables": ["request_id", "contact_name", "form6_no", "invoice_no", "portal_url", "contact_email"]
   },
   {
     "key": "cod_generated",
     "name": "Certificate of Destruction",
-    "subject": "Certificate {{cert_no}} issued for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction has been uploaded for request {{request_id}}.\n\n  Certificate : {{cert_no}}\n  Invoice     : {{invoice_no}}\n  Date        : {{cert_date}}\n\nPlease review and acknowledge closure in your portal when ready:\n{{portal_url}}\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited",
+    "subject": "Certificate {{cert_no}} issued for request {{request_id}} — please close your request",
+    "body": "Dear {{contact_name}},\n\nThe Certificate of Destruction has been uploaded for request {{request_id}}.\n\n  Certificate : {{cert_no}}\n  Invoice     : {{invoice_no}}\n  Date        : {{cert_date}}\n\nPlease review the certificate and complete Review & Close for this request in your portal when ready:\n{{portal_url}}\n\nThe request will auto-close on day 60 if it is not manually closed. Only closed requests generate Sustainability and Recycling Heroes credits for your organisation.\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
     "variables": ["request_id", "contact_name", "cert_no", "invoice_no", "cert_date", "portal_url", "contact_email"]
   },
   {

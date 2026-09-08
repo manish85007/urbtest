@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { processEmailQueue } from '../services/email.js';
 import { runRemindersIfDue } from '../services/reminders.js';
+import { runAutoCloseInvoices } from '../services/auto-close.js';
 import { purgeExpiredSessions } from '../services/legal.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
@@ -40,9 +41,19 @@ export async function jobsRoutes(app: FastifyInstance) {
 
   app.post('/internal/jobs/reminders', async (request) => {
     assertJobsAuth(request.headers.authorization);
-    const result = await runRemindersIfDue();
+    const reminders = await runRemindersIfDue();
+    const autoClose = reminders.skipped
+      ? { skipped: true as const, examined: 0, closed: 0, closedInvoiceNos: [] as string[] }
+      : await runAutoCloseInvoices();
     await markJobRun('job:reminders');
-    return { ok: true, ...result };
+    return { ok: true, reminders, autoClose };
+  });
+
+  app.post('/internal/jobs/auto-close', async (request) => {
+    assertJobsAuth(request.headers.authorization);
+    const autoClose = await runAutoCloseInvoices();
+    await markJobRun('job:auto-close');
+    return { ok: true, autoClose };
   });
 
   app.post('/internal/jobs/session-cleanup', async (request) => {

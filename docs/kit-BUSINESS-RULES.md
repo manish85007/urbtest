@@ -122,8 +122,9 @@ needing its own certificate.
 
 **C5 · Only the requestor closes a request.**
 Any client user of the same organisation may close after 30 days; an admin may
-force-close after 60, with a reason.
-`canCloseInv` · `audit6.js`
+force-close after 60, with a reason. Paid invoices that remain open 60 days after
+the first certificate are auto-closed by the nightly job.
+`canCloseInv` · `runAutoCloseInvoices` · `audit6.js`
 
 **C6 · A request cannot be closed while money is outstanding.**
 This applies to an admin force-close as well.
@@ -161,6 +162,11 @@ state change, not repeatedly.
 
 **S3 · Capacity alerts fire at 80% and 100%** of an authorised entry, per facility.
 `checkCapacityAlerts`
+
+**S4 · Auto-close runs daily** for invoices that are certified (Form 6 & CoD
+published), fully paid, and still open 60 days after the first certificate.
+The job is idempotent and records `inv.auto_close` in the audit log.
+`runAutoCloseInvoices`
 
 **Scheduled jobs must be safe to run twice.** Container platforms restart things,
 and a reminder job that reruns will email clients twice in a morning.

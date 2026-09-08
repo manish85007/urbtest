@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { attachSession, requireAdmin } from '../middleware/session.js';
 import { runReminders } from '../services/reminders.js';
+import { runAutoCloseInvoices } from '../services/auto-close.js';
 import { processEmailQueue, filterRecipientsByEmailPrefs } from '../services/email.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -9,8 +10,13 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post('/admin/jobs/reminders', { preHandler: requireAdmin }, async () => {
     const reminders = await runReminders();
+    const autoClose = await runAutoCloseInvoices();
     const email = await processEmailQueue();
-    return { reminders, email };
+    return { reminders, autoClose, email };
+  });
+
+  app.post('/admin/jobs/auto-close', { preHandler: requireAdmin }, async () => {
+    return runAutoCloseInvoices();
   });
 
   app.post('/admin/jobs/email-queue', { preHandler: requireAdmin }, async () => {
