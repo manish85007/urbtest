@@ -5,6 +5,8 @@ import {
   dataApi,
   filesApi,
   lifecycleApi,
+  type ComplianceRecipient,
+  type ComplianceRecipientList,
   type InvoiceDetail,
   type SessionUser,
   type SubmissionDetail,
@@ -1318,6 +1320,7 @@ function ComplianceCard({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [emailBusy, setEmailBusy] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   type DocRow = {
     key: string;
@@ -1399,18 +1402,27 @@ function ComplianceCard({
       });
   }
 
-  async function sendSelected() {
-    const picked = docs.filter((d) => selected.has(d.key));
-    if (!picked.length) return;
+  const pickedDocs = docs.filter((d) => selected.has(d.key));
+
+  async function sendSelected(recipientEmails: string[]) {
+    if (!pickedDocs.length || !recipientEmails.length) return;
     setEmailBusy(true);
     try {
-      const certificateIds = picked.filter((d) => d.certId).map((d) => d.certId!);
-      const form6InvoiceIds = picked.filter((d) => d.kind === 'Form 6').map((d) => d.invId);
+      const certificateIds = pickedDocs.filter((d) => d.certId).map((d) => d.certId!);
+      const form6InvoiceIds = pickedDocs.filter((d) => d.kind === 'Form 6').map((d) => d.invId);
       const ok = await onAction(
-        () => lifecycleApi.sendComplianceDocuments(sub.id, { certificateIds, form6InvoiceIds }),
-        `Emailed ${picked.length} document${picked.length === 1 ? '' : 's'} to the client.`,
+        () =>
+          lifecycleApi.sendComplianceDocuments(sub.id, {
+            certificateIds,
+            form6InvoiceIds,
+            recipientEmails,
+          }),
+        `Emailed ${pickedDocs.length} document${pickedDocs.length === 1 ? '' : 's'} to ${recipientEmails.length} recipient${recipientEmails.length === 1 ? '' : 's'}.`,
       );
-      if (ok !== false) setSelected(new Set());
+      if (ok !== false) {
+        setSelected(new Set());
+        setEmailOpen(false);
+      }
     } finally {
       setEmailBusy(false);
     }
@@ -1427,7 +1439,7 @@ function ComplianceCard({
             type="button"
             className="btn bp bsm"
             disabled={emailBusy || !selected.size}
-            onClick={() => void sendSelected()}
+            onClick={() => setEmailOpen(true)}
           >
             {emailBusy ? 'Sending…' : '✉ Send by email'}
           </button>
@@ -1516,7 +1528,170 @@ function ComplianceCard({
           MRN is internal only and is not emailed to clients. Form 6 and certificates can be shared from here.
         </div>
       ) : null}
+      {emailOpen ? (
+        <ComplianceEmailModal
+          submissionId={sub.id}
+          docs={pickedDocs.map((d) => `${d.kind} ${d.no} (${d.inv})`)}
+          busy={emailBusy}
+          onClose={() => setEmailOpen(false)}
+          onSend={(emails) => sendSelected(emails)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+const RECIPIENT_GROUPS: Array<{ group: ComplianceRecipient['group']; title: (site: string) => string }> = [
+  { group: 'site', title: (site) => `Portal users linked to ${site}` },
+  { group: 'internal', title: () => 'Urbeno (internal copy)' },
+  { group: 'contact', title: (site) => `Site contact on file for ${site}` },
+  { group: 'other-site', title: (site) => `Other users on this account — no access to ${site}` },
+];
+
+/** Pick exactly who receives the compliance documents, so users off this site are not mailed. */
+function ComplianceEmailModal({
+  submissionId,
+  docs,
+  busy,
+  onClose,
+  onSend,
+}: {
+  submissionId: string;
+  docs: string[];
+  busy: boolean;
+  onClose: () => void;
+  onSend: (recipientEmails: string[]) => Promise<void>;
+}) {
+  const [list, setList] = useState<ComplianceRecipientList | null>(null);
+  const [err, setErr] = useState('');
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let live = true;
+    lifecycleApi
+      .complianceRecipients(submissionId)
+      .then((res) => {
+        if (!live) return;
+        setList(res);
+        setChosen(new Set(res.recipients.filter((r) => r.suggested).map((r) => r.email)));
+      })
+      .catch((e: unknown) => {
+        if (live) setErr(e instanceof Error ? e.message : 'Could not load the recipient list.');
+      });
+    return () => {
+      live = false;
+    };
+  }, [submissionId]);
+
+  function toggle(email: string) {
+    setChosen((cur) => {
+      const next = new Set(cur);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
+  }
+
+  const recipients = list?.recipients ?? [];
+  const siteName = list?.siteName ?? 'this site';
+
+  return (
+    <Modal
+      title="✉ Send compliance documents"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn bs" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn bp"
+            disabled={busy || !chosen.size || !list}
+            onClick={() => void onSend([...chosen])}
+          >
+            {busy ? 'Sending…' : `Send to ${chosen.size} recipient${chosen.size === 1 ? '' : 's'}`}
+          </button>
+        </>
+      }
+    >
+      <div className="dim" style={{ fontSize: '.8rem', marginBottom: '.6rem' }}>
+        {docs.length} document{docs.length === 1 ? '' : 's'} will be shared for request{' '}
+        <b className="mono">{submissionId}</b>:
+        <ul style={{ margin: '.3rem 0 0 1rem' }}>
+          {docs.map((d) => (
+            <li key={d}>{d}</li>
+          ))}
+        </ul>
+      </div>
+      {err ? <p className="error">{err}</p> : null}
+      {!list && !err ? <div className="dim">Loading recipients…</div> : null}
+      {list ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.35rem' }}>
+            <b style={{ fontSize: '.85rem' }}>Recipients</b>
+            <div className="spacer" />
+            <button
+              type="button"
+              className="btn bs bsm"
+              onClick={() => setChosen(new Set(recipients.filter((r) => r.suggested).map((r) => r.email)))}
+            >
+              Suggested
+            </button>
+            <button
+              type="button"
+              className="btn bs bsm"
+              onClick={() => setChosen(new Set(recipients.map((r) => r.email)))}
+            >
+              All
+            </button>
+            <button type="button" className="btn bs bsm" onClick={() => setChosen(new Set())}>
+              None
+            </button>
+          </div>
+          <div className="check-list" style={{ maxHeight: 300 }}>
+            {RECIPIENT_GROUPS.map(({ group, title }) => {
+              const rows = recipients.filter((r) => r.group === group);
+              if (!rows.length) return null;
+              return (
+                <div key={group} style={{ marginBottom: '.35rem' }}>
+                  <div className="dim" style={{ fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                    {title(siteName)}
+                  </div>
+                  {rows.map((r) => (
+                    <label
+                      key={r.email}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: '.45rem', padding: '.15rem 0' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={chosen.has(r.email)}
+                        onChange={() => toggle(r.email)}
+                        style={{ width: 'auto', flex: 'none', marginTop: '.25rem' }}
+                      />
+                      <span>
+                        <b>{r.name}</b>{' '}
+                        <span className={`badge ${r.group === 'other-site' ? 'bg-am' : 'bg-gy'}`}>{r.roleLabel}</span>
+                        <div className="dim mono" style={{ fontSize: '.72rem' }}>
+                          {r.email}
+                        </div>
+                        <div className="dim" style={{ fontSize: '.72rem' }}>
+                          {r.note}
+                        </div>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+          <div className="dim" style={{ fontSize: '.74rem', marginTop: '.45rem' }}>
+            Only the ticked addresses receive the email. Users with no access to {siteName} are left unticked
+            so they are not sent site documents they cannot open in the portal.
+          </div>
+        </>
+      ) : null}
+    </Modal>
   );
 }
 

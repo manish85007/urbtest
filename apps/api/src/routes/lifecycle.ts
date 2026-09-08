@@ -28,7 +28,7 @@ import {
   uploadCertificate,
 } from '../services/invoice-service.js';
 import { raiseQuery, replyToQuery } from '../services/query-service.js';
-import { sendComplianceDocuments } from '../services/compliance-docs.js';
+import { listComplianceRecipients, sendComplianceDocuments } from '../services/compliance-docs.js';
 import { destroySerials, importSerials, parseSerialCsv, SERIAL_TEMPLATE_CSV } from '../services/serial-service.js';
 
 function handleServiceError(err: unknown, reply: FastifyReply) {
@@ -501,6 +501,15 @@ export async function lifecycleRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get('/submissions/:id/compliance/recipients', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      return await listComplianceRecipients(request.user!, id);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
   app.post('/submissions/:id/compliance/email', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
@@ -508,6 +517,7 @@ export async function lifecycleRoutes(app: FastifyInstance) {
         .object({
           certificateIds: z.array(z.string().min(1)).max(50).optional(),
           form6InvoiceIds: z.array(z.string().min(1)).max(50).optional(),
+          recipientEmails: z.array(z.string().email()).max(50).optional(),
         })
         .parse(request.body);
       return await sendComplianceDocuments(request.user!, id, body);

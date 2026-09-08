@@ -560,6 +560,29 @@ export interface SubmissionLifecycleEvent {
   createdAt: string;
 }
 
+export interface ComplianceRecipient {
+  email: string;
+  name: string;
+  role: string | null;
+  roleLabel: string;
+  group: 'site' | 'internal' | 'contact' | 'other-site';
+  siteLinked: boolean;
+  allSites: boolean;
+  raisedRequest: boolean;
+  onBehalfOf: boolean;
+  suggested: boolean;
+  note: string;
+}
+
+export interface ComplianceRecipientList {
+  submissionId: string;
+  clientId: string;
+  clientName: string;
+  siteId: string;
+  siteName: string;
+  recipients: ComplianceRecipient[];
+}
+
 export interface QueueItem {
   submissionId: string;
   invoiceId: string;
@@ -1489,11 +1512,14 @@ export const lifecycleApi = {
       body: JSON.stringify(body),
     }),
 
+  complianceRecipients: (submissionId: string) =>
+    api<ComplianceRecipientList>(`/submissions/${submissionId}/compliance/recipients`),
+
   sendComplianceDocuments: (
     submissionId: string,
-    body: { certificateIds?: string[]; form6InvoiceIds?: string[] },
+    body: { certificateIds?: string[]; form6InvoiceIds?: string[]; recipientEmails?: string[] },
   ) =>
-    api<{ sent: number; recipients: string[]; documents: number }>(
+    api<{ sent: number; recipients: string[]; notSent: string[]; documents: number }>(
       `/submissions/${submissionId}/compliance/email`,
       {
         method: 'POST',

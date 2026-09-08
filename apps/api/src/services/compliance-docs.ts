@@ -3,20 +3,75 @@ import { hasFeature } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { requireAdmin, loadSubmissionForActor } from '../lib/access.js';
 import { prisma } from '../lib/prisma.js';
+import type { SubmissionFull } from '../lib/db-helpers.js';
 import { auditLog } from './audit.js';
 import { sendTransactionalEmail } from './email.js';
+import {
+  buildComplianceRecipients,
+  selectComplianceRecipients,
+  type ComplianceRecipient,
+  type RecipientContext,
+} from './compliance-recipients.js';
 
 const PORTAL_URL = process.env.PORTAL_URL ?? 'http://localhost:5173';
 
-export async function sendComplianceDocuments(
-  actor: SessionUser,
-  submissionId: string,
-  input: { certificateIds?: string[]; form6InvoiceIds?: string[] },
-) {
+function requireComplianceEmailAccess(actor: SessionUser) {
   requireAdmin(actor);
   if (!hasFeature(actor, 'compliance.email')) {
     throw new AppError('You do not have permission to send compliance documents by email.', 403);
   }
+}
+
+async function recipientContextFor(sub: SubmissionFull): Promise<RecipientContext> {
+  const requestActors = [sub.createdBy, sub.onBehalfOf].filter((e): e is string => !!e);
+  const [portalUsers, actorUsers] = await Promise.all([
+    prisma.user.findMany({
+      where: { clientId: sub.clientId, active: true, role: { in: ['client', 'client_readonly'] } },
+      select: { email: true, name: true, role: true, siteIds: true, active: true },
+    }),
+    requestActors.length
+      ? prisma.user.findMany({
+          where: { email: { in: requestActors } },
+          select: { email: true, name: true, role: true, siteIds: true, active: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    users: [...portalUsers, ...actorUsers],
+    siteId: sub.siteId,
+    siteName: sub.site.name,
+    siteContactEmail: sub.site.contactEmail,
+    siteContactName: sub.site.contactName,
+    createdBy: sub.createdBy,
+    onBehalfOf: sub.onBehalfOf,
+  };
+}
+
+async function complianceRecipientsFor(sub: SubmissionFull): Promise<ComplianceRecipient[]> {
+  return buildComplianceRecipients(await recipientContextFor(sub));
+}
+
+/** Addresses the admin may pick from before emailing the compliance documents. */
+export async function listComplianceRecipients(actor: SessionUser, submissionId: string) {
+  requireComplianceEmailAccess(actor);
+  const sub = await loadSubmissionForActor(submissionId, actor);
+  return {
+    submissionId: sub.id,
+    clientId: sub.clientId,
+    clientName: sub.client.name,
+    siteId: sub.siteId,
+    siteName: sub.site.name,
+    recipients: await complianceRecipientsFor(sub),
+  };
+}
+
+export async function sendComplianceDocuments(
+  actor: SessionUser,
+  submissionId: string,
+  input: { certificateIds?: string[]; form6InvoiceIds?: string[]; recipientEmails?: string[] },
+) {
+  requireComplianceEmailAccess(actor);
   const sub = await loadSubmissionForActor(submissionId, actor);
   const certificateIds = [...new Set(input.certificateIds ?? [])];
   const form6InvoiceIds = [...new Set(input.form6InvoiceIds ?? [])];
@@ -66,24 +121,25 @@ export async function sendComplianceDocuments(
     lines.push(`  • Form 6 ${inv.recycling!.form6No} (${inv.invoiceNo})`);
   }
 
-  const users = await prisma.user.findMany({
-    where: { clientId: sub.clientId, active: true, role: { in: ['client', 'client_readonly'] } },
-    select: { email: true },
-  });
-  const recipients = [
-    ...new Set([sub.createdBy, ...users.map((u) => u.email)].filter(Boolean)),
-  ];
-  if (!recipients.length) {
-    throw new AppError('This client has no active portal users to email.');
+  const candidates = await complianceRecipientsFor(sub);
+  const picked = selectComplianceRecipients(candidates, input.recipientEmails ?? null);
+  if (picked.unknown.length) {
+    throw new AppError(
+      `Not a recipient on this request: ${picked.unknown.join(', ')}. Refresh and choose again.`,
+    );
   }
-
-  const creator = await prisma.user.findUnique({
-    where: { email: sub.createdBy },
-    select: { name: true },
-  });
+  if (!picked.emails.length) {
+    throw new AppError(
+      picked.mode === 'selected'
+        ? 'Select at least one recipient for this email.'
+        : `No active portal user is linked to ${sub.site.name}. Choose the recipients before sending.`,
+    );
+  }
+  const recipients = picked.emails;
+  const single = recipients.length === 1 ? candidates.find((c) => c.email === recipients[0]) : null;
 
   await sendTransactionalEmail('compliance_docs_share', recipients, {
-    contact_name: creator?.name || sub.client.contact || sub.client.name,
+    contact_name: single?.name || sub.client.contact || sub.client.name,
     client_name: sub.client.name,
     request_id: sub.id,
     document_list: lines.join('\n'),
@@ -107,8 +163,15 @@ export async function sendComplianceDocuments(
       certificateIds: certs.map((c) => c.id),
       form6InvoiceIds,
       recipients,
+      recipientMode: picked.mode,
+      notSent: picked.skipped,
     },
   });
 
-  return { sent: recipients.length, recipients, documents: lines.length };
+  return {
+    sent: recipients.length,
+    recipients,
+    notSent: picked.skipped,
+    documents: lines.length,
+  };
 }
