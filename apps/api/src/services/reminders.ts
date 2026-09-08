@@ -1,18 +1,15 @@
 import {
   SLA_LABEL,
-  formatINR,
   getPayStatus,
   settledPaise,
   invoiceDue,
-  paymentTermsLabel,
   recyclingSla,
-  sumPaise,
 } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { sendTransactionalEmail } from './email.js';
-import { notifyStaff, notifyUsers } from './notifications.js';
+import { notifyAdmins, notifyStaff } from './notifications.js';
+import { buildPaymentDigest, type PendingPayment } from './payment-digest.js';
 
-const PAY_REMINDER_MAX = Number(process.env.PAY_REMINDER_MAX ?? 12);
 const SLA_RECYCLE_DAYS = Number(process.env.SLA_RECYCLE_DAYS ?? 30);
 const SLA_WARN_AT = Number(process.env.SLA_WARN_AT ?? 0.8);
 
@@ -50,6 +47,43 @@ async function markReminderOnce(key: string) {
   return true;
 }
 
+/**
+ * One daily digest to the Super Admins for invoices that are past their terms with
+ * no payment recorded. Clients are never mailed about payment; recording it is an
+ * internal step, and the request cannot close until it is done.
+ */
+async function remindAdminsToRecordPayments(pending: PendingPayment[]): Promise<number> {
+  const { already } = await reminderSentToday('pay-digest');
+  if (already) return 0;
+
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin', active: true },
+    select: { email: true },
+  });
+  if (!admins.length) return 0;
+
+  const digest = buildPaymentDigest(pending);
+
+  await sendTransactionalEmail(
+    'payment_reminder',
+    admins.map((a) => a.email),
+    {
+      invoice_count: digest.count,
+      total_outstanding: digest.totalOutstanding,
+      invoice_list: digest.invoiceList,
+    },
+  );
+
+  await notifyAdmins(
+    'pay.due',
+    `${digest.count} invoice${digest.count === 1 ? '' : 's'} overdue with no payment recorded — ${digest.totalOutstanding} outstanding`,
+    '/requests',
+  );
+
+  await markReminderSent('pay-digest');
+  return digest.count;
+}
+
 /** Nightly payment + SLA reminders — ported from prototype runReminders(). */
 export async function runReminders() {
   const invoices = await prisma.invoice.findMany({
@@ -67,7 +101,7 @@ export async function runReminders() {
     },
   });
 
-  let sentPay = 0;
+  const pendingPayments: PendingPayment[] = [];
   let sentSla = 0;
 
   for (const inv of invoices) {
@@ -77,45 +111,16 @@ export async function runReminders() {
 
     if (pay.key !== 'paid') {
       const due = invoiceDue(inv.invoiceDate, sub.client.payTermsDays);
-      const key = `pay:${inv.id}`;
-      const { already, count } = await reminderSentToday(key);
-
-      if (due.isOverdue && !already && count < PAY_REMINDER_MAX) {
-        const clientUsers = await prisma.user.findMany({
-          where: { clientId: sub.clientId, active: true },
-          select: { email: true },
+      if (due.isOverdue) {
+        pendingPayments.push({
+          invoiceNo: inv.invoiceNo,
+          requestId: sub.id,
+          clientName: sub.client.name,
+          dueDate: due.dueDate,
+          overdueDays: due.overdue,
+          totalPaise: Number(inv.totalPaise),
+          duePaise: Number(pay.duePaise),
         });
-        const to = [
-          ...new Set([
-            sub.createdBy,
-            sub.client.email,
-            ...clientUsers.map((u) => u.email),
-          ]),
-        ].filter(Boolean) as string[];
-
-        await sendTransactionalEmail('payment_reminder', to, {
-          request_id: sub.id,
-          invoice_no: inv.invoiceNo,
-          invoice_date: inv.invoiceDate.toISOString().slice(0, 10),
-          invoice_total: formatINR(Number(inv.totalPaise)),
-          amount_paid: formatINR(Number(paidPaise)),
-          amount_due: formatINR(Number(pay.duePaise)),
-          payment_terms: paymentTermsLabel(sub.client.payTermsDays),
-          due_date: due.dueDate,
-          overdue_line: `Overdue by     : ${due.overdue} day${due.overdue === 1 ? '' : 's'}`,
-          contact_name: sub.site.contactName ?? sub.client.contact ?? 'Customer',
-          client_name: sub.client.name,
-        });
-
-        await notifyUsers(
-          to,
-          'pay.due',
-          `Invoice ${inv.invoiceNo} is overdue by ${due.overdue} day${due.overdue === 1 ? '' : 's'} — ${formatINR(Number(pay.duePaise))} outstanding`,
-          sub.id,
-        );
-
-        await markReminderSent(key);
-        sentPay++;
       }
     }
 
@@ -160,6 +165,8 @@ export async function runReminders() {
       }
     }
   }
+
+  const sentPay = pendingPayments.length ? await remindAdminsToRecordPayments(pendingPayments) : 0;
 
   return { sentPay, sentSla };
 }

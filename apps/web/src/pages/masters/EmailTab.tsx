@@ -33,7 +33,7 @@ const TXN_WHEN: Record<string, string> = {
   cod_delivery: 'when a certificate is uploaded',
   password_reset: 'on password reset request',
   user_welcome: 'when a user is created',
-  payment_reminder: 'when an invoice term elapses',
+  payment_reminder: 'daily to Super Admins while an invoice is overdue and unpaid',
   sla_alert: 'when recycling SLA is at risk',
   capacity_alert: 'when a category crosses 80% or 100%',
 };

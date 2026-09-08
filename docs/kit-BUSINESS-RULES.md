@@ -148,8 +148,10 @@ This applies to an admin force-close as well.
 
 ## Scheduled behaviour
 
-**S1 · Payment reminders run daily** against the client's agreed payment terms.
-A settled invoice is never chased, and no invoice is chased twice in one day.
+**S1 · Payment reminders run daily** against the client's agreed payment terms and go
+to Super Admins only, as one digest of the invoices awaiting a recorded payment.
+Clients are never chased, a settled invoice is never listed, and the digest is sent
+once per day.
 `runPaymentReminders` · `audit_v63.js`
 
 **S2 · The recycling SLA is 30 days from MRN receipt to certificate issue.**

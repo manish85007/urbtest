@@ -71,10 +71,10 @@
   },
   {
     "key": "payment_reminder",
-    "name": "Payment Reminder",
-    "subject": "Payment reminder — invoice {{invoice_no}} for request {{request_id}}",
-    "body": "Dear {{contact_name}},\n\nThis is a reminder that the following invoice is outstanding.\n\n  Request ID     : {{request_id}}\n  Invoice        : {{invoice_no}} dated {{invoice_date}}\n  Invoice value  : {{invoice_total}}\n  Received       : {{amount_paid}}\n  Outstanding    : {{amount_due}}\n  Payment terms  : {{payment_terms}}\n  Due date       : {{due_date}}\n  {{overdue_line}}\n\nPlease arrange payment at your earliest convenience. If payment has already been made, share the UTR and we will reconcile it against this invoice.\n\nNote that a request cannot be closed in Urb TecTrack until the invoice against it is fully settled.\n\nQuestions? {{contact_email}}\n\nWarm regards,\nUrbeno Private Limited\nRecycling Heroes™",
-    "variables": ["request_id", "invoice_no", "invoice_date", "invoice_total", "amount_paid", "amount_due", "payment_terms", "due_date", "overdue_line", "contact_name", "client_name", "contact_email"]
+    "name": "Payment Record Reminder (Super Admin)",
+    "subject": "Record payment — {{invoice_count}} invoice(s) overdue, {{total_outstanding}} outstanding",
+    "body": "Internal reminder for Super Admins.\n\n{{invoice_count}} invoice(s) are past their payment terms with no payment recorded in Urb TecTrack.\n\n{{invoice_list}}\n\nTotal outstanding : {{total_outstanding}}\n\nOpen each invoice and use Record payment once the funds are received. A request cannot be closed until its invoices are fully settled.\n{{portal_url}}\n\nThis reminder repeats daily until the payment is recorded or the invoice is closed. Clients are not notified about payment.\n\nUrb TecTrack automated reminder",
+    "variables": ["invoice_count", "total_outstanding", "invoice_list", "portal_url"]
   },
   {
     "key": "sla_alert",
