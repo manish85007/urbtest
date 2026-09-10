@@ -544,7 +544,6 @@ export function InvoiceLifecyclePanel({
                           <th>Issued</th>
                           <th>Portal</th>
                           <th>Emailed</th>
-                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -568,20 +567,6 @@ export function InvoiceLifecyclePanel({
                               )}
                             </td>
                             <td>{c.mailedAt ? <span className="badge bg-g">sent</span> : '—'}</td>
-                            <td>
-                              {c.fileId ? (
-                                <a
-                                  className="btn bp bsm"
-                                  href={filesApi.url(c.fileId)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  ⬇ Download
-                                </a>
-                              ) : (
-                                <span className="dim">—</span>
-                              )}
-                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -594,6 +579,11 @@ export function InvoiceLifecyclePanel({
                       : `Form 6 ${invoice.recycling.form6No} is on file. Upload the signed certificate PDF, then Super Admin certifies to publish.`}
                   </div>
                 )}
+                {invoice.certificates.some((c) => c.fileId) ? (
+                  <p className="dim" style={{ fontSize: '.78rem', margin: '.5rem 0 0' }}>
+                    Download certificates from <b>Compliance Documents</b> below.
+                  </p>
+                ) : null}
               </div>
             ) : (
               <div className="card" style={{ marginBottom: '.6rem' }}>
@@ -647,50 +637,17 @@ export function InvoiceLifecyclePanel({
             <div className="dim" style={{ fontSize: '.83rem', marginBottom: '.45rem' }}>
               {isAdmin
                 ? 'This invoice is ready to close. The client must sign off via their portal.'
-                : 'Confirm you have received the Certificate of Destruction, then acknowledge closure.'}
+                : 'Confirm you have received the Certificate of Destruction, then acknowledge closure. Downloads are in Compliance Documents above.'}
             </div>
-            {invoice.certificates.some((c) => c.fileId) ? (
-              <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
-                {invoice.certificates
-                  .filter((c) => c.fileId)
-                  .map((c) => (
-                    <a
-                      key={c.id ?? c.certNo}
-                      className="btn bs bsm"
-                      href={filesApi.url(c.fileId!)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      ⬇ {c.certNo}
-                    </a>
-                  ))}
-              </div>
-            ) : null}
           </div>
         ) : (
           <div className="card" style={{ marginBottom: '.6rem' }}>
             <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
             <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
               The certificate is on file. Closure waits until this invoice is paid — payment can be recorded
-              any time under the client’s terms and does not block earlier steps.
+              any time under the client’s terms and does not block earlier steps. Download from Compliance
+              Documents above.
             </p>
-            {invoice.certificates.some((c) => c.fileId) ? (
-              <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', marginTop: '.45rem' }}>
-                {invoice.certificates
-                  .filter((c) => c.fileId)
-                  .map((c) => (
-                    <a
-                      key={c.id ?? c.certNo}
-                      className="btn bs bsm"
-                      href={filesApi.url(c.fileId!)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      ⬇ Download {c.certNo}
-                    </a>
-                  ))}
-              </div>
-            ) : null}
           </div>
         )
       ) : null}
@@ -1197,9 +1154,9 @@ function RecyclingCard({
                 Edit Form 6
               </button>
             ) : null}
-            {(published || isStaff) ? (
+            {!published && isStaff ? (
               <a className="btn bs bsm" href={filesApi.pdf(`/invoices/${invoice.id}/form6.pdf`)} target="_blank" rel="noopener noreferrer">
-                ⬇ Form 6{published ? '' : ' (preview)'}
+                ⬇ Form 6 (preview)
               </a>
             ) : null}
           </>
@@ -1527,8 +1484,8 @@ function CertificateForm({
     >
       <p className="dim" style={{ fontSize: '.82rem', marginBottom: '.8rem' }}>
         The certificate is prepared outside the system. Upload the signed PDF here. Upload one certificate per
-        department if the client needs them split. Use Compliance Documents on the request to email certificates
-        to the client when ready.
+        department if the client needs them split. Downloads and emailing stay in{' '}
+        <b>Compliance Documents</b> on this request.
       </p>
       {existingCerts?.length ? (
         <div

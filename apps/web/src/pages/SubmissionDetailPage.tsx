@@ -495,7 +495,6 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 onAction={act}
               />
             ))}
-            <CertificatesCard sub={sub} />
             <ComplianceCard sub={sub} isStaff={isStaff} isAdmin={canComplianceAdmin} onAction={act} />
           </WorkflowSection>
 
@@ -1257,61 +1256,6 @@ function RecyclingSlaSidebar({ invoices }: { invoices: SubmissionDetail['invoice
   );
 }
 
-function CertificatesCard({ sub }: { sub: SubmissionDetail }) {
-  const rows = sub.invoices.flatMap((inv) => inv.certificates.map((c) => ({ inv, c })));
-  if (!rows.length) return null;
-
-  return (
-    <div className="card" style={{ background: 'var(--g3)', borderColor: 'var(--g4)' }}>
-      <div className="card-hd">
-        <div className="card-ttl" style={{ color: 'var(--g2)' }}>
-          🏅 Certificates of Destruction
-        </div>
-        <span className="badge bg-g">{rows.length}</span>
-      </div>
-      <div className="tw">
-        <table>
-          <thead>
-            <tr>
-              <th>Certificate</th>
-              <th>Department / Scope</th>
-              <th>Invoice</th>
-              <th>Issued</th>
-              <th>Emailed</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ inv, c }) => (
-              <tr key={c.id ?? c.certNo}>
-                <td className="mono">
-                  <b>{c.certNo}</b>
-                  {c.note ? <div className="dim" style={{ fontSize: '.7rem' }}>{c.note}</div> : null}
-                </td>
-                <td>{c.department || <span className="dim">whole invoice</span>}</td>
-                <td className="mono dim">{inv.invoiceNo}</td>
-                <td className="dim">{fmtDate(c.certDate)}</td>
-                <td>
-                  {c.mailedAt ? <span className="badge bg-g">✉️ sent</span> : <span className="dim">—</span>}
-                </td>
-                <td>
-                  {c.fileId ? (
-                    <a className="btn bp bsm" href={filesApi.url(c.fileId)} target="_blank" rel="noopener noreferrer">
-                      ⬇ Download
-                    </a>
-                  ) : (
-                    <span className="dim">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function ComplianceCard({
   sub,
   isStaff,
@@ -1369,6 +1313,10 @@ function ComplianceCard({
       });
     }
     for (const c of inv.certificates) {
+      // Client downloads only after Super Admin certifies; staff can fetch from here anytime.
+      const published = !!inv.recycling?.clientPublishedAt;
+      if (!c.fileId) continue;
+      if (!isStaff && !published) continue;
       docs.push({
         key: `cert:${c.id ?? c.certNo}`,
         kind: 'Certificate',
@@ -1377,7 +1325,7 @@ function ComplianceCard({
         invId: inv.id,
         dt: c.certDate ?? '',
         note: c.department || 'whole invoice',
-        href: c.fileId ? filesApi.url(c.fileId) : undefined,
+        href: filesApi.url(c.fileId),
         certId: c.id,
         emailed: !!c.mailedAt,
       });
@@ -1461,8 +1409,8 @@ function ComplianceCard({
         ) : null}
       </div>
       <div className="dim" style={{ fontSize: '.78rem', marginBottom: '.5rem' }}>
-        Every regulatory document raised against this request. Retained for a minimum of five years per
-        Rule 12(4) of the E-Waste (Management) Rules, 2022; certificates for ten.
+        Single place for Form 6 and Certificate of Destruction downloads on this request. Documents are retained for
+        at least five years under Rule 12(4) of the E-Waste (Management) Rules, 2022; certificates for ten.
         {isAdmin ? ' Select documents and use Send by email when the client should receive them.' : ''}
       </div>
       <div className="tw">
