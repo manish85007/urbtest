@@ -5,6 +5,7 @@ import { idParamsSchema } from '../lib/params.js';
 import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
 import {
   acknowledgeSubmission,
+  assignSubmissionRequestor,
   createSubmission,
   rejectSubmission,
   updateSubmission,
@@ -195,6 +196,16 @@ export async function lifecycleRoutes(app: FastifyInstance) {
         })
         .parse(request.body);
       return await updateSubmission(request.user!, id, body);
+    } catch (err) {
+      return handleServiceError(err, reply);
+    }
+  });
+
+  app.patch('/submissions/:id/requestor', { preHandler: [requireAuth, requireAdmin] }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const body = z.object({ onBehalfOf: z.string().min(1) }).parse(request.body);
+      return await assignSubmissionRequestor(request.user!, id, body.onBehalfOf);
     } catch (err) {
       return handleServiceError(err, reply);
     }

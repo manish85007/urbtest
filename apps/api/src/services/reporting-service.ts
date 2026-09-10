@@ -9,6 +9,7 @@ import {
   inFiscalYear,
   invStage,
   invoiceDue,
+  isClientMutatorRole,
   isClientPortalRole,
   parseReportPeriod,
   paymentTermsLabel,
@@ -316,11 +317,52 @@ export async function getImpactReport(
     },
   });
 
+  const creatorEmails = [
+    ...new Set(pendingClose.map((inv) => inv.submission.createdBy.toLowerCase()).filter(Boolean)),
+  ];
+  const creatorRoles = creatorEmails.length
+    ? new Map(
+        (
+          await prisma.user.findMany({
+            where: { email: { in: creatorEmails } },
+            select: { email: true, role: true },
+          })
+        ).map((u) => [u.email.toLowerCase(), u.role] as const),
+      )
+    : new Map<string, string>();
+
   const pending = pendingClose
     .filter((inv) => {
       if (invoiceStage(inv) !== 8) return false;
       const pay = getPayStatus(inv.totalPaise, settledPaise(inv.payments));
-      return pay.key === 'paid';
+      if (pay.key !== 'paid') return false;
+
+      // Client portal: only show invoices this user can close (or will be able to after 30 days).
+      if (isClientPortalRole(actor.role)) {
+        if (!isClientMutatorRole(actor.role)) return false;
+        const actorEmail = actor.email.toLowerCase();
+        const onBehalf = inv.submission.onBehalfOf?.trim().toLowerCase() || null;
+        if (onBehalf) {
+          if (onBehalf === actorEmail) return true;
+          const firstCert = inv.certificates
+            .map((c) => c.uploadedAt)
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+          const days = firstCert ? (Date.now() - firstCert.getTime()) / 86400000 : 0;
+          return days >= 30;
+        }
+        const creatorRole = creatorRoles.get(inv.submission.createdBy.toLowerCase());
+        if (creatorRole === 'client') {
+          if (inv.submission.createdBy.toLowerCase() === actorEmail) return true;
+          const firstCert = inv.certificates
+            .map((c) => c.uploadedAt)
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+          const days = firstCert ? (Date.now() - firstCert.getTime()) / 86400000 : 0;
+          return days >= 30;
+        }
+        // Staff-raised with no assigned requestor — hidden until Super Admin assigns one.
+        return false;
+      }
+      return true;
     })
     .map((inv) => ({
       submissionId: inv.submissionId,

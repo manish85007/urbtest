@@ -7,7 +7,8 @@ export type SubmissionLifecycleEventKind =
   | 'returned'
   | 'resubmitted'
   | 'acknowledged'
-  | 'loading_complete';
+  | 'loading_complete'
+  | 'requestor_assigned';
 
 const EVENT_LABELS: Record<SubmissionLifecycleEventKind, string> = {
   created: 'Request raised',
@@ -15,6 +16,7 @@ const EVENT_LABELS: Record<SubmissionLifecycleEventKind, string> = {
   resubmitted: 'Requestor resubmitted',
   acknowledged: 'Acknowledged by Urbeno',
   loading_complete: 'Loading complete',
+  requestor_assigned: 'Requestor assigned for closure',
 };
 
 export function lifecycleEventLabel(event: string): string {

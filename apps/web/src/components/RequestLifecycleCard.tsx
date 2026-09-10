@@ -7,6 +7,7 @@ const EVENT_META: Record<string, { icon: string; tone: string }> = {
   resubmitted: { icon: '✉️', tone: 'var(--g)' },
   acknowledged: { icon: '✅', tone: 'var(--g)' },
   loading_complete: { icon: '📦', tone: 'var(--bl)' },
+  requestor_assigned: { icon: '👤', tone: 'var(--am, #f59e0b)' },
 };
 
 function eventLabel(event: string): string {
@@ -21,6 +22,8 @@ function eventLabel(event: string): string {
       return 'Acknowledged by Urbeno';
     case 'loading_complete':
       return 'Loading complete';
+    case 'requestor_assigned':
+      return 'Requestor assigned for closure';
     default:
       return event;
   }

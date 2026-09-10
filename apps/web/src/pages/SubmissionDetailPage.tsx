@@ -288,6 +288,12 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               user={user}
               busy={busy}
               onEdit={() => setStep({ kind: 'edit' })}
+              onAssignRequestor={(email) =>
+                act(
+                  () => lifecycleApi.assignRequestor(sub.id, email),
+                  `Assigned ${email} as requestor for closure.`,
+                )
+              }
               onBom={(bomFileIds) =>
                 act(
                   () =>
@@ -729,24 +735,54 @@ function RequestCard({
   busy,
   onEdit,
   onBom,
+  onAssignRequestor,
 }: {
   sub: SubmissionDetail;
   user: SessionUser;
   busy: boolean;
   onEdit: () => void;
   onBom: (bomFileIds: string[]) => void;
+  onAssignRequestor: (email: string) => void;
 }) {
   const isClient = userCan(user, 'raiseClientRequest');
   const closed = !!sub.closedAt;
   const canEdit = !closed && (userCan(user, 'editRequestAsStaff') || (isClient && sub.derivedStage === 1));
   const showResubmit = isClient && sub.derivedStage === 1 && !!sub.rejectNote;
+  const canAssignRequestor = user.role === 'admin' && !closed;
   const bomIds = bomFilesOf(sub);
+  const [portalUsers, setPortalUsers] = useState<Array<{ id: string; email: string; name: string }>>([]);
+  const [portalUsersLoading, setPortalUsersLoading] = useState(false);
+  const [assignEmail, setAssignEmail] = useState(sub.onBehalfOf || '');
+
+  useEffect(() => {
+    setAssignEmail(sub.onBehalfOf || '');
+  }, [sub.id, sub.onBehalfOf]);
+
+  useEffect(() => {
+    if (!canAssignRequestor) return;
+    let cancelled = false;
+    setPortalUsersLoading(true);
+    dataApi
+      .portalUsers(sub.clientId, sub.siteId)
+      .then((list) => {
+        if (!cancelled) setPortalUsers(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPortalUsers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPortalUsersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canAssignRequestor, sub.clientId, sub.siteId]);
 
   return (
     <CollapsibleCard
       title="📝 Pickup"
       badge={showResubmit ? <span className="badge bg-am">Update in the popup</span> : undefined}
-      defaultOpen={sub.derivedStage <= 2}
+      defaultOpen={sub.derivedStage <= 2 || (canAssignRequestor && !sub.onBehalfOf && sub.derivedStage >= 8)}
       summary={`${num(Number(sub.approxWeight))} kg · ${sub.approxQty} units · ${fmtDate(sub.requestDate)}`}
       actions={
         canEdit ? (
@@ -796,6 +832,62 @@ function RequestCard({
           </div>
         </div>
       </div>
+      {canAssignRequestor ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: '.6rem',
+            background: sub.onBehalfOf ? 'var(--g5)' : 'var(--am2, #fff7ed)',
+            border: sub.onBehalfOf ? undefined : '1px solid var(--am, #f59e0b)',
+          }}
+        >
+          <div className="card-ttl" style={{ fontSize: '.9rem', marginBottom: '.35rem' }}>
+            {sub.onBehalfOf ? 'Requestor for closure' : 'Assign requestor for closure'}
+          </div>
+          <p className="dim" style={{ fontSize: '.78rem', margin: '0 0 .5rem' }}>
+            {sub.onBehalfOf
+              ? 'This client user can review and close once certificates are paid and published — no 60-day wait.'
+              : 'Urbeno-raised requests without a requestor cannot be closed by clients until you assign one. The assignee gets the request on their home dashboard.'}
+          </p>
+          <div className="fr2" style={{ alignItems: 'end' }}>
+            <div className="fg" style={{ flex: 1 }}>
+              <label htmlFor="assign-requestor">Client requestor</label>
+              <select
+                id="assign-requestor"
+                value={assignEmail}
+                disabled={busy || portalUsersLoading}
+                onChange={(e) => setAssignEmail(e.target.value)}
+              >
+                <option value="">
+                  {portalUsersLoading
+                    ? 'Loading users…'
+                    : portalUsers.length
+                      ? 'Select a client user…'
+                      : 'No active client users for this site'}
+                </option>
+                {portalUsers.map((u) => (
+                  <option key={u.id} value={u.email}>
+                    {u.name ? `${u.name} (${u.email})` : u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn bp"
+              disabled={
+                busy ||
+                portalUsersLoading ||
+                !assignEmail ||
+                assignEmail.toLowerCase() === (sub.onBehalfOf || '').toLowerCase()
+              }
+              onClick={() => onAssignRequestor(assignEmail)}
+            >
+              {sub.onBehalfOf ? 'Update requestor' : 'Assign requestor'}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {sub.notes ? (
         <div className="tile" style={{ marginBottom: '.5rem' }}>
           <div className="tile-l">Notes</div>

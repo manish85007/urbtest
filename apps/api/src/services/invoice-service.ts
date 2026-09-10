@@ -1489,17 +1489,17 @@ export async function closeInvoice(
     if (actor.clientId !== invoice.submission.clientId) {
       throw new AppError('You do not have permission to close this invoice.', 403);
     }
-    // Determine the effective requestor:
-    // - If onBehalfOf is set, that email is the designated requestor (admin raised on their behalf).
-    // - Otherwise check if createdBy is actually a client-role user.
-    // When admin raised the request (no client creator), any client user of that client may close immediately.
+    // Effective requestor:
+    // - onBehalfOf designates the client who may close immediately (admin-raised or reassigned).
+    // - Otherwise, if createdBy is a client user, that creator closes (peers wait 30 days).
+    // - Staff-raised with no onBehalfOf: client close is blocked until Super Admin assigns a requestor
+    //   (60-day auto/force-close remains the fallback).
     const effectiveRequestor = invoice.submission.onBehalfOf ?? null;
     if (effectiveRequestor) {
-      // onBehalfOf designates the requestor — they may close any time; others must wait 30 days
-      const isCreator = actor.email === effectiveRequestor;
-      if (!isCreator && daysSinceCert < 30) {
+      const isRequestor = actor.email.toLowerCase() === effectiveRequestor.toLowerCase();
+      if (!isRequestor && daysSinceCert < 30) {
         throw new AppError(
-          'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
+          'Only the assigned requestor can close within 30 days of certificate upload, or any client user after 30 days.',
         );
       }
     } else {
@@ -1515,8 +1515,11 @@ export async function closeInvoice(
             'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
           );
         }
+      } else {
+        throw new AppError(
+          'A client requestor has not been assigned yet. Ask Super Admin to assign a requestor so this invoice can be closed, or wait for the automatic close 60 days after the first certificate.',
+        );
       }
-      // If raised by admin with no onBehalfOf, any client user of that client may close immediately.
     }
   } else {
     throw new AppError('Only the client requestor may close this invoice.', 403);

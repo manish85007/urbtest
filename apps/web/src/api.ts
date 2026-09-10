@@ -1268,6 +1268,12 @@ export const lifecycleApi = {
       body: JSON.stringify(body),
     }),
 
+  assignRequestor: (id: string, onBehalfOf: string) =>
+    api<SubmissionDetail>(`/submissions/${id}/requestor`, {
+      method: 'PATCH',
+      body: JSON.stringify({ onBehalfOf }),
+    }),
+
   addVehicle: (
     submissionId: string,
     body: {

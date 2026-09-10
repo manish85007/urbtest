@@ -119,23 +119,8 @@ export async function createSubmission(actor: SessionUser, input: CreateSubmissi
 
   let onBehalfOf: string | null = null;
   if (!isClientPortalRole(actor.role) && input.onBehalfOf?.trim()) {
-    const email = input.onBehalfOf.trim().toLowerCase();
-    const requestor = await prisma.user.findFirst({
-      where: {
-        email,
-        clientId,
-        role: 'client',
-        active: true,
-      },
-      select: { email: true, siteIds: true },
-    });
-    if (!requestor) {
-      throw new AppError('Selected requestor is not an active user for this client.');
-    }
-    if (requestor.siteIds.length && !requestor.siteIds.includes(site.id)) {
-      throw new AppError('Selected requestor does not have access to this site.');
-    }
-    onBehalfOf = email;
+    const requestor = await resolveActiveClientRequestor(clientId, site.id, input.onBehalfOf);
+    onBehalfOf = requestor.email;
   }
 
   const id = await nextSequence('sub');
@@ -467,6 +452,91 @@ export async function updateSubmission(
       updated.id,
     );
   }
+
+  return withDerivedStages(updated);
+}
+
+async function resolveActiveClientRequestor(clientId: string, siteId: string, emailRaw: string) {
+  const email = emailRaw.trim().toLowerCase();
+  const requestor = await prisma.user.findFirst({
+    where: {
+      email,
+      clientId,
+      role: 'client',
+      active: true,
+    },
+    select: { email: true, siteIds: true, name: true },
+  });
+  if (!requestor) {
+    throw new AppError('Selected requestor is not an active client user for this organisation.');
+  }
+  if (requestor.siteIds.length && !requestor.siteIds.includes(siteId)) {
+    throw new AppError('Selected requestor does not have access to this site.');
+  }
+  return requestor;
+}
+
+/** Super Admin assigns (or changes) the client requestor who may close a staff-raised request. */
+export async function assignSubmissionRequestor(
+  actor: SessionUser,
+  submissionId: string,
+  onBehalfOf: string,
+) {
+  requireAdmin(actor);
+  const email = onBehalfOf.trim().toLowerCase();
+  if (!email) throw new AppError('Select a client requestor to assign.');
+
+  const sub = await loadSubmissionForActor(submissionId, actor);
+  if (sub.closedAt) {
+    throw new AppError('This request is already closed.');
+  }
+
+  const creator = await prisma.user.findUnique({
+    where: { email: sub.createdBy },
+    select: { role: true },
+  });
+  const raisedByClient = creator?.role === 'client';
+  if (raisedByClient && !sub.onBehalfOf) {
+    throw new AppError(
+      'This request was raised by a client user — the requestor is already the creator.',
+    );
+  }
+
+  const requestor = await resolveActiveClientRequestor(sub.clientId, sub.siteId, email);
+  if (sub.onBehalfOf?.toLowerCase() === requestor.email) {
+    return withDerivedStages(sub);
+  }
+
+  const previous = sub.onBehalfOf;
+  const updated = await prisma.submission.update({
+    where: { id: submissionId },
+    data: { onBehalfOf: requestor.email },
+    include: submissionInclude,
+  });
+
+  await auditLog({
+    actorEmail: actor.email,
+    actorId: actor.id,
+    action: 'sub.requestor.assign',
+    entity: 'submission',
+    entityId: submissionId,
+    details: { onBehalfOf: requestor.email, previous },
+  });
+
+  await logSubmissionLifecycle(
+    submissionId,
+    'requestor_assigned',
+    `Assigned ${requestor.email} as requestor for closure`,
+    actor,
+    { onBehalfOf: requestor.email, previous, requestorName: requestor.name },
+  );
+
+  await notifyUsers(
+    [requestor.email],
+    'sub.requestor',
+    `You were assigned as requestor for ${submissionId} — you can review and close once certificates are ready.`,
+    submissionId,
+  );
 
   return withDerivedStages(updated);
 }
