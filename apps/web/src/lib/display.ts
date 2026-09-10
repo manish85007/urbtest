@@ -1,6 +1,3 @@
-/** Re-export shared place formatter for web callers. */
-export { titleCasePlace } from '@urb-tectrack/shared';
-
 /** Natural sort for alphanumeric IDs (CEEW2 before CEEW10). */
 export function naturalCompare(a: string, b: string): number {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
