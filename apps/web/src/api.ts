@@ -443,6 +443,8 @@ export interface InvoiceDetail {
     factoryId: string;
     receivedAt?: string;
     receivedBy?: string;
+    deliveryChallanNo?: string | null;
+    deliveryChallanDate?: string | null;
     driverSign?: string | null;
     managerSign?: string | null;
     securitySign?: string | null;
@@ -1405,6 +1407,8 @@ export const lifecycleApi = {
     body: {
       factoryId: string;
       receivedAt: string;
+      deliveryChallanNo?: string;
+      deliveryChallanDate?: string;
       driverSign?: string;
       managerSign?: string;
       securitySign?: string;
@@ -1425,6 +1429,8 @@ export const lifecycleApi = {
     body: {
       factoryId: string;
       receivedAt: string;
+      deliveryChallanNo?: string;
+      deliveryChallanDate?: string;
       driverSign?: string;
       managerSign?: string;
       securitySign?: string;

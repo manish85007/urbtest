@@ -170,6 +170,8 @@ export interface PaymentInput {
 export interface MrnInput {
   factoryId: string;
   receivedAt: string;
+  deliveryChallanNo?: string;
+  deliveryChallanDate?: string;
   driverSign?: string;
   managerSign?: string;
   securitySign?: string;
@@ -626,6 +628,22 @@ export async function deletePayment(actor: SessionUser, paymentId: string) {
 
 type MrnMaterial = { n: string; q: number; w: number };
 
+function normalizeDeliveryChallan(input: MrnInput): {
+  deliveryChallanNo: string | null;
+  deliveryChallanDate: Date | null;
+} {
+  const no = input.deliveryChallanNo?.trim() || '';
+  const dateRaw = input.deliveryChallanDate?.trim() || '';
+  if (no && !dateRaw) {
+    throw new AppError('Enter the delivery challan date when a challan number is provided.');
+  }
+  if (!no && dateRaw) {
+    throw new AppError('Enter the delivery challan number when a challan date is provided.');
+  }
+  if (!no) return { deliveryChallanNo: null, deliveryChallanDate: null };
+  return { deliveryChallanNo: no, deliveryChallanDate: new Date(dateRaw) };
+}
+
 function parseMrnMaterials(input: MrnInput): MrnMaterial[] {
   const materials = (input.materials ?? [])
     .map((m) => ({
@@ -712,6 +730,10 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
 
   assertRecordedDate(actor, input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
+  const { deliveryChallanNo, deliveryChallanDate } = normalizeDeliveryChallan(input);
+  if (deliveryChallanDate) {
+    assertRecordedDate(actor, input.deliveryChallanDate!, 'Delivery challan date');
+  }
   const letterheadSnapshot = letterheadSnapshotJson(await captureLetterheadSnapshot(input.factoryId));
 
   const mrn = await prisma.$transaction(async (tx) => {
@@ -724,6 +746,8 @@ export async function createMrn(actor: SessionUser, invoiceId: string, input: Mr
         factoryId: input.factoryId,
         receivedAt,
         receivedBy: actor.email,
+        deliveryChallanNo,
+        deliveryChallanDate,
         driverSign,
         managerSign,
         securitySign,
@@ -776,11 +800,17 @@ export async function updateMrn(actor: SessionUser, invoiceId: string, input: Mr
 
   assertRecordedDate(actor, input.receivedAt, 'Receiving date');
   const receivedAt = new Date(input.receivedAt);
+  const { deliveryChallanNo, deliveryChallanDate } = normalizeDeliveryChallan(input);
+  if (deliveryChallanDate) {
+    assertRecordedDate(actor, input.deliveryChallanDate!, 'Delivery challan date');
+  }
 
   const mrn = await prisma.mrn.update({
     where: { invoiceId },
     data: {
       receivedAt,
+      deliveryChallanNo,
+      deliveryChallanDate,
       driverSign,
       managerSign,
       securitySign,

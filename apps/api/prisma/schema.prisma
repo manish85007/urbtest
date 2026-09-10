@@ -385,6 +385,9 @@ model Mrn {
   factoryId    String   @map("factory_id") @db.VarChar(16)
   receivedAt   DateTime @map("received_at") @db.Date
   receivedBy   String   @map("received_by")
+  /** Client delivery challan when goods move before the tax invoice. */
+  deliveryChallanNo   String?   @map("delivery_challan_no")
+  deliveryChallanDate DateTime? @map("delivery_challan_date") @db.Date
   driverSign   String?  @map("driver_sign")
   managerSign  String?  @map("manager_sign")
   securitySign String?  @map("security_sign")

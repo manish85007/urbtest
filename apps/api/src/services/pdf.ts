@@ -168,6 +168,12 @@ export async function mrnPdf(actor: SessionUser, invoiceId: string): Promise<{ f
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'E-way Bill Date', fmt(invoice.ewayBillDate)],
           ['Client', `${sub.client.name} (${sub.clientId})`, 'Client GST', sub.site.gstin || '—'],
           ['Origin Site', sub.site.name, 'Received On', fmt(mrn.receivedAt)],
+          [
+            'Delivery Challan',
+            mrn.deliveryChallanNo || '—',
+            'Delivery Challan Date',
+            fmt(mrn.deliveryChallanDate),
+          ],
           ['MRN Number', mrn.mrnNo, 'Invoice billing weight', `${num(invoice.billingWeight.toString())} kg`],
           ['Material received', `${num(receivedKg)} kg`, 'Condition on Arrival', mrn.condition || 'Good'],
         ],
@@ -307,6 +313,12 @@ export async function form6Pdf(actor: SessionUser, invoiceId: string): Promise<{
           ['Request ID', sub.id, 'Invoice Number', invoice.invoiceNo],
           ['E-way Bill Number', invoice.ewayBillNo || '—', 'E-way Bill Date', fmt(invoice.ewayBillDate)],
           ['MRN Reference', invoice.mrn?.mrnNo || '—', 'Received On', fmt(invoice.mrn?.receivedAt)],
+          [
+            'Delivery Challan',
+            invoice.mrn?.deliveryChallanNo || '—',
+            'Delivery Challan Date',
+            fmt(invoice.mrn?.deliveryChallanDate),
+          ],
           [
             'Invoice billed weight',
             `${num(invoice.billingWeight.toString())} kg`,

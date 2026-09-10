@@ -948,7 +948,20 @@ export async function getRegisterReport(
       ];
     });
   } else if (type === 'mrn') {
-    head = ['MRN', 'Invoice', 'Request', 'Client', 'Factory', 'Received', 'Vehicles', 'Qty', 'Weight kg', 'Received By'];
+    head = [
+      'MRN',
+      'Invoice',
+      'Request',
+      'Client',
+      'Factory',
+      'Received',
+      'Delivery Challan',
+      'Challan Date',
+      'Vehicles',
+      'Qty',
+      'Weight kg',
+      'Received By',
+    ];
     const mrns = await prisma.mrn.findMany({
       where: { invoice: { submission: scope } },
       include: {
@@ -969,6 +982,8 @@ export async function getRegisterReport(
           m.invoice.submission.client.name,
           m.factory.name,
           fmtDate(m.receivedAt),
+          m.deliveryChallanNo || '',
+          m.deliveryChallanDate ? fmtDate(m.deliveryChallanDate) : '',
           m.invoice.vehicleIds.length,
           mats.reduce((a, x) => a + Number(x.q ?? 0), 0),
           Number(mats.reduce((a, x) => a + Number(x.w ?? 0), 0).toFixed(3)),

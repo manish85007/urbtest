@@ -924,6 +924,14 @@ function MrnCard({
               <div className="tile-v">{fmtDate(m.receivedAt)}</div>
             </div>
             <div className="tile">
+              <div className="tile-l">Delivery Challan</div>
+              <div className="tile-v mono">{m.deliveryChallanNo || '—'}</div>
+            </div>
+            <div className="tile">
+              <div className="tile-l">Challan Date</div>
+              <div className="tile-v">{m.deliveryChallanDate ? fmtDate(m.deliveryChallanDate) : '—'}</div>
+            </div>
+            <div className="tile">
               <div className="tile-l">Billed / received</div>
               <div className="tile-v mono">
                 {num(Number(invoice.billingWeight))} / {num(matWt)} kg

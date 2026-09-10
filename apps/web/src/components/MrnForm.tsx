@@ -26,6 +26,8 @@ interface MrnFormProps {
   onSubmit: (body: {
     factoryId: string;
     receivedAt: string;
+    deliveryChallanNo?: string;
+    deliveryChallanDate?: string;
     driverSign: string;
     managerSign: string;
     securitySign: string;
@@ -103,6 +105,10 @@ export function MrnForm({
   const [factories, setFactories] = useState<Array<{ id: string; name: string }>>([]);
   const [factoryId, setFactoryId] = useState(invoice.mrn?.factoryId ?? 'URB-BLR');
   const [receivedAt, setReceivedAt] = useState(invoice.mrn?.receivedAt?.slice(0, 10) || today);
+  const [deliveryChallanNo, setDeliveryChallanNo] = useState(invoice.mrn?.deliveryChallanNo || '');
+  const [deliveryChallanDate, setDeliveryChallanDate] = useState(
+    invoice.mrn?.deliveryChallanDate?.slice(0, 10) || '',
+  );
   const [condition, setCondition] = useState(invoice.mrn?.condition || 'Good');
   const [note, setNote] = useState('');
   const [driverSign, setDriverSign] = useState(invoice.mrn?.driverSign || invoiceVehs[0]?.driverName || '');
@@ -171,9 +177,22 @@ export function MrnForm({
           setError('Upload at least one photograph of the material inside the vehicle.');
           return;
         }
+        const challanNo = deliveryChallanNo.trim();
+        const challanDate = deliveryChallanDate.trim();
+        if (challanNo && !challanDate) {
+          setError('Enter the delivery challan date when a challan number is provided.');
+          return;
+        }
+        if (!challanNo && challanDate) {
+          setError('Enter the delivery challan number when a challan date is provided.');
+          return;
+        }
         onSubmit({
           factoryId,
           receivedAt,
+          ...(challanNo
+            ? { deliveryChallanNo: challanNo, deliveryChallanDate: challanDate }
+            : {}),
           driverSign: driverSign.trim(),
           managerSign: managerSign.trim(),
           securitySign: securitySign.trim(),
@@ -261,6 +280,31 @@ export function MrnForm({
           max={maxDate}
           required
           hint={backdateHint ?? 'Today or an earlier date only'}
+        />
+      </div>
+      <div className="fr2" style={{ marginTop: '.45rem' }}>
+        <div className="fg">
+          <label htmlFor="mr-dc-no">Delivery Challan No. (optional)</label>
+          <input
+            id="mr-dc-no"
+            value={deliveryChallanNo}
+            onChange={(e) => setDeliveryChallanNo(e.target.value)}
+            placeholder="When goods move before tax invoice"
+            disabled={disabled}
+          />
+        </div>
+        <DateField
+          id="mr-dc-dt"
+          label="Delivery Challan Date"
+          value={deliveryChallanDate}
+          onChange={setDeliveryChallanDate}
+          min={minDate}
+          max={maxDate}
+          hint={
+            deliveryChallanNo.trim() || deliveryChallanDate
+              ? (backdateHint ?? 'Required when challan number is entered')
+              : 'Optional — use when material arrives on challan'
+          }
         />
       </div>
 
