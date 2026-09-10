@@ -3,8 +3,22 @@ import { useSearchParams } from 'react-router-dom';
 import { complianceApi, type ControlRow } from '../api';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
+import { formatDetailObject } from '../lib/display';
+import { fmtTS } from '../lib/format';
 
 type Tab = 'controls' | 'security' | 'access' | 'incidents' | 'privacy' | 'retention' | 'evidence';
+
+const TAB_ALIASES: Record<string, Tab> = {
+  'security-events': 'security',
+  events: 'security',
+  'access-review': 'access',
+  reviews: 'access',
+  incident: 'incidents',
+  dsr: 'privacy',
+  privacy: 'privacy',
+  evidence: 'evidence',
+  pack: 'evidence',
+};
 
 const TABS: Array<[Tab, string]> = [
   ['controls', 'Control status'],
@@ -24,9 +38,23 @@ function stateBadge(state: string) {
 
 export function CompliancePage() {
   const [params, setParams] = useSearchParams();
-  const tabParam = params.get('tab') as Tab | null;
-  const tab: Tab = TABS.some(([id]) => id === tabParam) ? (tabParam as Tab) : 'controls';
+  const rawTab = params.get('tab') ?? '';
+  const resolved = (TAB_ALIASES[rawTab] ?? rawTab) as Tab | '';
+  const known = TABS.some(([id]) => id === resolved);
+  const tab: Tab = known ? (resolved as Tab) : 'controls';
   const [error, setError] = useState('');
+  const [tabHint, setTabHint] = useState('');
+
+  useEffect(() => {
+    if (rawTab && !known) {
+      setTabHint(`Unknown tab “${rawTab}” — showing ${TABS.find(([id]) => id === tab)?.[1] ?? 'default'}.`);
+    } else if (rawTab && TAB_ALIASES[rawTab] && TAB_ALIASES[rawTab] !== rawTab) {
+      setParams({ tab: TAB_ALIASES[rawTab] }, { replace: true });
+      setTabHint('');
+    } else {
+      setTabHint('');
+    }
+  }, [rawTab, known, tab, setParams]);
 
   return (
     <div>
@@ -38,6 +66,11 @@ export function CompliancePage() {
           </div>
         </div>
       </div>
+      {tabHint ? (
+        <div className="dim" style={{ fontSize: '.78rem', marginBottom: '.45rem', color: 'var(--am)' }}>
+          {tabHint}
+        </div>
+      ) : null}
       <div className="tabs">
         {TABS.map(([id, label]) => (
           <button
@@ -142,7 +175,7 @@ function SecurityTab({ onError }: { onError: (s: string) => void }) {
   function exportCsv() {
     const head = ['When', 'Severity', 'Event', 'Account', 'Detail'];
     const body = rows.map((r) =>
-      [r.ts, r.severity, r.kind, r.email, JSON.stringify(r.detail)].map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','),
+      [fmtTS(r.ts), r.severity, r.kind, r.email, formatDetailObject(r.detail)].map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','),
     );
     const blob = new Blob([[head.join(','), ...body].join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -195,7 +228,7 @@ function SecurityTab({ onError }: { onError: (s: string) => void }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td className="dim">{r.ts.replace('T', ' ').slice(0, 19)}</td>
+                <td className="dim">{fmtTS(r.ts)}</td>
                 <td>
                   <span className={`badge ${r.severity === 'high' ? 'bg-rd' : r.severity === 'warn' ? 'bg-am' : 'bg-gy'}`}>
                     {r.severity}
@@ -204,7 +237,7 @@ function SecurityTab({ onError }: { onError: (s: string) => void }) {
                 <td>{r.kind}</td>
                 <td>{r.email}</td>
                 <td className="dim" style={{ fontSize: '.78rem' }}>
-                  {typeof r.detail === 'object' ? JSON.stringify(r.detail) : String(r.detail)}
+                  {formatDetailObject(r.detail)}
                 </td>
               </tr>
             ))}
@@ -393,7 +426,29 @@ function IncidentsTab({ onError }: { onError: (s: string) => void }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '1.4rem .8rem' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--g2)', marginBottom: '.35rem' }}>
+                    No incidents have been recorded
+                  </div>
+                  <div className="dim" style={{ fontSize: '.8rem', marginBottom: '.7rem' }}>
+                    Security or operational incidents will appear here once logged.
+                  </div>
+                  <button
+                    type="button"
+                    className="btn bp bsm"
+                    onClick={() => {
+                      setEditing(null);
+                      setOpen(true);
+                    }}
+                  >
+                    Report Incident
+                  </button>
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
               <tr key={r.id}>
                 <td>{r.ref}</td>
                 <td>{r.title}</td>
@@ -424,7 +479,8 @@ function IncidentsTab({ onError }: { onError: (s: string) => void }) {
                   </button>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>

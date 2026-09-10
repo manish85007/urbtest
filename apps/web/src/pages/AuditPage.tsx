@@ -3,6 +3,7 @@ import { dataApi, type AuditLogPage } from '../api';
 import { downloadCsvGrid } from '../lib/csv';
 import { DateField } from '../components/DateField';
 import { fmtTS } from '../lib/format';
+import { formatDetailObject } from '../lib/display';
 
 const EMPTY: AuditLogPage = {
   total: 0,
@@ -23,11 +24,7 @@ function actionBadge(action: string): string {
 }
 
 function detailText(details: unknown): string {
-  try {
-    return JSON.stringify(details ?? {}).slice(0, 140);
-  } catch {
-    return '';
-  }
+  return formatDetailObject(details);
 }
 
 export function AuditPage() {
@@ -103,7 +100,7 @@ export function AuditPage() {
         r.action,
         r.entity,
         r.entityId || '',
-        JSON.stringify(r.details ?? {}),
+        formatDetailObject(r.details),
       ]),
     );
   }
