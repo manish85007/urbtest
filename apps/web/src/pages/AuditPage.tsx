@@ -198,12 +198,12 @@ export function AuditPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Entity</th>
-                    <th>Reference</th>
-                    <th>Detail</th>
+                    <th scope="col">When</th>
+                    <th scope="col">User</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Entity</th>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Detail</th>
                   </tr>
                 </thead>
                 <tbody>

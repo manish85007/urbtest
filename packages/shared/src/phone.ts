@@ -1,4 +1,4 @@
-/** Indian mobile numbers: country code + frozen 10-digit national number. */
+/** Indian mobile numbers: 10-digit national number (no country-code prefix in UI). */
 
 export const DEFAULT_COUNTRY_CODE = '91';
 
@@ -36,8 +36,16 @@ export function formatE164(national: string, cc = DEFAULT_COUNTRY_CODE): string 
   return n ? `+${cc}${n}` : '';
 }
 
+/** Display form: exactly 10 digits (no +91 / spaces). Empty if unusable. */
+export function formatPhoneDisplay(raw: string | null | undefined): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  const n = national10(s);
+  return /^\d{10}$/.test(n) ? n : s.replace(/\D/g, '').slice(-10) || s;
+}
+
 export function isValidNational10(raw: string): boolean {
-  return /^\d{10}$/.test(national10(raw)) && national10(raw).length === 10;
+  return /^\d{10}$/.test(national10(raw));
 }
 
 export function splitPhone(raw: string): { cc: string; national: string } {

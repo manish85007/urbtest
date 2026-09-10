@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { authApi, type SecurityStatus, type SessionUser } from './api';
@@ -37,6 +37,22 @@ function AdminOnly({ user, children }: { user: SessionUser; children: ReactNode 
 function AdminOrAuditor({ user, children }: { user: SessionUser; children: ReactNode }) {
   if (user.role !== 'admin' && user.role !== 'auditor') return <Navigate to="/" replace />;
   return children;
+}
+
+function NotFoundPage() {
+  return (
+    <div className="card" style={{ maxWidth: 420, margin: '2rem auto', textAlign: 'center' }}>
+      <h1 className="h1" style={{ marginBottom: '.5rem' }}>
+        Page not found
+      </h1>
+      <p className="dim" style={{ marginBottom: '1rem' }}>
+        That URL is not part of Urb TecTrack. Check the address or return to your dashboard.
+      </p>
+      <Link to="/" className="btn bp">
+        Dashboard
+      </Link>
+    </div>
+  );
 }
 
 export function App() {
@@ -222,7 +238,10 @@ export function App() {
           element={<ProfilePage user={user} onUserUpdate={setUser} />}
         />
         <Route path="/legal/:key" element={<LegalPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/settings" element={<Navigate to="/masters?tab=company" replace />} />
+        <Route path="/recycling-heroes" element={<Navigate to="/heroes" replace />} />
+        <Route path="/sustainability" element={<Navigate to="/impact" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Shell>
   );

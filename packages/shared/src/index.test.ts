@@ -3,7 +3,7 @@ import { getFY, formatMrnNumber, formatForm6Number } from './fiscal-year.js';
 import { invStage, subStage, viewPhaseForStage } from './stage.js';
 import { deriveTax, rupeesToPaise } from './money.js';
 import { recoveryFor, weightsBalance } from './recovery.js';
-import { formatE164, isValidNational10, national10 } from './phone.js';
+import { formatE164, isValidNational10, national10, formatPhoneDisplay } from './phone.js';
 import { isPastCalendarDate, localYmd, requestDateError, lifecycleDateError, HISTORICAL_REQUEST_FROM, HISTORICAL_BACKDATE_FROM } from './calendar-date.js';
 
 describe('fiscal year', () => {
@@ -74,6 +74,8 @@ describe('phone', () => {
     expect(national10('+91 99001 12233')).toBe('9900112233');
     expect(isValidNational10('9900112233')).toBe(true);
     expect(formatE164('9900112233')).toBe('+919900112233');
+    expect(formatPhoneDisplay('+91 99001 12233')).toBe('9900112233');
+    expect(formatPhoneDisplay('9900112233')).toBe('9900112233');
     expect(isValidNational10('990011')).toBe(false);
   });
 });

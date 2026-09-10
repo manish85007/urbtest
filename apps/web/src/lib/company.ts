@@ -4,8 +4,8 @@ export const COMPANY = {
   brand: 'Recycling Heroes™',
   email: 'info@urbeno.in',
   /** Prefer Masters → Company & Letterhead; this is only a temporary fallback. */
-  phone: '+91 99022 99007',
-  phoneTel: '+919902299007',
+  phone: '9902299007',
+  phoneTel: '9902299007',
   wa: '919902299007',
   waUrl: 'https://wa.me/919902299007',
   /** Public certificate pack (TÜV Rheinland) on the corporate site. */
@@ -19,7 +19,7 @@ export const COMPANY = {
 } as const;
 
 export function phoneTelHref(phone: string): string {
-  const digits = phone.replace(/[^\d+]/g, '');
+  const digits = phone.replace(/\D/g, '');
   return digits || COMPANY.phoneTel;
 }
 

@@ -22,7 +22,7 @@ const SAMPLE_VARS: Record<string, string> = {
   expiry_minutes: '15',
   support_email: 'info@urbeno.in',
   contact_email: 'info@urbeno.in',
-  temp_password: 'demo',
+  temp_password: 'TtA1b2C3d4E5f6G7h8i9j07!',
   admin_name: 'Urbeno Admin',
   portal_url: 'https://tectrack.urbeno.in',
 };

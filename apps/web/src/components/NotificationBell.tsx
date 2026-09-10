@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dataApi } from '../api';
+import { fmtTS } from '../lib/format';
 
 export function NotificationBell() {
   const nav = useNavigate();
@@ -94,7 +95,7 @@ export function NotificationBell() {
               >
                 <div>{n.text}</div>
                 <div className="dim" style={{ fontSize: '.7rem', marginTop: '.15rem' }}>
-                  {n.createdAt.slice(0, 16).replace('T', ' ')}
+                  {fmtTS(n.createdAt)}
                 </div>
               </button>
             ))

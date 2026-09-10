@@ -8,7 +8,7 @@ import {
 } from '../api';
 import { BarChart, DonutChart } from '../components/charts';
 import { StageBadge } from '../components/StageProgress';
-import { fmtDate, num } from '../lib/format';
+import { displayLabel, fmtDate, kg, num, titleCaseName } from '../lib/format';
 import { userCan } from '../lib/permissions';
 import { useAnimatedNumber } from '../lib/useAnimatedNumber';
 import { AdminDashboard } from './admin/AdminDashboard';
@@ -56,10 +56,10 @@ function ClientDashboard({
       {/* Header */}
       <div className="f-row" style={{ marginBottom: '1rem' }}>
         <div>
-          <div className="h1">Welcome, {first}</div>
+          <h1 className="h1">Welcome, {first}</h1>
           <div className="p-mu" style={{ margin: 0 }}>
-            {report.clientName || user.name} · {report.period.fy}
-            {siteName ? ` · ${siteName}` : ' · all sites'}
+            {titleCaseName(report.clientName || user.name)} · {report.period.fy}
+            {siteName ? ` · ${displayLabel(siteName)}` : ' · all sites'}
           </div>
         </div>
         <div className="spacer" />
@@ -83,7 +83,7 @@ function ClientDashboard({
               className={`client-site-chip ${siteId === st.id ? 'on' : ''}`}
               onClick={() => onSite(siteId === st.id ? '' : st.id)}
             >
-              {st.name} · {st.open} open
+              {displayLabel(st.name)} · {st.open} open
             </button>
           ))}
         </div>
@@ -180,7 +180,7 @@ function ClientDashboard({
                 <span>
                   <b style={{ color: '#1e40af' }}>{p.submissionId}</b>
                   <span className="dim" style={{ fontSize: '.78rem', marginLeft: '.4rem' }}>
-                    {p.siteName} · {p.registration}
+                    {displayLabel(p.siteName)} · {p.registration}
                   </span>
                 </span>
                 <span style={{ fontWeight: 700, color: '#1e3a8a' }}>{fmtDate(p.expectedAt)}</span>
@@ -256,10 +256,10 @@ function ClientDashboard({
             <table>
               <thead>
                 <tr>
-                  <th>Request</th>
-                  <th>Site</th>
-                  <th>Status</th>
-                  <th>Weight</th>
+                  <th scope="col">Request</th>
+                  <th scope="col">Site</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Weight</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,7 +273,7 @@ function ClientDashboard({
                         {fmtDate(s.requestDate)}
                       </div>
                     </td>
-                    <td className="dim">{s.siteName}</td>
+                    <td className="dim">{displayLabel(s.siteName)}</td>
                     <td>
                       {s.returned ? (
                         <span className="badge bg-am">Pending with You</span>
@@ -281,7 +281,7 @@ function ClientDashboard({
                         <StageBadge stage={s.stage} />
                       )}
                     </td>
-                    <td className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)} kg</td>
+                    <td className="mono">{kg(s.netKg > 0 ? s.netKg : s.approxWeight)} kg</td>
                   </tr>
                 ))}
               </tbody>

@@ -6,6 +6,8 @@ import { FileUpload } from '../components/FileUpload';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
 import { UserFormModal } from './masters/UserFormModal';
+import { titleCasePlace } from '../lib/display';
+import { displayCode } from '../lib/format';
 
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -76,7 +78,8 @@ export function ClientDetailPage() {
             <div className="h1">{client.name}</div>
             <div className="p-mu" style={{ margin: 0 }}>
               <span className="badge bg-g mono">{client.id}</span> · {client.city || ''} · {client.stats.requests}{' '}
-              requests · {client.users.length} users
+              request{client.stats.requests === 1 ? '' : 's'} · {client.users.length} user
+              {client.users.length === 1 ? '' : 's'}
             </div>
           </div>
         </div>
@@ -146,12 +149,12 @@ export function ClientDetailPage() {
                   {client.sites.map((st) => (
                     <tr key={st.id} style={st.active === false ? { opacity: 0.55 } : undefined}>
                       <td className="mono">
-                        <b>{st.code}</b>
+                        <b>{displayCode(st.code)}</b>
                       </td>
                       <td>
                         {st.name}
                         <div className="dim" style={{ fontSize: '.72rem' }}>
-                          {st.city || ''}
+                          {titleCasePlace(st.city) || ''}
                           {st.state ? `, ${st.state}` : ''}
                         </div>
                       </td>

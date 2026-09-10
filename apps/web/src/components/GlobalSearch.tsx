@@ -44,6 +44,7 @@ export function GlobalSearch() {
     <div className="srch" ref={box}>
       <input
         type="text"
+        aria-label="Search"
         value={q}
         placeholder="Search device serial, asset tag, request, invoice, CoD…"
         onChange={(e) => setQ(e.target.value)}

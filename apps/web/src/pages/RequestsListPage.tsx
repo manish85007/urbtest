@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { VIEW_PHASES, viewPhaseForStage, getFY, listFiscalYears } from '@urb-tectrack/shared';
 import { dataApi, type SessionUser, type SubmissionSummary } from '../api';
 import { StageBadge } from '../components/StageProgress';
-import { fmtDate, num } from '../lib/format';
+import { displayLabel, displayPoRef, fmtDate, kg, titleCaseName } from '../lib/format';
 import { isClientPortalUser, isStaffUser, userCan } from '../lib/permissions';
 
 interface RequestsListPageProps {
@@ -128,7 +128,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
               <option value="">All stages</option>
               {VIEW_PHASES.map((s) => (
                 <option key={s.n} value={String(s.n)}>
-                  {s.n}. {s.l}
+                  {s.n} · {s.l}
                 </option>
               ))}
             </select>
@@ -203,13 +203,13 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
             <table>
               <thead>
                 <tr>
-                  <th>Request</th>
-                  {isStaff ? <th>Client</th> : null}
-                  <th>Site</th>
-                  <th>Stage</th>
-                  <th>Invoices</th>
-                  <th>Net kg</th>
-                  <th>Pick-up date</th>
+                  <th scope="col">Request</th>
+                  {isStaff ? <th scope="col">Client</th> : null}
+                  <th scope="col">Site</th>
+                  <th scope="col">Stage</th>
+                  <th scope="col">Invoices</th>
+                  <th scope="col">Net kg</th>
+                  <th scope="col">Pick-up date</th>
                 </tr>
               </thead>
               <tbody>
@@ -224,11 +224,11 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                         <b>{r.id}</b>
                       </Link>
                       <div className="dim" style={{ fontSize: '.72rem' }}>
-                        {r.ref || 'no PO'}
+                        {displayPoRef(r.ref)}
                       </div>
                     </td>
-                    {isStaff ? <td>{r.clientName}</td> : null}
-                    <td className="dim">{r.siteName}</td>
+                    {isStaff ? <td>{titleCaseName(r.clientName)}</td> : null}
+                    <td className="dim">{displayLabel(r.siteName)}</td>
                     <td>
                       {r.returned ? (
                         <span className="badge bg-am" title="Returned to requestor — awaiting their update">
@@ -254,7 +254,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                         <span className="dim">—</span>
                       )}
                     </td>
-                    <td className="mono">{num(r.netKg && r.netKg > 0 ? r.netKg : Number(r.approxWeight) || 0)}</td>
+                    <td className="mono">{kg(r.netKg && r.netKg > 0 ? r.netKg : Number(r.approxWeight) || 0)}</td>
                     <td className="dim">{fmtDate(r.requestDate)}</td>
                   </tr>
                 ))}

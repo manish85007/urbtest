@@ -1,4 +1,4 @@
-import { hasPermission, isValidNational10, national10, formatE164, countryCodeOf, lifecycleDateError } from '@urb-tectrack/shared';
+import { hasPermission, isValidNational10, national10, lifecycleDateError } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { AppError } from '../lib/errors.js';
 import { roundKg, toKg } from '../lib/decimal.js';
@@ -468,5 +468,5 @@ function requireMobile(raw: string, label: string): string {
   if (!isValidNational10(raw)) {
     throw new AppError(`${label} must be a 10-digit mobile number.`);
   }
-  return formatE164(national10(raw), countryCodeOf(raw));
+  return national10(raw);
 }

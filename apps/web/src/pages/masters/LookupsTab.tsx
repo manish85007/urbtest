@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { formatPhoneDisplay, isValidNational10, national10, titleCasePlace } from '@urb-tectrack/shared';
 import { dataApi, type LookupRow } from '../../api';
 import { Modal } from '../../components/Modal';
+import { PhoneField } from '../../components/PhoneField';
 import {
   LOOKUP_DEFS,
   canonicalLookupCategory,
@@ -16,22 +18,26 @@ interface LookupsTabProps {
 function cell(row: LookupRow, col: LookupCol): string {
   const v = row[col.k];
   if (v === undefined || v === null || v === '') return '—';
+  if (col.k === 'phone') return formatPhoneDisplay(String(v)) || String(v);
+  if (col.k === 'label') return titleCasePlace(String(v)) || String(v);
   return String(v);
 }
 
 export function LookupsTab({ lookups, onChanged }: LookupsTabProps) {
   const [editing, setEditing] = useState<{ def: LookupDef; row?: LookupRow } | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LookupRow[]>();
     for (const row of lookups) {
+      if (!showInactive && row.active === false) continue;
       const key = canonicalLookupCategory(row.category);
       const list = map.get(key) ?? [];
       list.push(row);
       map.set(key, list);
     }
     return map;
-  }, [lookups]);
+  }, [lookups, showInactive]);
 
   async function toggle(row: LookupRow, on: boolean) {
     await dataApi.upsertLookup({
@@ -54,6 +60,16 @@ export function LookupsTab({ lookups, onChanged }: LookupsTabProps) {
 
   return (
     <>
+      <div className="f-row" style={{ marginBottom: '.55rem', alignItems: 'center' }}>
+        <label className="dim" style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', margin: 0 }}>
+          <input
+            type="checkbox"
+            checked={showInactive}
+            onChange={(e) => setShowInactive(e.target.checked)}
+          />
+          Show deactivated entries
+        </label>
+      </div>
       {LOOKUP_DEFS.map((def) => {
         const rows = grouped.get(def.key) ?? [];
         return (
@@ -171,6 +187,11 @@ function LookupModal({
       setError(`${first.h} is required.`);
       return;
     }
+    const phoneRaw = values.phone?.trim() ?? '';
+    if (phoneRaw && !isValidNational10(phoneRaw)) {
+      setError('Enter a valid 10-digit phone number.');
+      return;
+    }
     const body: Parameters<typeof dataApi.upsertLookup>[0] = {
       category: def.key,
       id: row?.id,
@@ -179,6 +200,8 @@ function LookupModal({
       const raw = values[c.k]?.trim() ?? '';
       if (c.kind === 'number') {
         (body as Record<string, unknown>)[c.k] = raw ? Number(raw) : 0;
+      } else if (c.k === 'phone' && raw) {
+        (body as Record<string, unknown>)[c.k] = national10(raw);
       } else {
         (body as Record<string, unknown>)[c.k] = raw;
       }
@@ -208,21 +231,30 @@ function LookupModal({
       onOk={() => void save()}
     >
       {error ? <p className="error">{error}</p> : null}
-      {def.cols.map((c) => (
-        <div className="fg" key={c.k}>
-          <label htmlFor={`lk-${c.k}`}>
-            {c.h}
-            {c.required ? ' *' : ''}
-          </label>
-          <input
-            id={`lk-${c.k}`}
-            type={numberKeys.has(c.k) ? 'number' : 'text'}
-            step={numberKeys.has(c.k) ? 'any' : undefined}
-            value={values[c.k] ?? ''}
-            onChange={(e) => setValues((v) => ({ ...v, [c.k]: e.target.value }))}
+      {def.cols.map((c) =>
+        c.k === 'phone' ? (
+          <PhoneField
+            key={c.k}
+            label={c.h}
+            value={values.phone ?? ''}
+            onChange={(e164) => setValues((v) => ({ ...v, phone: e164 }))}
           />
-        </div>
-      ))}
+        ) : (
+          <div className="fg" key={c.k}>
+            <label htmlFor={`lk-${c.k}`}>
+              {c.h}
+              {c.required ? ' *' : ''}
+            </label>
+            <input
+              id={`lk-${c.k}`}
+              type={numberKeys.has(c.k) ? 'number' : 'text'}
+              step={numberKeys.has(c.k) ? 'any' : undefined}
+              value={values[c.k] ?? ''}
+              onChange={(e) => setValues((v) => ({ ...v, [c.k]: e.target.value }))}
+            />
+          </div>
+        ),
+      )}
     </Modal>
   );
 }

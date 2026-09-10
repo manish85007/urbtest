@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { COUNTRY_CODES, digitsOnly, formatE164, splitPhone } from '@urb-tectrack/shared';
+import { digitsOnly, national10 } from '@urb-tectrack/shared';
 
 interface PhoneFieldProps {
   label: string;
   value: string;
-  onChange: (e164: string) => void;
+  /** Emits a 10-digit national number (or '' while incomplete). */
+  onChange: (national10: string) => void;
   required?: boolean;
   id?: string;
   placeholder?: string;
 }
 
-/** Country-code select + 10-digit national number input. */
+/** 10-digit mobile input — no country-code prefix in the UI. */
 export function PhoneField({
   label,
   value,
@@ -19,30 +20,17 @@ export function PhoneField({
   id,
   placeholder = '9845000000',
 }: PhoneFieldProps) {
-  const parsed = splitPhone(value);
   const inputId = id ?? `ph-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  const [draft, setDraft] = useState(national10(value));
 
-  // Keep a local draft so that partial typing (< 10 digits) doesn't corrupt
-  // the controlled value via the E164 round-trip.
-  const [draft, setDraft] = useState(parsed.national);
-  const [cc, setCc] = useState(parsed.cc);
-
-  // Sync draft when parent resets the value (e.g. vehicle edit loads existing)
   useEffect(() => {
-    setDraft(parsed.national);
-    setCc(parsed.cc);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setDraft(national10(value));
   }, [value]);
 
-  function handleNationalChange(raw: string) {
+  function handleChange(raw: string) {
     const digits = digitsOnly(raw).slice(0, 10);
     setDraft(digits);
-    onChange(digits ? (digits.length === 10 ? formatE164(digits, cc) : digits) : '');
-  }
-
-  function handleCcChange(newCc: string) {
-    setCc(newCc);
-    onChange(draft ? formatE164(draft, newCc) : '');
+    onChange(digits.length === 10 ? digits : digits);
   }
 
   return (
@@ -51,31 +39,18 @@ export function PhoneField({
         {label}
         {required ? ' *' : ''}
       </label>
-      <div className="phone-in">
-        <select
-          aria-label="ISD country code"
-          value={cc}
-          onChange={(e) => handleCcChange(e.target.value)}
-        >
-          {COUNTRY_CODES.map((c) => (
-            <option key={c.cc} value={c.cc}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <input
-          id={inputId}
-          type="tel"
-          inputMode="numeric"
-          autoComplete="tel-national"
-          maxLength={10}
-          pattern="[0-9]{10}"
-          placeholder={placeholder}
-          value={draft}
-          required={required}
-          onChange={(e) => handleNationalChange(e.target.value)}
-        />
-      </div>
+      <input
+        id={inputId}
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel-national"
+        maxLength={10}
+        pattern="[0-9]{10}"
+        placeholder={placeholder}
+        value={draft}
+        required={required}
+        onChange={(e) => handleChange(e.target.value)}
+      />
     </div>
   );
 }

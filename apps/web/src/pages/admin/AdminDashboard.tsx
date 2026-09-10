@@ -4,7 +4,7 @@ import { formatINR } from '@urb-tectrack/shared';
 import { type SessionUser, type StaffDashboardReport } from '../../api';
 import { BarChart, CapacityRing, DonutChart } from '../../components/charts';
 import { StageBadge } from '../../components/StageProgress';
-import { fmtDate, num } from '../../lib/format';
+import { displayLabel, fmtDate, kg, num, titleCaseName } from '../../lib/format';
 import { useAnimatedNumber } from '../../lib/useAnimatedNumber';
 import { dashboardTitle } from '../../lib/roles';
 import { userCan } from '../../lib/permissions';
@@ -85,10 +85,12 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
     <div className="admin-dash">
       <div className="f-row admin-dash-hd">
         <div>
-          <div className="h1">{dashboardTitle(user.role)}</div>
+          <h1 className="h1">{dashboardTitle(user.role)}</h1>
           <div className="p-mu" style={{ margin: 0 }}>
             {fy} · {user.name}
-            {!isAdminVariant && (user.factoryIds ?? []).length ? ` · ${(user.factoryIds ?? []).join(', ')}` : ''}
+            {!isAdminVariant && (user.factoryIds ?? []).length
+              ? ` · ${(user.factoryIds ?? []).map((id) => displayLabel(id)).join(', ')}`
+              : ''}
             {isAdminVariant ? ' · operations overview' : ''}
           </div>
         </div>
@@ -149,7 +151,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
           <div className="admin-dash-metric-l">Open · {report.stats.totalRequests} total</div>
         </Link>
         <Link to="/reports?type=summary" className="admin-dash-metric">
-          <div className="admin-dash-metric-v">{num(fyKg)}</div>
+          <div className="admin-dash-metric-v">{kg(fyKg)}</div>
           <div className="admin-dash-metric-l">Net kg · {fy}</div>
         </Link>
         <Link to="/reports?type=invoices" className="admin-dash-metric">
@@ -240,10 +242,10 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                     <div className="dim" style={{ fontSize: '.72rem' }}>{r.ref || ''}</div>
                   </>,
                   <>
-                    {r.clientName}
-                    <div className="dim" style={{ fontSize: '.72rem' }}>{r.siteName}</div>
+                    {titleCaseName(r.clientName)}
+                    <div className="dim" style={{ fontSize: '.72rem' }}>{displayLabel(r.siteName)}</div>
                   </>,
-                  <span className="mono">{r.approxWeight} kg</span>,
+                  <span className="mono">{kg(Number(r.approxWeight) || 0)}</span>,
                   <span className="dim">{fmtDate(r.requestDate)}</span>,
                   <Link to={`/requests/${r.id}`} className="btn bp bsm" onClick={(e) => e.stopPropagation()}>
                     {userCan(user, 'acknowledgeRequest') ? 'Acknowledge' : 'Open'}
@@ -274,7 +276,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                     <b className="mono">{r.invoiceNo}</b>
                     <div className="dim" style={{ fontSize: '.7rem' }}>{r.submissionId}</div>
                   </>,
-                  <span className="dim">{r.clientName}</span>,
+                  <span className="dim">{titleCaseName(r.clientName)}</span>,
                   <span className="mono">{formatINR(Number(r.outstandingPaise))}</span>,
                   <span className="badge bg-rd">{r.overdueDays}d</span>,
                 ],
@@ -299,7 +301,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                     <b className="mono">{r.invoiceNo}</b>
                     <div className="dim" style={{ fontSize: '.7rem' }}>{r.submissionId}</div>
                   </>,
-                  <span className="dim">{r.clientName}</span>,
+                  <span className="dim">{titleCaseName(r.clientName)}</span>,
                   <span className="mono">{r.daysUsed} / {r.slaDays}</span>,
                   <span className="badge bg-am">{r.stateLabel}</span>,
                 ],
@@ -345,8 +347,8 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                       <div className="dim" style={{ fontSize: '.72rem' }}>{fmtDate(s.requestDate)}</div>
                     </>,
                     <>
-                      {s.clientName}
-                      <div className="dim" style={{ fontSize: '.72rem' }}>{s.siteName}</div>
+                      {titleCaseName(s.clientName)}
+                      <div className="dim" style={{ fontSize: '.72rem' }}>{displayLabel(s.siteName)}</div>
                     </>,
                     <StageBadge stage={s.stage} />,
                     <>
@@ -358,7 +360,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                           ))
                         : <span className="dim">—</span>}
                     </>,
-                    <span className="mono">{num(s.netKg > 0 ? s.netKg : s.approxWeight)}</span>,
+                    <span className="mono">{kg(s.netKg > 0 ? s.netKg : s.approxWeight)}</span>,
                   ],
                 }))}
                 headers={['Request', 'Client', 'Stage', 'Invoices', 'Net kg']}
@@ -392,7 +394,7 @@ function AdminTable({
     <div className="tw admin-table-wrap">
       <table>
         <thead>
-          <tr>{headers.map((h) => <th key={h}>{h}</th>)}</tr>
+          <tr>{headers.map((h) => <th key={h} scope="col">{h}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
@@ -439,7 +441,7 @@ function AdminQueueCard({
               <span>
                 <b>{item.invoiceNo}</b>
                 <span className="dim" style={{ fontSize: '.72rem', marginLeft: '.35rem' }}>
-                  {item.submissionId} · {item.clientName}
+                  {item.submissionId} · {titleCaseName(item.clientName)}
                 </span>
               </span>
               <span className="badge bg-gy">{act}</span>

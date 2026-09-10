@@ -3,7 +3,10 @@ import { randomBytes } from 'node:crypto';
 import {
   gstinError,
   isClientPortalRole,
+  isValidNational10,
+  national10,
   requiresUrbenoEmail,
+  titleCasePlace,
   treesEarned,
 } from '@urb-tectrack/shared';
 import { AppError } from '../lib/errors.js';
@@ -65,7 +68,7 @@ function siteData(input: SiteInput) {
     name,
     address,
     gstin,
-    city: input.city?.trim() || null,
+    city: input.city != null ? titleCasePlace(input.city) || null : null,
     state: input.state?.trim() || null,
     pin: input.pin?.trim() || null,
     contactName: input.contactName?.trim() || null,
@@ -107,9 +110,13 @@ export async function createClient(
       data: {
         id,
         name,
-        city: input.city?.trim() || null,
+        city: input.city != null ? titleCasePlace(input.city) || null : null,
         contact: input.contact?.trim() || null,
-        phone: input.phone?.trim() || null,
+        phone: input.phone
+          ? isValidNational10(input.phone)
+            ? national10(input.phone)
+            : input.phone.trim()
+          : null,
         email: input.email?.trim().toLowerCase() || null,
         payTermsDays: input.payTermsDays ?? 30,
         logoFileId: input.logoFileId ?? null,
@@ -465,7 +472,12 @@ export async function updateClient(
       name: input.name?.trim() || undefined,
       city: input.city !== undefined ? input.city.trim() || null : undefined,
       contact: input.contact !== undefined ? input.contact.trim() || null : undefined,
-      phone: input.phone !== undefined ? input.phone.trim() || null : undefined,
+      phone:
+        input.phone !== undefined
+          ? input.phone && isValidNational10(input.phone)
+            ? national10(input.phone)
+            : input.phone.trim() || null
+          : undefined,
       email: input.email !== undefined ? input.email.trim().toLowerCase() || null : undefined,
       payTermsDays: input.payTermsDays,
       logoFileId: input.logoFileId !== undefined ? input.logoFileId : undefined,

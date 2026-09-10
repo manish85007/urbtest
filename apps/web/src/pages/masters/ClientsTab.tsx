@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { dataApi, filesApi, type ClientSummary, type LookupRow } from '../../api';
 import { FileUpload } from '../../components/FileUpload';
 import { Modal } from '../../components/Modal';
+import { titleCasePlace } from '../../lib/display';
 import { validClientCode } from '../../lib/lookup-defs';
 
 interface SiteDraft {
@@ -72,7 +73,7 @@ export function ClientsTab({ clients, payTerms, onChanged }: ClientsTabProps) {
                   <td>
                     <b>{c.name}</b>
                     <div className="dim" style={{ fontSize: '.72rem' }}>
-                      {c.city || ''}
+                      {titleCasePlace(c.city) || ''}
                     </div>
                   </td>
                   <td>

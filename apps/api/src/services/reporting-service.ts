@@ -107,7 +107,7 @@ function mapActiveRequest(s: SubmissionFull) {
   return {
     id: s.id,
     clientName: s.client.name,
-    siteName: s.site.name,
+    siteName: displayLabel(s.site.name),
     requestDate: s.requestDate.toISOString().slice(0, 10),
     stage: deriveSubmissionStage(s),
     invoices: s.invoices.map((inv) => ({
@@ -144,7 +144,7 @@ export async function getStaffDashboard(actor: SessionUser) {
     .map((s) => ({
       id: s.id,
       clientName: s.client.name,
-      siteName: s.site.name,
+      siteName: displayLabel(s.site.name),
       approxWeight: Number(s.approxWeight),
       approxQty: s.approxQty,
       requestDate: s.requestDate.toISOString().slice(0, 10),
@@ -355,7 +355,7 @@ export async function getImpactReport(
     return {
       id: s.id,
       siteId: s.siteId,
-      siteName: s.site.name,
+      siteName: displayLabel(s.site.name),
       stage,
       returned: stage === 1 && !!s.rejectNote,
       netKg: submissionNetKg(s),
@@ -377,7 +377,7 @@ export async function getImpactReport(
         .filter((v) => !v.weighment && v.expectedAt && v.expectedAt > now)
         .map((v) => ({
           submissionId: s.id,
-          siteName: s.site.name,
+          siteName: displayLabel(s.site.name),
           siteId: s.siteId,
           expectedAt: (v.expectedAt as Date).toISOString().slice(0, 10),
           registration: v.registration,
@@ -460,7 +460,11 @@ export async function getCapacityReport(actor: SessionUser, factoryId: string, p
     }),
   );
 
-  entries.sort((a, b) => b.pct - a.pct);
+  entries.sort(
+    (a, b) =>
+      b.pct - a.pct ||
+      a.entryId.localeCompare(b.entryId, undefined, { numeric: true, sensitivity: 'base' }),
+  );
   const authorized = entries.reduce((s, e) => s + e.capKg, 0);
   const processed = entries.reduce((s, e) => s + e.usedKg, 0);
 
@@ -687,12 +691,33 @@ const HERO_MILESTONE = 10;
 
 function fmtDate(d: Date | null | undefined): string {
   if (!d) return '';
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function fmtTs(d: Date | null | undefined): string {
   if (!d) return '';
-  return d.toISOString().slice(0, 16).replace('T', ' ');
+  return d.toLocaleString('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function displayLabel(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return String(raw).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function displayPo(ref: string | null | undefined): string {
+  const t = String(ref ?? '').trim();
+  if (!t || /^n\/?a$/i.test(t) || /^no\s*po$/i.test(t)) return 'N/A';
+  return t;
+}
+
+function fmtKg(n: number): number {
+  return Math.round(Number(n || 0) * 100) / 100;
 }
 
 function rupees(paise: bigint | number): number {
@@ -789,14 +814,14 @@ export async function getRegisterReport(
       return [
         s.id,
         s.client.name,
-        s.site.name,
-        s.ref || '',
+        displayLabel(s.site.name),
+        displayPo(s.ref),
         fmtDate(s.requestDate),
         `${stage} · ${stageLabel(stage)}`,
         s.vehicles.length,
         s.invoices.length,
-        Number(s.approxWeight),
-        Number(submissionNetKg(s).toFixed(3)),
+        fmtKg(Number(s.approxWeight)),
+        fmtKg(submissionNetKg(s)),
         s.closedAt ? fmtDate(s.closedAt) : '',
       ];
     });
@@ -1126,7 +1151,7 @@ export async function getRegisterReport(
       ];
     });
   } else if (type === 'sustain') {
-    head = ['Client ID', 'Client', 'Site', 'Closed Invoices', 'Net kg', 'Tonnes', 'CO2e avoided kg', 'Landfill diverted kg', 'Tree equivalent', 'Water kL', 'Energy kWh'];
+    head = ['Client ID', 'Client', 'Site', 'Closed Invoices', 'Net kg', 'Tonnes', 'CO₂e avoided kg', 'Landfill diverted kg', 'Tree equivalent', 'Water kL', 'Energy kWh'];
     const clients = clientId
       ? await prisma.client.findMany({ where: { id: clientId } })
       : isClientPortalRole(actor.role) && actor.clientId

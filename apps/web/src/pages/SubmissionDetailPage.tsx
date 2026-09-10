@@ -26,7 +26,7 @@ import { PhoneField } from '../components/PhoneField';
 import { Modal } from '../components/Modal';
 import { EMPTY_LINE, LineItemsEditor, namedDraftLines, type DraftLine } from '../components/LineItemsEditor';
 import { lookupLabel, useLookups } from '../hooks/useLookups';
-import { fmtDate, fmtTS, num, todayIso } from '../lib/format';
+import { displayLabel, displayPoRef, fmtDate, fmtTS, kg, num, todayIso } from '../lib/format';
 import { defaultDateTimeValue, localDateIso, splitDateTime } from '../lib/datetime';
 import { isStaffUser, userCan } from '../lib/permissions';
 import {
@@ -189,7 +189,8 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             ) : null}
           </div>
           <div className="p-mu" style={{ margin: '.15rem 0 0' }}>
-            {sub.client.name} · {sub.site.name} · {sub.ref || 'no PO'} · raised {fmtDate(sub.requestDate)}
+            {sub.client.name} · {displayLabel(sub.site.name)} · {displayPoRef(sub.ref)} · raised{' '}
+            {fmtDate(sub.requestDate)}
           </div>
         </div>
         <div className="spacer" />
@@ -555,7 +556,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
               </div>
               <div className="tile">
                 <div className="tile-l">Site</div>
-                <div className="tile-v">{sub.site.name}</div>
+                <div className="tile-v">{displayLabel(sub.site.name)}</div>
               </div>
               <div className="tile">
                 <div className="tile-l">Approx</div>
@@ -918,7 +919,7 @@ function VehicleCard({
     <CollapsibleCard
       id="assign-vehicle"
       title={`Assigned vehicles (${sub.vehicles.length})`}
-      badge={netKg ? <span className="badge bg-g">{num(netKg)} kg net</span> : null}
+      badge={netKg ? <span className="badge bg-g">{kg(netKg)} kg net</span> : null}
       defaultOpen={sub.derivedStage >= 3 && sub.derivedStage <= 4}
       summary={
         sub.vehicles.length
@@ -946,7 +947,7 @@ function VehicleCard({
                 <b className="mono">{v.registration}</b>
                 <span className="badge bg-gy">{lookupLabel(vehicleTypes, v.vehicleType)}</span>
                 <span className={`badge ${w ? 'bg-g' : 'bg-am'}`}>
-                  {w ? `⚖️ ${num(Number(w.netKg))} kg` : 'Awaiting weighment'}
+                  {w ? `⚖️ ${kg(Number(w.netKg))} kg` : 'Awaiting weighment'}
                 </span>
                 {w?.manual ? (
                   <span className="badge bg-am" title="Recorded without a weighbridge">
@@ -1003,7 +1004,7 @@ function VehicleCard({
                     <div className="tile">
                       <div className="tile-l">Gross / Tare</div>
                       <div className="tile-v mono">
-                        {num(Number(w.grossKg ?? 0))} / {num(Number(w.tareKg ?? 0))}
+                        {kg(Number(w.grossKg ?? 0))} / {kg(Number(w.tareKg ?? 0))}
                       </div>
                     </div>
                     <div className="tile">
@@ -1110,7 +1111,7 @@ function VehicleCard({
           }}
         >
           <span>Total net weighed</span>
-          <span className="mono">{num(netKg)} kg</span>
+          <span className="mono">{kg(netKg)} kg</span>
         </div>
       ) : null}
     </CollapsibleCard>
@@ -1119,7 +1120,11 @@ function VehicleCard({
 
 function DetailsCard({ sub }: { sub: SubmissionDetail }) {
   return (
-    <CollapsibleCard title="Details" defaultOpen={sub.derivedStage < 3} summary={`${sub.client.name} · ${sub.site.name}`}>
+    <CollapsibleCard
+      title="Details"
+      defaultOpen={sub.derivedStage < 3}
+      summary={`${sub.client.name} · ${displayLabel(sub.site.name)}`}
+    >
       <div className="tile" style={{ marginBottom: '.4rem' }}>
         <div className="tile-l">Client</div>
         <div className="tile-v">
@@ -1128,9 +1133,9 @@ function DetailsCard({ sub }: { sub: SubmissionDetail }) {
       </div>
       <div className="tile" style={{ marginBottom: '.4rem' }}>
         <div className="tile-l">Site</div>
-        <div className="tile-v">{sub.site.name}</div>
+        <div className="tile-v">{displayLabel(sub.site.name)}</div>
         <div className="dim" style={{ fontSize: '.72rem' }}>
-          {sub.site.address || sub.site.code}
+          {sub.site.address || displayLabel(sub.site.code)}
         </div>
       </div>
       <div className="tile" style={{ marginBottom: '.4rem' }}>
@@ -2032,7 +2037,7 @@ function AssignVehicleForm({
         });
       }}
     >
-      <h3>{vehicle ? 'Edit vehicle' : 'Assign vehicle'}</h3>
+      <h2 className="modal-h">{vehicle ? 'Edit vehicle' : 'Assign vehicle'}</h2>
       <p className="dim" style={{ fontSize: '.82rem', margin: '-.3rem 0 .7rem' }}>
         {vehicle
           ? 'Update registration or type if the vehicle broke down or was replaced. A remark is required for those changes.'
@@ -2300,7 +2305,7 @@ function WeighForm({
         }
       }}
     >
-      <h3>Weigh {vehicle.registration}</h3>
+      <h2 className="modal-h">Weigh {vehicle.registration}</h2>
       <DateField
         id="wh-dt"
         label="Weighment date"
@@ -2569,7 +2574,7 @@ function InvoiceForm({
         });
       }}
     >
-      <h3>{invoice ? 'Edit invoice' : 'Raise invoice'}</h3>
+      <h2 className="modal-h">{invoice ? 'Edit invoice' : 'Raise invoice'}</h2>
       <p className="dim" style={{ fontSize: '.82rem', margin: '-.3rem 0 .7rem' }}>
         Each invoice needs its own e-way bill and progresses independently through MRN, recycling, certificate and
         closure. Billing weights across all invoices must equal the total weighment of all vehicles.

@@ -160,6 +160,10 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
   const activeLabel = items.find((i) => isActive(i))?.label ?? 'Urb TecTrack';
 
   return (
+    <>
+    <a href="#main-content" className="skip-link">
+      Skip to content
+    </a>
     <div className={`app app-shell ${navOpen ? 'nav-open' : ''} ${navCollapsed && !isNarrow ? 'nav-collapsed' : ''}`}>
       {navOpen ? (
         <button
@@ -305,7 +309,7 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
           </div>
         </header>
 
-        <main className="wrap">{children}</main>
+        <main id="main-content" className="wrap">{children}</main>
 
         <footer className="foot">
           <div className="foot-in">
@@ -332,5 +336,6 @@ export function Shell({ user, onLogout, children, mfaGraceDaysLeft = null }: She
         </footer>
       </div>
     </div>
+    </>
   );
 }

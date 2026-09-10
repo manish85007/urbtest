@@ -29,11 +29,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [captcha, setCaptcha] = useState<CaptchaPayload | null>(null);
   const [captchaReady, setCaptchaReady] = useState(false);
   const [captchaKey, setCaptchaKey] = useState(0);
-
-  const onCaptchaChange = useCallback((payload: CaptchaPayload | null, ready: boolean) => {
-    setCaptcha(payload);
-    setCaptchaReady(ready);
-  }, []);
+  const [emailHint, setEmailHint] = useState('');
 
   function refreshCaptcha() {
     setCaptchaKey((k) => k + 1);
@@ -41,8 +37,33 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setCaptchaReady(false);
   }
 
+  function clearAuthError() {
+    if (error) setError('');
+  }
+
+  function validateEmailField(value: string): boolean {
+    const v = value.trim();
+    if (!v) {
+      setEmailHint('Email is required.');
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      setEmailHint('Enter a valid email address (e.g. you@company.com).');
+      return false;
+    }
+    setEmailHint('');
+    return true;
+  }
+
+  const onCaptchaChange = useCallback((payload: CaptchaPayload | null, ready: boolean) => {
+    setCaptcha(payload);
+    setCaptchaReady(ready);
+    if (ready) setError('');
+  }, []);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateEmailField(email)) return;
     const continuing = needMfa || needEmailOtp;
     if (!continuing && !captchaReady) {
       setError('Complete the security check before signing in.');
@@ -141,9 +162,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <div style={{ marginBottom: '.9rem' }}>
             <LogoPrimary />
           </div>
-          <div className="lbrand-n">
+          <h1 className="lbrand-n">
             Urb TecTrack<span style={{ fontSize: '.6em', verticalAlign: 'super' }}>™</span>
-          </div>
+          </h1>
           <div className="lbrand-s">E-waste management platform</div>
         </div>
 
@@ -156,7 +177,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </p>
               <div className="fg">
                 <label>Email</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <input
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearAuthError();
+                  }}
+                  required
+                />
               </div>
               <LoginCaptcha refreshKey={captchaKey} onChange={onCaptchaChange} />
               {error ? <div style={{ color: 'var(--rd)', fontSize: '.8rem', marginBottom: '.5rem' }}>{error}</div> : null}
@@ -229,7 +260,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </button>
               <div className="forgot">
                 <a
-                  onClick={() => {
+                  href="#sign-in"
+                  onClick={(e) => {
+                    e.preventDefault();
                     setReset(false);
                     setResetStep('email');
                     refreshCaptcha();
@@ -246,26 +279,50 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <label htmlFor="li-em">Email</label>
               <input
                 id="li-em"
+                name="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearAuthError();
+                  if (emailHint) setEmailHint('');
+                }}
+                onBlur={() => {
+                  if (email.trim()) validateEmailField(email);
+                }}
                 placeholder="you@company.com"
-                autoComplete="username"
+                autoComplete="email"
+                required
               />
+              {emailHint ? (
+                <div style={{ color: 'var(--rd)', fontSize: '.75rem', marginTop: '.25rem' }}>{emailHint}</div>
+              ) : null}
             </div>
             <div className="fg">
               <label htmlFor="li-pw">Password</label>
               <input
                 id="li-pw"
+                name="password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearAuthError();
+                }}
+                placeholder="Enter your password"
                 autoComplete="current-password"
+                required
               />
             </div>
             {!needMfa && !needEmailOtp ? (
-              <LoginCaptcha refreshKey={captchaKey} onChange={onCaptchaChange} />
+              <>
+                <LoginCaptcha refreshKey={captchaKey} onChange={onCaptchaChange} />
+                {!captchaReady ? (
+                  <p className="dim" style={{ fontSize: '.75rem', margin: '-.25rem 0 .55rem' }}>
+                    Complete the security check to sign in.
+                  </p>
+                ) : null}
+              </>
             ) : null}
             {needMfa ? (
               <div className="fg">
@@ -354,8 +411,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </button>
             <div className="forgot">
               <a
-                onClick={() => {
+                href="#forgot-password"
+                onClick={(e) => {
+                  e.preventDefault();
                   setReset(true);
+                  setInfo('');
+                  clearAuthError();
                   refreshCaptcha();
                 }}
               >

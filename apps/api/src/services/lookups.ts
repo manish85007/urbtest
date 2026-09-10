@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { isValidNational10, national10, titleCasePlace } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 
@@ -39,6 +40,12 @@ function num(data: Record<string, unknown>, ...keys: string[]): number | undefin
   return undefined;
 }
 
+function normalizePhoneField(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (isValidNational10(raw)) return national10(raw);
+  return raw;
+}
+
 export function toLookupRow(r: { id: string; category: string; data: unknown; active: boolean }): LookupRow {
   const data = asRecord(r.data);
   return {
@@ -50,7 +57,7 @@ export function toLookupRow(r: { id: string; category: string; data: unknown; ac
     description: str(data, 'description', 'ds', 'note'),
     days: num(data, 'days'),
     code: str(data, 'code', 'cd'),
-    phone: str(data, 'phone', 'ph'),
+    phone: normalizePhoneField(str(data, 'phone', 'ph')),
     gstin: str(data, 'gstin') || (typeof data.gst === 'string' ? data.gst : undefined),
     transporterId: str(data, 'transporterId', 'trId'),
     address: str(data, 'address', 'addr'),
@@ -71,7 +78,7 @@ export async function listLookups(category: string, includeInactive = false): Pr
     },
     orderBy: { id: 'asc' },
   });
-  return rows.map(toLookupRow);
+  return sortLookupRows(rows.map(toLookupRow), canonical);
 }
 
 export async function listAllLookups(includeInactive = true): Promise<LookupRow[]> {
@@ -79,7 +86,31 @@ export async function listAllLookups(includeInactive = true): Promise<LookupRow[
     where: includeInactive ? {} : { active: true },
     orderBy: [{ category: 'asc' }, { id: 'asc' }],
   });
-  return rows.map(toLookupRow);
+  const mapped = rows.map(toLookupRow);
+  const byCat = new Map<string, LookupRow[]>();
+  for (const row of mapped) {
+    const key = canonicalLookupCategory(row.category);
+    const list = byCat.get(key) ?? [];
+    list.push(row);
+    byCat.set(key, list);
+  }
+  const out: LookupRow[] = [];
+  for (const [cat, list] of [...byCat.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    out.push(...sortLookupRows(list, cat));
+  }
+  return out;
+}
+
+function sortLookupRows(rows: LookupRow[], category: string): LookupRow[] {
+  return [...rows].sort((a, b) => {
+    if (category === 'taxRate' || category === 'gst') {
+      return (a.rate ?? 0) - (b.rate ?? 0) || a.label.localeCompare(b.label);
+    }
+    if (category === 'payTerms' || category === 'paymentTerms') {
+      return (a.days ?? 0) - (b.days ?? 0) || a.label.localeCompare(b.label);
+    }
+    return a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' });
+  });
 }
 
 function nextLookupId(category: string) {
@@ -141,7 +172,9 @@ export async function upsertLookup(input: {
     ...(input.description !== undefined ? { description: input.description } : {}),
     ...(input.days !== undefined ? { days: input.days } : {}),
     ...(input.code !== undefined ? { code: input.code } : {}),
-    ...(input.phone !== undefined ? { phone: input.phone } : {}),
+    ...(input.phone !== undefined
+      ? { phone: input.phone && isValidNational10(input.phone) ? national10(input.phone) : input.phone.trim() || null }
+      : {}),
     ...(input.gstin !== undefined ? { gstin: input.gstin } : {}),
     ...(input.transporterId !== undefined ? { transporterId: input.transporterId } : {}),
     ...(input.address !== undefined ? { address: input.address } : {}),
@@ -182,7 +215,7 @@ export const LOOKUP_SEED: Array<{
     category: 'logistics',
     id: 'LP1',
     label: 'Ravi Logistics',
-    phone: '+91 98450 11111',
+    phone: '9845011111',
     gstin: '29AAFCR1234M1Z8',
     transporterId: '88AAFCR1234M1',
     address: '12 Peenya Industrial Area, Bengaluru 560058',
@@ -191,7 +224,7 @@ export const LOOKUP_SEED: Array<{
     category: 'logistics',
     id: 'LP2',
     label: 'SwiftMove',
-    phone: '+91 98450 22222',
+    phone: '9845022222',
     gstin: '29AAGCS5678N1Z5',
     transporterId: '88AAGCS5678N1',
     address: 'Warehouse 4, Bommasandra, Bengaluru 560099',
@@ -200,7 +233,7 @@ export const LOOKUP_SEED: Array<{
     category: 'logistics',
     id: 'LP3',
     label: 'SecureMove',
-    phone: '+91 98450 33333',
+    phone: '9845033333',
     gstin: '27AAHCS9012P1Z2',
     transporterId: '88AAHCS9012P1',
     address: 'Unit 9, MIDC Andheri East, Mumbai 400093',
@@ -209,7 +242,7 @@ export const LOOKUP_SEED: Array<{
     category: 'logistics',
     id: 'LP4',
     label: 'Urbeno Own Fleet',
-    phone: '+91 98450 44444',
+    phone: '9845044444',
     gstin: '29AABCU1234R1ZX',
     transporterId: '88AABCU1234R1',
     address: 'Plot 47, Peenya Industrial Area Phase II, Bengaluru 560058',
@@ -283,12 +316,15 @@ export const LOOKUP_SEED: Array<{
 ];
 
 const RETIRED_LOOKUPS = [
+  { category: 'destructStd', id: 'NIST' },
+  { category: 'destructStd', id: 'DIN' },
+];
+
+const REMOVE_LOOKUP_IDS = [
   { category: 'taxRate', id: 'GST18' },
   { category: 'taxRate', id: 'GST12' },
   { category: 'taxRate', id: 'GST5' },
   { category: 'taxRate', id: 'GST0' },
-  { category: 'destructStd', id: 'NIST' },
-  { category: 'destructStd', id: 'DIN' },
 ];
 
 export async function seedLookups() {
@@ -332,5 +368,44 @@ export async function seedLookups() {
       ],
       skipDuplicates: true,
     });
+  }
+
+  // Remove incomplete GST* tax stubs that duplicate TX* rates.
+  for (const row of REMOVE_LOOKUP_IDS) {
+    await prisma.lookupMaster.deleteMany({
+      where: { id: row.id, category: row.category },
+    });
+  }
+
+  // Normalize logistics phones to 10 digits and title-case ALL-CAPS labels.
+  const logistics = await prisma.lookupMaster.findMany({ where: { category: 'logistics' } });
+  for (const row of logistics) {
+    const data = asRecord(row.data);
+    const next = { ...data };
+    let changed = false;
+    const phone = str(data, 'phone', 'ph');
+    if (phone && isValidNational10(phone)) {
+      const n = national10(phone);
+      if (phone !== n) {
+        next.phone = n;
+        changed = true;
+      }
+    }
+    const label = str(data, 'label', 'nm');
+    if (label) {
+      const titled = titleCasePlace(label);
+      // Only rewrite when the label is effectively ALL CAPS.
+      const letters = label.replace(/[^A-Za-z]/g, '');
+      if (letters && letters === letters.toUpperCase() && titled !== label) {
+        next.label = titled;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await prisma.lookupMaster.update({
+        where: { id: row.id },
+        data: { data: next as Prisma.InputJsonValue },
+      });
+    }
   }
 }

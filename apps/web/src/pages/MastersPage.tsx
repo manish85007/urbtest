@@ -13,6 +13,14 @@ import { AnnouncementsTab } from './masters/AnnouncementsTab';
 
 type Tab = 'company' | 'clients' | 'users' | 'factories' | 'cats' | 'lookups' | 'email' | 'announcements';
 
+const TAB_ALIASES: Record<string, Tab> = {
+  emails: 'email',
+  templates: 'email',
+  'email-templates': 'email',
+  categories: 'cats',
+  category: 'cats',
+};
+
 const TABS: Array<[Tab, string]> = [
   ['company', 'Company & Letterhead'],
   ['clients', 'Clients & Sites'],
@@ -27,8 +35,11 @@ const TABS: Array<[Tab, string]> = [
 export function MastersPage() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
-  const tabParam = params.get('tab') as Tab | null;
+  const rawTab = params.get('tab') ?? '';
+  const tabParam = (TAB_ALIASES[rawTab] ?? rawTab) as Tab | '';
+  const tabKnown = !rawTab || TABS.some(([id]) => id === tabParam);
   const tab: Tab = TABS.some(([id]) => id === tabParam) ? (tabParam as Tab) : 'clients';
+  const [tabHint, setTabHint] = useState('');
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [factories, setFactories] = useState<FactorySummary[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -80,6 +91,19 @@ export function MastersPage() {
   }, []);
 
   useEffect(() => {
+    if (rawTab && TAB_ALIASES[rawTab] && TAB_ALIASES[rawTab] !== rawTab) {
+      setParams({ tab: TAB_ALIASES[rawTab] }, { replace: true });
+      setTabHint('');
+      return;
+    }
+    if (rawTab && !tabKnown) {
+      setTabHint(`Unknown tab “${rawTab}” — showing Clients & Sites.`);
+    } else {
+      setTabHint('');
+    }
+  }, [rawTab, tabKnown, setParams]);
+
+  useEffect(() => {
     if (tab !== 'email') return;
     emailsApi.outbox().then(setOutbox).catch(() => undefined);
     emailsApi.templates().then(setTemplates).catch(() => undefined);
@@ -116,6 +140,11 @@ export function MastersPage() {
         </div>
       </div>
       {error ? <p className="error">{error}</p> : null}
+      {tabHint ? (
+        <p className="dim" style={{ fontSize: '.78rem', color: 'var(--am)' }}>
+          {tabHint}
+        </p>
+      ) : null}
       {flash ? <CompletionDialog message={flash.message} onClose={dismissFlash} /> : null}
 
       <div className="card" style={{ padding: '.4rem' }}>

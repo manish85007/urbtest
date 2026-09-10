@@ -11,6 +11,23 @@ import {
 } from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
 import { isAdminUser, isStaffUser } from '../lib/permissions';
+import { displayLabel, num, titleCaseName } from '../lib/format';
+
+function formatImpactHead(head: string): string {
+  return head.replace(/\bCO2E\b/gi, 'CO₂e').replace(/\bCO2\b/gi, 'CO₂');
+}
+
+function formatImpactCell(head: string, cell: unknown): string {
+  if (cell == null || cell === '') return '';
+  if (typeof cell === 'number') return num(cell);
+  const s = String(cell);
+  const h = head.toLowerCase();
+  if (/client|organisation|organization/.test(h)) return titleCaseName(s) || s;
+  if (/site|factory/.test(h)) return displayLabel(s) || s;
+  const n = Number(s.replace(/,/g, ''));
+  if (s.trim() !== '' && Number.isFinite(n) && /^-?\d[\d,]*(\.\d+)?$/.test(s.trim())) return num(n);
+  return s;
+}
 
 function periodQs(period: PeriodQuery) {
   return `period=${encodeURIComponent(period.period ?? 'fy')}&fy=${encodeURIComponent(period.fy ?? '')}&year=${encodeURIComponent(period.year ?? '')}&from=${encodeURIComponent(period.from ?? '')}&to=${encodeURIComponent(period.to ?? '')}`;
@@ -156,9 +173,11 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
               <thead>
                 <tr>
                   {staffReport.head.map((head) => (
-                    <th key={head}>{head}</th>
+                    <th key={head} scope="col">
+                      {formatImpactHead(head)}
+                    </th>
                   ))}
-                  {isAdmin || isStaff ? <th></th> : null}
+                  {isAdmin || isStaff ? <th scope="col"></th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -168,7 +187,9 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
                   return (
                     <tr key={idx}>
                       {row.map((cell, cellIdx) => (
-                        <td key={cellIdx}>{cell}</td>
+                        <td key={cellIdx}>
+                          {formatImpactCell(staffReport.head[cellIdx] ?? '', cell)}
+                        </td>
                       ))}
                       {isAdmin || isStaff ? (
                         <td>
@@ -282,7 +303,9 @@ export function ImpactPage({ user }: { user?: SessionUser }) {
             <b>Recycling Heroes promise:</b> every 1 tonne of closed e-waste earns 1 sapling, nurtured for{' '}
             {SUSTAINABILITY.nurtureYears} years toward self-reliance
           </li>
-          <li>CO₂e avoided: {SUSTAINABILITY.co2PerKg} kg per kg e-waste — EPA WARM v16, mixed electronics</li>
+          <li>
+            CO<sub>2</sub>e avoided: {SUSTAINABILITY.co2PerKg} kg per kg e-waste — EPA WARM v16, mixed electronics
+          </li>
           <li>Landfill diversion: {SUSTAINABILITY.landfillRatio} — authorised recycler downstream recovery average</li>
           <li>Water / energy: {SUSTAINABILITY.waterPerKg} kL and {SUSTAINABILITY.energyPerKg} kWh per kg</li>
           <li>

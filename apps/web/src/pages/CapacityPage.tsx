@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { CATEGORY_GROUPS, periodLabel, parseReportPeriod } from '@urb-tectrack/shared';
 import { dataApi, type CapacityReport, type PeriodQuery, type SessionUser } from '../api';
 import { PeriodPicker } from '../components/PeriodPicker';
-import { num } from '../lib/format';
+import { kg, num, pct1 } from '../lib/format';
 
 interface CapacityPageProps {
   user: SessionUser;
@@ -15,7 +15,7 @@ function Bar({ pct }: { pct: number }) {
   return (
     <div className="bar">
       <div className="bar-f" style={{ width: `${n}%`, background: color }} />
-      <div className="bar-t">{pct.toFixed(1)}%</div>
+      <div className="bar-t">{pct1(pct)}</div>
     </div>
   );
 }
@@ -127,7 +127,7 @@ export function CapacityPage({ user }: CapacityPageProps) {
                 className="stat-v"
                 style={{ color: util >= 80 ? 'var(--rd)' : util >= 50 ? 'var(--am)' : 'var(--g2)' }}
               >
-                {util.toFixed(2)}%
+                {util.toFixed(1)}%
               </div>
               <div className="stat-t">overall</div>
             </div>
@@ -151,12 +151,12 @@ export function CapacityPage({ user }: CapacityPageProps) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Entry</th>
-                      <th>Description</th>
-                      <th>TPA</th>
-                      <th>Used kg</th>
-                      <th>Remaining</th>
-                      <th>Utilization</th>
+                      <th scope="col">Entry</th>
+                      <th scope="col">Description</th>
+                      <th scope="col">TPA</th>
+                      <th scope="col">Used kg</th>
+                      <th scope="col">Remaining</th>
+                      <th scope="col">Utilization</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -167,10 +167,10 @@ export function CapacityPage({ user }: CapacityPageProps) {
                         </td>
                         <td style={{ fontSize: '.8rem' }}>{e.description.slice(0, 50)}</td>
                         <td className="mono">{e.capacityTpa}</td>
-                        <td className="mono">{num(e.usedKg)}</td>
-                        <td className="mono">{num(e.remKg ?? Math.max(0, e.capKg - e.usedKg))}</td>
+                        <td className="mono">{kg(e.usedKg)}</td>
+                        <td className="mono">{kg(e.remKg ?? Math.max(0, e.capKg - e.usedKg))}</td>
                         <td>
-                          <span className={`badge ${e.exceeded ? 'bg-rd' : 'bg-am'}`}>{e.pct.toFixed(1)}%</span>
+                          <span className={`badge ${e.exceeded ? 'bg-rd' : 'bg-am'}`}>{pct1(e.pct)}</span>
                         </td>
                       </tr>
                     ))}
@@ -188,12 +188,12 @@ export function CapacityPage({ user }: CapacityPageProps) {
               <table>
                 <thead>
                   <tr>
-                    <th>Code</th>
-                    <th>Group</th>
-                    <th>Entries</th>
-                    <th style={{ textAlign: 'right' }}>TPA</th>
-                    <th style={{ textAlign: 'right' }}>Used (t)</th>
-                    <th style={{ minWidth: 160 }}>Utilization</th>
+                    <th scope="col">Code</th>
+                    <th scope="col">Group</th>
+                    <th scope="col">Entries</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>TPA</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>Used (t)</th>
+                    <th scope="col" style={{ minWidth: 160 }}>Utilization</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,12 +228,12 @@ export function CapacityPage({ user }: CapacityPageProps) {
               <table>
                 <thead>
                   <tr>
-                    <th>Entry</th>
-                    <th>Description</th>
-                    <th>Group</th>
-                    <th style={{ textAlign: 'right' }}>TPA</th>
-                    <th style={{ textAlign: 'right' }}>Used kg</th>
-                    <th style={{ minWidth: 140 }}>Utilization</th>
+                    <th scope="col">Entry</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Group</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>TPA</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>Used kg</th>
+                    <th scope="col" style={{ minWidth: 140 }}>Utilization</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -252,7 +252,7 @@ export function CapacityPage({ user }: CapacityPageProps) {
                         {e.capacityTpa}
                       </td>
                       <td className="mono" style={{ textAlign: 'right' }}>
-                        {num(e.usedKg)}
+                        {kg(e.usedKg)}
                       </td>
                       <td>
                         <Bar pct={e.pct} />

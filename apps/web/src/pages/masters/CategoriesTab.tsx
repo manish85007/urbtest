@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CATEGORY_GROUPS } from '@urb-tectrack/shared';
 import { dataApi, type CategorySummary, type FactorySummary } from '../../api';
 import { Modal } from '../../components/Modal';
+import { displayCode } from '../../lib/format';
 
 interface CategoriesTabProps {
   factories: FactorySummary[];
@@ -43,13 +44,18 @@ export function CategoriesTab({ factories, onChanged }: CategoriesTabProps) {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter((c) => {
-      if (!showInactive && c.active === false) return false;
-      if (group && c.groupCode !== group) return false;
-      if (activity && (c.activity || 'Recycling') !== activity) return false;
-      if (needle && !`${c.entryId} ${c.description}`.toLowerCase().includes(needle)) return false;
-      return true;
-    });
+    return rows
+      .filter((c) => {
+        if (!showInactive && c.active === false) return false;
+        if (group && c.groupCode !== group) return false;
+        if (activity && (c.activity || 'Recycling') !== activity) return false;
+        if (needle && !`${c.entryId} ${c.description}`.toLowerCase().includes(needle)) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        String(a.groupCode).localeCompare(String(b.groupCode)) ||
+        String(a.entryId).localeCompare(String(b.entryId), undefined, { numeric: true, sensitivity: 'base' }),
+      );
   }, [rows, q, group, activity, showInactive]);
 
   async function toggle(c: CategorySummary, on: boolean) {
@@ -173,7 +179,7 @@ export function CategoriesTab({ factories, onChanged }: CategoriesTabProps) {
               {filtered.map((c) => (
                 <tr key={c.id} style={c.active === false ? { opacity: 0.5 } : undefined}>
                   <td className="mono">
-                    <b>{c.entryId}</b>
+                          <b>{displayCode(c.entryId)}</b>
                   </td>
                   <td style={{ fontSize: '.82rem' }}>{c.description}</td>
                   <td>

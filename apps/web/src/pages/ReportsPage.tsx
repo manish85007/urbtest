@@ -13,6 +13,23 @@ import {
 import { downloadCsvGrid } from '../lib/csv';
 import { isClientPortalUser, isStaffUser } from '../lib/permissions';
 import { PeriodPicker } from '../components/PeriodPicker';
+import { displayLabel, num, titleCaseName } from '../lib/format';
+
+function formatRegisterHead(head: string): string {
+  return head.replace(/\bCO2\b/gi, 'CO₂').replace(/\bCO2e\b/gi, 'CO₂e');
+}
+
+function formatRegisterCell(head: string, cell: unknown): string {
+  if (cell == null || cell === '') return '';
+  if (typeof cell === 'number') return num(cell);
+  const s = String(cell);
+  const h = head.toLowerCase();
+  if (/client|organisation|organization/.test(h)) return titleCaseName(s) || s;
+  if (/site|factory|location/.test(h)) return displayLabel(s) || s;
+  const n = Number(s.replace(/,/g, ''));
+  if (s.trim() !== '' && Number.isFinite(n) && /^-?\d[\d,]*(\.\d+)?$/.test(s.trim())) return num(n);
+  return s;
+}
 
 const KINDS: Array<{
   id: RegisterType;
@@ -270,14 +287,19 @@ export function ReportsPage({ user }: ReportsPageProps) {
                 <thead>
                   <tr>
                     {report.head.map((h) => (
-                      <th key={h}>{h}</th>
+                      <th key={h} scope="col">
+                        {formatRegisterHead(h)}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {shown.map((row, i) => (
                     <tr key={i}>
-                      {row.map((cell, ci) => (
+                      {row.map((cell, ci) => {
+                        const head = report.head[ci] ?? '';
+                        const formatted = formatRegisterCell(head, cell);
+                        return (
                         <td key={ci} className={typeof cell === 'number' ? 'mono' : undefined}>
                           {ci === requestCol && typeof cell === 'string' && cell ? (
                             <Link to={`/requests/${cell}`}>{cell}</Link>
@@ -288,10 +310,10 @@ export function ReportsPage({ user }: ReportsPageProps) {
                           ) : ci === downloadCol ? (
                             <span className="dim">—</span>
                           ) : (
-                            String(cell ?? '')
+                            formatted
                           )}
                         </td>
-                      ))}
+                      );})}
                     </tr>
                   ))}
                 </tbody>

@@ -62,8 +62,7 @@ export function CompanyTab({ onChanged }: Props) {
     <div className="card" style={{ marginTop: '.8rem' }}>
       <div className="card-ttl">Urbeno company &amp; letterhead</div>
       <p className="dim" style={{ fontSize: '.84rem', margin: '.35rem 0 .8rem' }}>
-        Production statutory details for Urbeno Private Limited. Stored in the backend (
-        <span className="mono">company.profile</span>) and printed on Form 6 / MRN. Replace demo values before go-live.
+        Legal name, address, GSTIN, PAN, CIN and PCB registrations printed on Form 6 and MRN letterheads.
       </p>
       <form className="sub-form" onSubmit={save} style={{ paddingTop: 0, border: 'none' }}>
         <div className="fr2">

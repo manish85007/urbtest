@@ -1,4 +1,4 @@
-import { localYmd } from '@urb-tectrack/shared';
+import { localYmd, titleCaseName } from '@urb-tectrack/shared';
 
 /** Use en-US so September is "Sep" (en-IN / en-GB yield "Sept"). */
 const DATE_LOCALE = 'en-US';
@@ -53,8 +53,22 @@ export function todayIso(): string {
   return localYmd();
 }
 
-/** User-facing site / factory codes — drop underscores (QLCM_NOIDA → QLCMNOIDA). */
+/** User-facing site / factory codes — underscores → spaces. */
 export function displayCode(code: string | null | undefined): string {
-  if (!code) return '';
-  return String(code).replace(/_/g, '');
+  return displayLabel(code);
 }
+
+/** Strip underscores from any user-facing label (site codes/names). */
+export function displayLabel(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return String(raw).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Missing PO / purchase-order reference. */
+export function displayPoRef(ref: string | null | undefined): string {
+  const t = String(ref ?? '').trim();
+  if (!t || /^n\/?a$/i.test(t) || /^no\s*po$/i.test(t)) return 'N/A';
+  return t;
+}
+
+export { titleCaseName };

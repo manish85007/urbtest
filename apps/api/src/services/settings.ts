@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { isValidNational10, national10 } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../lib/errors.js';
 import { sendSmtp, type SmtpConfig, normalizeSmtpTls } from '../lib/smtp.js';
@@ -164,7 +165,7 @@ export const DEFAULT_COMPANY: CompanyProfile = {
   gst: process.env.URBENO_GST ?? '29AABCU1234R1ZW',
   pan: process.env.URBENO_PAN ?? 'AABCU1234R',
   cin: process.env.URBENO_CIN ?? '',
-  phone: process.env.URBENO_PHONE ?? '+91 99022 99007',
+  phone: process.env.URBENO_PHONE ?? '9902299007',
   email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
   wa: process.env.URBENO_WA ?? '919902299007',
   cpcb: process.env.URBENO_CPCB ?? 'CPCB/EPR/2022/KA/00817',
@@ -182,7 +183,10 @@ export function parseCompanyProfile(raw: unknown): CompanyProfile {
     gst: String(d.gst ?? DEFAULT_COMPANY.gst).trim(),
     pan: String(d.pan ?? DEFAULT_COMPANY.pan).trim(),
     cin: String(d.cin ?? DEFAULT_COMPANY.cin).trim(),
-    phone: String(d.phone ?? DEFAULT_COMPANY.phone).trim(),
+    phone: (() => {
+      const raw = String(d.phone ?? DEFAULT_COMPANY.phone).trim();
+      return isValidNational10(raw) ? national10(raw) : raw;
+    })(),
     email: String(d.email ?? DEFAULT_COMPANY.email).trim(),
     wa: String(d.wa ?? DEFAULT_COMPANY.wa).trim(),
     cpcb: String(d.cpcb ?? DEFAULT_COMPANY.cpcb).trim(),
@@ -211,7 +215,12 @@ export async function saveCompanyProfile(
     gst: input.gst !== undefined ? String(input.gst).trim().toUpperCase() : prev.gst,
     pan: input.pan !== undefined ? String(input.pan).trim().toUpperCase() : prev.pan,
     cin: input.cin !== undefined ? String(input.cin).trim().toUpperCase() : prev.cin,
-    phone: input.phone !== undefined ? String(input.phone).trim() : prev.phone,
+    phone:
+      input.phone !== undefined
+        ? isValidNational10(String(input.phone))
+          ? national10(String(input.phone))
+          : String(input.phone).trim()
+        : prev.phone,
     email: input.email !== undefined ? String(input.email).trim() : prev.email,
     wa: input.wa !== undefined ? String(input.wa).trim() : prev.wa,
     cpcb: input.cpcb !== undefined ? String(input.cpcb).trim() : prev.cpcb,
