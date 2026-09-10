@@ -41,6 +41,8 @@ function handleServiceError(err: unknown, reply: FastifyReply) {
 const mrnBodySchema = z.object({
   factoryId: z.string().min(1),
   receivedAt: z.string(),
+  deliveryChallanNo: z.string().optional(),
+  deliveryChallanDate: z.string().optional(),
   driverSign: z.string().optional(),
   managerSign: z.string().optional(),
   securitySign: z.string().optional(),
