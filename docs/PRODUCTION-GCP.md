@@ -13,9 +13,9 @@ UAT (`tectrack-uat` / `tectrack-uat` SQL) is **not** reused. Production uses a s
 
 | Resource | Name |
 |---|---|
-| Cloud SQL Postgres 16 | `tectrack-prod` (`db-g1-small`, 20 GB, nightly backups) |
+| Cloud SQL Postgres 16 | `tectrack-prod` (`db-g1-small`, 20 GB, **REGIONAL HA**, nightly backups + PITR, 30-day retention) |
 | Cloud Run | `tectrack-prod` |
-| Storage | `gs://<project>-tectrack-prod-uploads` |
+| Storage | `gs://<project>-tectrack-prod-uploads` (object versioning + 30-day soft delete) |
 | Secrets | `tectrack-prod-db-password`, `tectrack-prod-session-secret`, `tectrack-prod-admin-password` |
 | SMTP | reuse `tectrack-smtp-pass` |
 | HTTPS LB | `tectrack-prod-*` (blanks `Server` header) |
@@ -86,7 +86,34 @@ curl -sSI https://tectrack.urbeno.in/health
 
 Expect `{"ok":true,...}`. HTML should use `Cache-Control: no-cache, no-store, must-revalidate`. `Server` should be blank at the LB.
 
-### 5. Optional — stop direct `*.run.app` access
+### 5. Backups & BCP (production)
+
+| Control | Setting |
+|---|---|
+| Cloud SQL automated backups | Daily at **18:30 UTC** (00:00 IST), **30** retained |
+| Point-in-time recovery (PITR) | **Enabled** (7 days of transaction logs) |
+| Cloud SQL availability | **REGIONAL** (failover within asia-south1) |
+| Uploads bucket | Object **versioning** on + **30-day soft delete** |
+
+Restore a DB backup (example — pick a backup id from `gcloud sql backups list`):
+
+```bash
+gcloud sql backups list --instance=tectrack-prod --limit=10
+# Restore into a *new* instance first when practising; only overwrite prod after a successful drill.
+gcloud sql backups restore BACKUP_ID \
+  --backup-instance=tectrack-prod \
+  --backup-project=YOUR_PROJECT_ID \
+  --destination-instance=tectrack-prod-restore-drill
+```
+
+Point-in-time restore (to a timestamp within the transaction-log window):
+
+```bash
+gcloud sql instances clone tectrack-prod tectrack-prod-pitr-drill \
+  --point-in-time='2026-09-10T06:00:00.000Z'
+```
+
+### 6. Optional — stop direct `*.run.app` access
 
 ```bash
 gcloud run services update tectrack-prod --region=asia-south1 \
@@ -95,7 +122,7 @@ gcloud run services update tectrack-prod --region=asia-south1 \
 
 Do this **only after** the LB URL works.
 
-### 6. First login checklist (Super Admin)
+### 7. First login checklist (Super Admin)
 
 1. Open https://tectrack.urbeno.in  
 2. Sign in as manish@urbeno.in  
@@ -108,7 +135,7 @@ Do this **only after** the LB URL works.
 
 Do **not** run UAT seed (`UAT_SEED=true`) on this service — the app refuses it when `NODE_ENV=production`.
 
-### 7. Later deploys (code only)
+### 8. Later deploys (code only)
 
 Re-run `./infra/gcp/deploy-prod.sh`. Seed is idempotent and **does not reset** the admin password after the user exists. You can later set `PRODUCTION_SEED=false` on Cloud Run if you want to skip seed on every start.
 
@@ -116,4 +143,4 @@ Re-run `./infra/gcp/deploy-prod.sh`. Seed is idempotent and **does not reset** t
 
 ## Cost note (asia-south1, 24/7)
 
-Roughly Cloud SQL `db-g1-small` + Cloud Run min 1 + global HTTPS LB: **higher than UAT** (SQL is no longer `f1-micro`). Review the GCP billing console after week one.
+Roughly Cloud SQL `db-g1-small` **REGIONAL** + Cloud Run min 1 + global HTTPS LB: **higher than UAT** (SQL is no longer `f1-micro`, and REGIONAL roughly doubles the SQL compute/storage charge). Review the GCP billing console after week one.

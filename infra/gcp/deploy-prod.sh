@@ -89,10 +89,12 @@ if ! gcloud sql instances describe "${INSTANCE}" --project="${PROJECT}" >/dev/nu
     --region="${REGION}" \
     --storage-size=20 \
     --storage-type=SSD \
-    --availability-type=ZONAL \
+    --availability-type=REGIONAL \
     --backup \
     --backup-start-time=18:30 \
-    --retained-backups-count=7 \
+    --retained-backups-count=30 \
+    --enable-point-in-time-recovery \
+    --retained-transaction-log-days=7 \
     --project="${PROJECT}"
 fi
 
@@ -154,6 +156,12 @@ if ! gcloud storage buckets describe "gs://${BUCKET}" >/dev/null 2>&1; then
     --public-access-prevention \
     --project="${PROJECT}"
 fi
+
+# BCP: object versioning + 30-day soft delete for accidental upload recovery.
+gcloud storage buckets update "gs://${BUCKET}" \
+  --versioning \
+  --soft-delete-duration=2592000s \
+  --quiet || true
 
 if ! gcloud iam service-accounts describe "${SA_EMAIL}" --project="${PROJECT}" >/dev/null 2>&1; then
   gcloud iam service-accounts create "${SA_NAME}" \
