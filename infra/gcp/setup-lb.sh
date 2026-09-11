@@ -13,7 +13,7 @@ set -euo pipefail
 
 REGION="${GCP_REGION:-asia-south1}"
 SERVICE="${GCP_RUN_SERVICE:-tectrack-uat}"
-DOMAIN="${GCP_LB_DOMAIN:-tectrack-uat.urbeno.in}"
+DOMAIN="${GCP_LB_DOMAIN:-uat.urbeno.in}"
 PREFIX="${GCP_LB_PREFIX:-tectrack-uat}"
 
 NEG="${PREFIX}-neg"

@@ -1,14 +1,15 @@
-# UAT-ADMIN — Urbeno administrator
+# UAT-ADMIN — Urbeno Super Admin
 
-**Role:** Admin · operations, masters, audit, compliance  
-**Business rules:** stages 2–5 and 8, W1–W3, B1–B4, C1–C6, A1–A4, X1–X11, Masters, letterhead.
+**Role:** `admin` · full lifecycle controls, Masters, Audit, Compliance  
+**Business rules:** stages 2–5 and 8, W1–W3, B1–B4, C1–C6, A1–A4, X1–X11, Masters, letterhead.  
+**Operations Manager** (`ops@urbeno.in`) has a **separate** script: [UAT-OPERATIONS.md](./UAT-OPERATIONS.md). Do not run invoice / certify / Masters / Compliance steps as ops.
 
 | Field | Value |
 |-------|--------|
-| Environment / URL | |
+| Environment / URL | https://uat.urbeno.in (GCP) or https://tectrack.urbeno.in (prod candidate) |
 | Build / git SHA | |
 | Tester name | |
-| Account used | `admin@urbeno.in` (primary). Keep `ops@urbeno.in` as backup. |
+| Account used | `admin@urbeno.in` (Super Admin). Do **not** substitute `ops@urbeno.in` for A4–A8. |
 | Password | `demo` unless rotated |
 | Date (IST) | |
 | Browser | |
@@ -22,9 +23,9 @@ Create a **throwaway user** in Masters before password-lockout tests so `demo` a
 
 | ID | Step | Expected | Result | Notes / initials |
 |----|------|----------|--------|------------------|
-| A0.1 | Sign in as `admin@urbeno.in`. Accept policies if prompted. | **Operations Dashboard**. | ☐ | |
+| A0.1 | Sign in as `admin@urbeno.in`. Accept policies if prompted. | **Operations Dashboard** (Super Admin shell). | ☐ | |
 | A0.2 | Navigation. | **Dashboard**, **Requests**, **Recycle Heroes**, **Capacity**, **Masters**, **Reports**, **Audit**, **Compliance**. | ☐ | |
-| A0.3 | Profile. | Role **Urbeno Admin**. Letterhead / company form is visible (factory/client must not see this editor). | ☐ | |
+| A0.3 | Profile. | Role **Urbeno Admin** / Super Admin. Letterhead / company form is visible (factory/client/ops must not see this editor). | ☐ | |
 
 ---
 
@@ -153,9 +154,9 @@ Throwaway user created: _______________________
 | Cases executed | _____ of _____ |
 | Pass / Fail / N/A / Blocked | _____ / _____ / _____ / _____ |
 | Blockers found | Yes / No — IDs: |
-| Fit for production as **admin / operations** | ☐ Yes ☐ Yes, with waivers ☐ No |
+| Fit for production as **Super Admin** | ☐ Yes ☐ Yes, with waivers ☐ No |
 
 | | Name | Signature | Date |
 |--|------|-----------|------|
 | Tester | | | |
-| Urbeno operations lead | | | |
+| Urbeno product / Super Admin lead | | | |

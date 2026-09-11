@@ -11,8 +11,9 @@ This pack is the **user-acceptance test** for going live. Automated Playwright t
 | [training/](./training/README.md) | **Trainers / end users** | Role-wise training PDFs (Client, Factory, Admin) with screenshots |
 | [UAT-CLIENT.md](./UAT-CLIENT.md) | Client user (requestor) | Detailed internal client script (same scope) |
 | [UAT-FACTORY.md](./UAT-FACTORY.md) | Factory manager | MRN, Form 6, capacity; no client or compliance access |
-| [UAT-ADMIN.md](./UAT-ADMIN.md) | Urbeno administrator | Lifecycle ops, Masters, Audit, Compliance |
-| [UAT-CROSS-ROLE-LIFECYCLE.md](./UAT-CROSS-ROLE-LIFECYCLE.md) | All three, in sequence | One request through stages 1–9 |
+| [UAT-OPERATIONS.md](./UAT-OPERATIONS.md) | Urbeno Operations Manager | Ack / vehicles / weighment / reports; **no** invoice, CoD certify, Masters, Compliance |
+| [UAT-ADMIN.md](./UAT-ADMIN.md) | Urbeno Super Admin | Invoice, CoD certify, Masters, Audit, Compliance |
+| [UAT-CROSS-ROLE-LIFECYCLE.md](./UAT-CROSS-ROLE-LIFECYCLE.md) | Client + Ops/Super Admin + Factory | One request through stages 1–9 |
 | [UAT-PRODUCTION-SIGNOFF.md](./UAT-PRODUCTION-SIGNOFF.md) | Product owner + testers | Go / no-go certificate |
 
 Print or copy each script. Mark every case **Pass / Fail / N/A / Blocked**. Attach screenshots for Fail and Blocked.
@@ -23,13 +24,15 @@ Related: [E2E-TESTING.md](../E2E-TESTING.md) (how to run the app and Playwright)
 
 ## Roles under test
 
-The product has **three** signed-in roles. Every production user is one of these.
+The product has **signed-in roles** under test. Use the matching script for each persona.
 
 | Role | What they are | Seeded UAT accounts (password `demo`) |
 |------|----------------|----------------------------------------|
 | **Client** | The waste generator. Raises pickups, sees own organisation only, closes after certificate + payment. | `ramesh@techcorp.in` (TechCorp), `priya@techcorp.in` (TechCorp), `meera@infosoft.in` (Infosoft), `anand@bharatretail.in` (Bharat Retail) |
+| **Client Read Only** | Same tenant visibility as client; cannot raise or close. | `viewer@techcorp.in` (seeded when present) |
 | **Factory** | Facility manager. Records goods receipt (MRN) and recycling (Form 6). Sees capacity. Never sees Compliance. | `blr@urbeno.in` (Bengaluru `URB-BLR`), `kgf@urbeno.in` (Kolar `URB-KGF`) |
-| **Admin** | Urbeno operations. Acknowledges, vehicles, weighment, invoices, certificates, Masters, Audit, Compliance. | `admin@urbeno.in` (Manish Jain), `ops@urbeno.in` (Deepa Rao) |
+| **Operations** | Urbeno field ops. Acknowledges, vehicles, weighment, reports. **Cannot** raise invoices or certify CoD. | `ops@urbeno.in` (Deepa Rao) |
+| **Super Admin** | Full Urbeno control. Invoices, certificates, certify publish, Masters, Audit, Compliance. | `admin@urbeno.in` (Manish Jain) |
 
 Do **not** change the shared `demo` password until the last session of the day, or create a dedicated throwaway user in Masters for password / lockout tests.
 
@@ -41,8 +44,9 @@ Record this on every script header before starting.
 
 | Field | Write the value |
 |-------|-----------------|
-| Environment | Staging / UAT / Production-candidate (never mix) |
-| Web URL | e.g. `http://localhost:5173` or `https://staging-tectrack.urbeno.in` |
+| Environment | UAT / Production-candidate (never mix) |
+| Web URL | **UAT:** `https://uat.urbeno.in` · **Prod:** `https://tectrack.urbeno.in` · Local: `http://localhost:5173` |
+| Hosting | **GCP only** — Cloud Run + Cloud SQL + Cloud Storage (AWS UAT stack removed) |
 | API health | `GET /health` returns `{ "ok": true }` |
 | Git / build | Branch + short SHA, or release tag |
 | Date / time | ISO date, IST |
@@ -98,12 +102,12 @@ Log defects in the table on [UAT-PRODUCTION-SIGNOFF.md](./UAT-PRODUCTION-SIGNOFF
 ## Execution order (recommended)
 
 1. Each role runs **Access & navigation** on a fresh browser session (or Incognito).
-2. Run **[UAT-CROSS-ROLE-LIFECYCLE.md](./UAT-CROSS-ROLE-LIFECYCLE.md)** with all three testers available the same day. Write the new `REQ-…` id at the top of every script.
-3. Finish remaining cases on each role script (reports, Masters, Compliance, negative tests).
-4. Admin runs password-policy and lockout on a **dedicated** user, not the shared demo accounts.
+2. Run **[UAT-CROSS-ROLE-LIFECYCLE.md](./UAT-CROSS-ROLE-LIFECYCLE.md)** with Client, Super Admin (or Ops for early stages + Super Admin for invoice/certify), and Factory available the same day. Write the new `REQ-…` id at the top of every script.
+3. Finish remaining cases on each role script (Operations boundaries, Masters, Compliance, negative tests).
+4. Super Admin runs password-policy and lockout on a **dedicated** user, not the shared demo accounts.
 5. Complete [UAT-PRODUCTION-SIGNOFF.md](./UAT-PRODUCTION-SIGNOFF.md).
 
-Typical calendar: **one working day** for the three role scripts plus lifecycle; **half a day** for Compliance and Masters; sign-off the following morning after defect triage.
+Typical calendar: **one working day** for the role scripts plus lifecycle; **half a day** for Compliance and Masters; sign-off the following morning after defect triage.
 
 ---
 

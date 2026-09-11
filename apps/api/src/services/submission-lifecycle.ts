@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { isAuditorRole, isStaffRole, roleDisplayLabel } from '@urb-tectrack/shared';
 import type { SessionUser } from '../lib/auth-context.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -36,9 +37,52 @@ export async function logSubmissionLifecycle(
       event,
       summary,
       actorEmail: actor.email,
+      actorRole: actor.role,
       details: (details ?? {}) as Prisma.InputJsonValue,
     },
   });
+}
+
+/** Staff / auditor identity must not appear on the client portal. */
+export function hideActorIdentityOnClientPortal(
+  role: string | null | undefined,
+  email?: string | null,
+): boolean {
+  if (role && (isStaffRole(role) || isAuditorRole(role))) return true;
+  if (email && /@urbeno\.in$/i.test(email)) return true;
+  return false;
+}
+
+export function portalActorRoleLabel(
+  role: string | null | undefined,
+  email?: string | null,
+): string {
+  if (role) return roleDisplayLabel(role);
+  if (email && /@urbeno\.in$/i.test(email)) return 'Urbeno';
+  return 'Urbeno';
+}
+
+/** Rewrite stored summaries that embed staff names for client display. */
+export function clientFacingLifecycleSummary(
+  event: string,
+  roleLabel: string,
+  originalSummary: string,
+): string {
+  switch (event) {
+    case 'created':
+      return `Request raised by ${roleLabel}`;
+    case 'acknowledged':
+      return `Acknowledged by ${roleLabel}`;
+    case 'loading_complete':
+      return `Loading complete — confirmed by ${roleLabel}`;
+    case 'returned':
+    case 'resubmitted':
+      return originalSummary;
+    case 'requestor_assigned':
+      return originalSummary;
+    default:
+      return originalSummary;
+  }
 }
 
 export function summarizeSubmissionChanges(

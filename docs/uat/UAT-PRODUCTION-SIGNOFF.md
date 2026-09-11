@@ -1,6 +1,9 @@
 # Urb TecTrack — production UAT sign-off
 
-Use this certificate only after the three role scripts and the cross-role lifecycle are finished. Attach marked scripts (PDF or paper) and the defect log.
+Use this certificate only after the role scripts and the cross-role lifecycle are finished. Attach marked scripts (PDF or paper) and the defect log.
+
+**Hosting under test:** GCP Cloud Run + Cloud SQL + Cloud Storage.  
+**UAT URL:** https://uat.urbeno.in · **Production URL:** https://tectrack.urbeno.in
 
 ---
 
@@ -9,11 +12,12 @@ Use this certificate only after the three role scripts and the cross-role lifecy
 | Field | Value |
 |-------|--------|
 | Product | Urb TecTrack (Urbeno e-waste platform) |
-| Environment name / URL | |
+| Environment name / URL | ☐ UAT `https://uat.urbeno.in` ☐ Prod candidate `https://tectrack.urbeno.in` ☐ Other: ________ |
 | Git branch | |
 | Git SHA (full or 12-char) | |
 | Release / tag | |
-| Database migrated to | Prisma migrations including `20260817120000_v64_compliance` |
+| Database migrated to | Prisma migrations through latest (include `lifecycle_actor_role`, `mrn_delivery_challan`) |
+| Cloud Run service / revision | `tectrack-uat` / `tectrack-prod` · revision: ________ |
 | Test window (IST) | From _____________ to _____________ |
 | UAT lead | |
 
@@ -27,10 +31,12 @@ This is **not** a production URL unless the environment is explicitly named prod
 |--------|--------|------|------|-----|---------|--------|
 | [UAT-CLIENT.md](./UAT-CLIENT.md) | | | | | | ☐ |
 | [UAT-FACTORY.md](./UAT-FACTORY.md) | | | | | | ☐ |
-| [UAT-ADMIN.md](./UAT-ADMIN.md) | | | | | | ☐ |
+| [UAT-OPERATIONS.md](./UAT-OPERATIONS.md) | | | | | | ☐ |
+| [UAT-ADMIN.md](./UAT-ADMIN.md) (Super Admin) | | | | | | ☐ |
 | [UAT-CROSS-ROLE-LIFECYCLE.md](./UAT-CROSS-ROLE-LIFECYCLE.md) — request `REQ-` ______ | | | | | | ☐ |
 
-Playwright (`pnpm e2e`) on this SHA: ☐ Pass ☐ Fail ☐ Not run — log: _____________
+Playwright (`pnpm e2e`) on this SHA: ☐ Pass ☐ Fail ☐ Not run — log: _____________  
+CI (migrate deploy + unit + integration): ☐ Pass ☐ Fail — run: _____________
 
 ---
 
@@ -41,10 +47,12 @@ Playwright (`pnpm e2e`) on this SHA: ☐ Pass ☐ Fail ☐ Not run — log: ____
 | Stages 1–9 completed on a **new** request, client closed | ☐ | Request ID: |
 | TechCorp cannot open Infosoft `REQ-00043` | ☐ | Screenshot / case C1.2 |
 | Clients never see MRN | ☐ | L7 / C4.2 |
-| Weighment requires slip + pickup photos; net = gross − tare | ☐ | A3 / L4 |
+| Client lifecycle shows **role titles**, not staff email/name | ☐ | L7 |
+| Weighment requires slip + pickup photos; net = gross − tare | ☐ | A3 / O3 / L4 |
 | Invoice tax/total derived; e-way required; unique invoice no. | ☐ | A4 / L5 |
+| Operations cannot raise invoice or certify CoD | ☐ | O4 / N6 |
 | Form 6 split equals billing weight | ☐ | F4 / L8 / N3 |
-| Factory and client cannot use Compliance | ☐ | F0.4 / C1.4 / N4 |
+| Factory, client, and Operations cannot use Compliance | ☐ | F0.4 / C1.4 / O4.3 / N4 |
 | Audit chain verifies (Compliance → Evidence / Control status) | ☐ | A8.1 / A8.7 |
 | Privacy accepted on this environment | ☐ | C0.2 / A0.1 |
 | Zero open Blockers | ☐ | Section 4 |
@@ -82,11 +90,12 @@ Record hosting items that UAT cannot prove in this environment.
 
 | Item | Status on this environment | Production follow-up |
 |------|----------------------------|----------------------|
-| Automated RDS/S3 backup (Control status “hosting control”) | ☐ Proven ☐ Warn / not hosted yet | |
-| SMTP / SES actually delivering to client inboxes | ☐ Proven ☐ Console / queue only | |
-| Uploads on durable S3 (not local disk) | ☐ Proven ☐ Local `UPLOAD_DIR` | |
+| Automated **Cloud SQL** backups / PITR (Control status “hosting control”) | ☐ Proven ☐ Warn / not configured yet | Prod uses REGIONAL HA + PITR per PRODUCTION-GCP.md |
+| Object storage on **Cloud Storage** (not local disk) | ☐ Proven ☐ Local `UPLOAD_DIR` | |
+| SMTP actually delivering to client inboxes | ☐ Proven ☐ Console / queue only | |
 | MFA enrolled on all privileged **production** users | ☐ Proven ☐ UAT only | |
 | `demo` password absent in production | ☐ Confirmed for prod ☐ N/A (this is UAT) | |
+| Cloud Run reachable only via custom domain / LB (optional harden) | ☐ Proven ☐ Direct `*.run.app` still open | |
 
 ---
 
@@ -114,7 +123,8 @@ By signing, you confirm the scripts were executed as written, results are truthf
 |------|------|-----------|------|
 | Client tester | | | |
 | Factory tester | | | |
-| Admin / operations tester | | | |
+| Operations tester | | | |
+| Super Admin tester | | | |
 | UAT lead | | | |
 | Product owner (Urbeno) | | | |
 | Engineering / release owner | | | |

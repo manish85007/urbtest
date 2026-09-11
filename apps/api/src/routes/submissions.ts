@@ -102,7 +102,7 @@ export async function submissionRoutes(app: FastifyInstance) {
 
     if (!sub) return reply.notFound('Request not found');
 
-    return redactSubmissionForActor(withDerivedStages(sub), request.user!);
+    return await redactSubmissionForActor(withDerivedStages(sub), request.user!);
   });
 
   app.get('/health/dashboard', { preHandler: requireStaff }, async () => {

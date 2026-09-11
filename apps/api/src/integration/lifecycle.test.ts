@@ -22,6 +22,12 @@ import {
 import { addVehicle, completeLoading, recordWeighment, updateVehicle } from '../services/vehicle-service.js';
 
 const hasDb = !!process.env.DATABASE_URL;
+const requireIntegration =
+  process.env.REQUIRE_INTEGRATION === 'true' || process.env.CI === 'true';
+
+if (requireIntegration && !hasDb) {
+  throw new Error('DATABASE_URL is required to run integration tests in CI.');
+}
 
 async function actor(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
@@ -58,13 +64,9 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
     await prisma.$disconnect();
   });
 
-  it('walks stages 1–9 for a new submission', async (ctx) => {
-    try {
-      await prisma.user.findFirst({ select: { passwordSetAt: true } });
-    } catch {
-      ctx.skip();
-      return;
-    }
+  it('walks stages 1–9 for a new submission', async () => {
+    // Soft-skips hide broken migrate/seed in CI — fail hard when DATABASE_URL is set.
+    await prisma.user.findFirst({ select: { passwordSetAt: true } });
 
     const client = await actor('ramesh@techcorp.in');
     const admin = await actor('admin@urbeno.in');
@@ -102,6 +104,13 @@ describe.skipIf(!hasDb)('full lifecycle integration', () => {
 
     const ack = await acknowledgeSubmission(admin, submissionId);
     expect(ack.derivedStage).toBeGreaterThanOrEqual(2);
+
+    const ackEvent = await prisma.submissionLifecycleEvent.findFirst({
+      where: { submissionId, event: 'acknowledged' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(ackEvent?.actorRole).toBe('admin');
+    expect(ackEvent?.actorEmail).toBe(admin.email);
 
     const { vehicle } = await addVehicle(admin, submissionId, {
       registration: 'KAINT2026',

@@ -1,6 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { redactSubmissionForActor } from '../lib/access.js';
 import type { SessionUser } from '../lib/auth-context.js';
+
+vi.mock('../lib/prisma.js', () => ({
+  prisma: {
+    user: {
+      findMany: vi.fn(async () => [
+        { email: 'suresh@urbeno.in', role: 'factory' },
+        { email: 'admin@urbeno.in', role: 'admin' },
+      ]),
+    },
+  },
+}));
 
 const client: SessionUser = {
   id: 'u1',
@@ -39,7 +50,11 @@ type Inv = {
 };
 
 describe('redactSubmissionForActor', () => {
-  it('strips MRN for clients but preserves hasMrn for lifecycle UI', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('strips MRN for clients but preserves hasMrn for lifecycle UI', async () => {
     const sub = {
       id: 'REQ-00090',
       invoices: [
@@ -57,7 +72,7 @@ describe('redactSubmissionForActor', () => {
       ] satisfies Inv[],
     };
 
-    const redacted = redactSubmissionForActor(sub, client);
+    const redacted = await redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].mrn).toBeNull();
     expect(redacted.invoices[0].hasMrn).toBe(true);
     expect(redacted.invoices[0].recycling).toEqual({
@@ -68,7 +83,7 @@ describe('redactSubmissionForActor', () => {
     expect(redacted.invoices[0].certificates).toEqual([{ certNo: 'COD-1' }]);
   });
 
-  it('hides Form 6 from clients until admin approval', () => {
+  it('hides Form 6 from clients until admin approval', async () => {
     const sub = {
       id: 'REQ-00090',
       invoices: [
@@ -81,12 +96,12 @@ describe('redactSubmissionForActor', () => {
         },
       ] satisfies Inv[],
     };
-    const redacted = redactSubmissionForActor(sub, client);
+    const redacted = await redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].recycling).toBeNull();
     expect(redacted.invoices[0].certificates).toEqual([]);
   });
 
-  it('hides approved Form 6 and CoD from clients until Super Admin certify', () => {
+  it('hides approved Form 6 and CoD from clients until Super Admin certify', async () => {
     const sub = {
       id: 'REQ-00090',
       invoices: [
@@ -99,27 +114,80 @@ describe('redactSubmissionForActor', () => {
         },
       ] satisfies Inv[],
     };
-    const redacted = redactSubmissionForActor(sub, client);
+    const redacted = await redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].recycling).toBeNull();
     expect(redacted.invoices[0].certificates).toEqual([]);
   });
 
-  it('infers hasMrn from mrn when flag was not pre-set', () => {
+  it('infers hasMrn from mrn when flag was not pre-set', async () => {
     const sub: { id: string; invoices: Inv[] } = {
       id: 'REQ-00090',
       invoices: [{ invoiceNo: 'INV-1', mrn: { mrnNo: 'MRN/1' } }],
     };
-    const redacted = redactSubmissionForActor(sub, client);
+    const redacted = await redactSubmissionForActor(sub, client);
     expect(redacted.invoices[0].hasMrn).toBe(true);
     expect(redacted.invoices[0].mrn).toBeNull();
   });
 
-  it('does not redact MRN for staff', () => {
+  it('does not redact MRN for staff', async () => {
     const sub = {
       id: 'REQ-00090',
       invoices: [{ invoiceNo: 'INV-1', hasMrn: true, mrn: { mrnNo: 'MRN/1' } }] satisfies Inv[],
     };
-    const out = redactSubmissionForActor(sub, admin);
+    const out = await redactSubmissionForActor(sub, admin);
     expect(out.invoices[0].mrn).toEqual({ mrnNo: 'MRN/1' });
+  });
+
+  it('replaces staff name/email with role on client portal lifecycle', async () => {
+    const sub = {
+      id: 'REQ-00090',
+      acknowledgedBy: 'suresh@urbeno.in',
+      loadingCompletedBy: 'admin@urbeno.in',
+      invoices: [] as Inv[],
+      lifecycleEvents: [
+        {
+          id: 'e1',
+          event: 'acknowledged',
+          summary: 'Acknowledged by Suresh',
+          actorEmail: 'suresh@urbeno.in',
+          actorRole: 'factory',
+          createdAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+    };
+
+    const redacted = await redactSubmissionForActor(sub, client);
+    expect(redacted.acknowledgedBy).toBe('Factory Manager');
+    expect(redacted.loadingCompletedBy).toBe('Super Admin');
+    const ev = redacted.lifecycleEvents?.[0] as {
+      summary: string;
+      actorEmail: string;
+      actorLabel?: string;
+    };
+    expect(ev.summary).toBe('Acknowledged by Factory Manager');
+    expect(ev.actorEmail).toBe('');
+    expect(ev.actorLabel).toBe('');
+  });
+
+  it('keeps staff identity for Urbeno users', async () => {
+    const sub = {
+      id: 'REQ-00090',
+      acknowledgedBy: 'suresh@urbeno.in',
+      invoices: [] as Inv[],
+      lifecycleEvents: [
+        {
+          id: 'e1',
+          event: 'acknowledged',
+          summary: 'Acknowledged by Suresh',
+          actorEmail: 'suresh@urbeno.in',
+          actorRole: 'factory',
+          createdAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const out = await redactSubmissionForActor(sub, admin);
+    expect(out.acknowledgedBy).toBe('suresh@urbeno.in');
+    expect(out.lifecycleEvents?.[0].summary).toBe('Acknowledged by Suresh');
+    expect(out.lifecycleEvents?.[0].actorEmail).toBe('suresh@urbeno.in');
   });
 });

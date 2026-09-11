@@ -560,6 +560,10 @@ export interface SubmissionLifecycleEvent {
   event: string;
   summary: string;
   actorEmail: string;
+  /** Role at action time (staff). Clients see role titles via summary, not email. */
+  actorRole?: string | null;
+  /** Display label for staff UI; empty on client portal after redaction. */
+  actorLabel?: string;
   details?: Record<string, unknown>;
   createdAt: string;
 }

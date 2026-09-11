@@ -62,9 +62,11 @@ export function RequestLifecycleCard({ events }: { events: SubmissionLifecycleEv
                 </span>
               </div>
               <div style={{ fontSize: '.84rem', marginTop: '.25rem', whiteSpace: 'pre-wrap' }}>{ev.summary}</div>
-              <div className="dim" style={{ fontSize: '.72rem', marginTop: '.2rem' }}>
-                {ev.actorEmail}
-              </div>
+              {ev.actorLabel || ev.actorEmail ? (
+                <div className="dim" style={{ fontSize: '.72rem', marginTop: '.2rem' }}>
+                  {ev.actorLabel || ev.actorEmail}
+                </div>
+              ) : null}
               {changes.length ? (
                 <ul style={{ margin: '.35rem 0 0 1rem', fontSize: '.78rem', color: 'var(--g1)' }}>
                   {changes.map((c) => (

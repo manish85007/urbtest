@@ -6,6 +6,12 @@ import { assertClientInvoiceNoUnique, assertClientSerialsUnique } from '../servi
 import { AppError } from '../lib/errors.js';
 
 const hasDb = !!process.env.DATABASE_URL;
+const requireIntegration =
+  process.env.REQUIRE_INTEGRATION === 'true' || process.env.CI === 'true';
+
+if (requireIntegration && !hasDb) {
+  throw new Error('DATABASE_URL is required to run integration tests in CI.');
+}
 
 describe.skipIf(!hasDb)('client-level duplicate checks', () => {
   beforeAll(async () => {

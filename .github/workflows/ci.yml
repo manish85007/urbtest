@@ -12,6 +12,8 @@ jobs:
       DATABASE_URL: postgresql://tectrack:tectrack@localhost:5432/tectrack_test?schema=public
       SESSION_SECRET: ci-test-session-secret-min-32-chars
       ENABLE_JOBS: 'false'
+      # Fail hard if integration suites would be skipped (no soft-skip in CI).
+      REQUIRE_INTEGRATION: 'true'
     services:
       postgres:
         image: postgres:16-alpine
@@ -40,12 +42,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm db:generate
-      - run: pnpm db:migrate:deploy
-      - run: pnpm db:seed
+      - name: Apply Prisma migrations
+        run: pnpm db:migrate:deploy
+      - name: Seed test database
+        run: pnpm db:seed
 
       - run: pnpm --filter @urb-tectrack/shared test
       - run: pnpm --filter @urb-tectrack/shared build
-      - run: pnpm --filter @urb-tectrack/api test
+      - name: API unit + integration tests
+        run: pnpm --filter @urb-tectrack/api test
+      - name: Integration suites only (explicit gate)
+        run: pnpm --filter @urb-tectrack/api exec vitest run src/integration
       - run: pnpm --filter @urb-tectrack/api lint
       - run: pnpm --filter @urb-tectrack/web lint
       - run: pnpm build

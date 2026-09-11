@@ -1,14 +1,15 @@
 # Urb TecTrack UAT on Google Cloud
 
-Dev-sized stack for tester sign-off. Region: **asia-south1** (Mumbai).
+Dev-sized stack for tester sign-off. Region: **asia-south1** (Mumbai).  
+Public URL: **https://uat.urbeno.in** (HTTPS load balancer in front of Cloud Run).
 
 | Service | Why | UAT size |
 |---|---|---|
-| Cloud Run | Same Docker image as AWS (API + SPA, HTTPS) | 1 vCPU / 1 GiB, min 1 instance |
+| Cloud Run | API + SPA | 1 vCPU / 1 GiB, min 1 instance |
 | Cloud SQL PostgreSQL 16 | Matches Prisma | `db-f1-micro`, 10 GB, zonal |
 | Cloud Storage | Weighment photos, certificates, serial CSVs | Private, uniform access |
 | Secret Manager | DB password + session secret | 2 secrets |
-| External HTTPS LB | Blanks GFE `Server` header; custom domain | Global EXTERNAL_MANAGED |
+| External HTTPS LB | Custom domain `uat.urbeno.in`; blanks GFE `Server` header | Global EXTERNAL_MANAGED |
 
 **Estimated monthly cost (24/7, asia-south1):** about **$55–90**
 
@@ -29,19 +30,31 @@ gcloud config set project YOUR_PROJECT_ID
 
 Billing must be enabled on the project. Demo logins (password `demo`): `admin@urbeno.in`, `kgf@urbeno.in`, `ramesh@techcorp.in`.
 
-## Strip `Server: Google Frontend`
+## Custom domain (`uat.urbeno.in`)
 
-Cloud Run’s Google Front End always injects `Server: Google Frontend`. App-side `removeHeader` cannot clear it. Put an HTTPS load balancer in front and blank the header:
+Cloud Run’s Google Front End injects `Server: Google Frontend`. Put the global HTTPS load balancer in front and blank it:
 
 ```bash
-# Optional override: GCP_LB_DOMAIN=tectrack-uat.urbeno.in
-./infra/gcp/setup-lb.sh
+GCP_LB_DOMAIN=uat.urbeno.in ./infra/gcp/setup-lb.sh
 ```
 
-Then create a DNS **A** record for the printed domain → LB IP. When the managed cert is `ACTIVE`, the script updates `PORTAL_URL` / `CORS_ORIGIN`. Verify:
+DNS (at the `urbeno.in` registrar):
+
+1. Remove any **CNAME** for `uat` that points at the AWS ALB.
+2. Create an **A** record: `uat.urbeno.in` → the LB IP printed by `setup-lb.sh` (currently **`8.233.150.171`**).
+
+When the Google-managed cert is `ACTIVE`, the script (or a manual update) sets:
 
 ```bash
-curl -sSI https://tectrack-uat.urbeno.in/ | grep -i ^server || echo '(no Server header)'
+gcloud run services update tectrack-uat --region=asia-south1 \
+  --update-env-vars=PORTAL_URL=https://uat.urbeno.in,CORS_ORIGIN=https://uat.urbeno.in
+```
+
+Verify:
+
+```bash
+curl -sS https://uat.urbeno.in/health
+curl -sSI https://uat.urbeno.in/ | grep -i ^server || echo '(no Server header)'
 ```
 
 Optionally lock Cloud Run to LB-only ingress:

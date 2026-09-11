@@ -227,6 +227,8 @@ model SubmissionLifecycleEvent {
   event        String
   summary      String
   actorEmail   String   @map("actor_email")
+  /// Role at the time of the action — used to show role (not name/email) on the client portal.
+  actorRole    String?  @map("actor_role")
   details      Json     @default("{}")
   createdAt    DateTime @default(now()) @map("created_at")
 
