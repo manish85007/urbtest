@@ -521,6 +521,11 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                 payTermsDays={sub.client.payTermsDays ?? 30}
                 user={user}
                 disabled={busy || !!sub.closedAt}
+                closeContext={{
+                  createdBy: sub.createdBy,
+                  createdByRole: sub.createdByRole,
+                  onBehalfOf: sub.onBehalfOf,
+                }}
                 onAction={act}
               />
             ))}

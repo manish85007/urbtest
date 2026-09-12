@@ -102,7 +102,18 @@ export async function submissionRoutes(app: FastifyInstance) {
 
     if (!sub) return reply.notFound('Request not found');
 
-    return await redactSubmissionForActor(withDerivedStages(sub), request.user!);
+    return await redactSubmissionForActor(
+      {
+        ...withDerivedStages(sub),
+        createdByRole: (
+          await prisma.user.findFirst({
+            where: { email: { equals: sub.createdBy, mode: 'insensitive' } },
+            select: { role: true },
+          })
+        )?.role ?? null,
+      },
+      request.user!,
+    );
   });
 
   app.get('/health/dashboard', { preHandler: requireStaff }, async () => {

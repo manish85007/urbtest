@@ -135,12 +135,16 @@ function redactLifecycleEvent(
 
 /** Rule R4 — clients never see MRN documents, but keep hasMrn for lifecycle UI.
  *  Form 6 + CoD are hidden until Super Admin certifies (clientPublishedAt).
- *  Staff name/email on lifecycle + ack fields are replaced with role titles. */
+ *  Certifier email is stripped once published. Staff name/email on lifecycle + ack fields become role titles. */
 export async function redactSubmissionForActor<T extends {
   invoices: Array<{
     mrn: unknown;
     hasMrn?: boolean;
-    recycling?: { reviewStatus?: string; clientPublishedAt?: Date | string | null } | null;
+    recycling?: {
+      reviewStatus?: string;
+      clientPublishedAt?: Date | string | null;
+      clientPublishedBy?: string | null;
+    } | null;
     certificates?: unknown[];
   }>;
   lifecycleEvents?: LifecycleEventLike[];
@@ -173,7 +177,9 @@ export async function redactSubmissionForActor<T extends {
         ...inv,
         hasMrn: inv.hasMrn ?? !!inv.mrn,
         mrn: null,
-        recycling: published ? inv.recycling : null,
+        recycling: published
+          ? { ...inv.recycling, clientPublishedBy: null }
+          : null,
         certificates: published ? (inv.certificates ?? []) : [],
       };
     }),

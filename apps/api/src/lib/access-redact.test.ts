@@ -45,6 +45,7 @@ type Inv = {
     form6No: string;
     reviewStatus?: string;
     clientPublishedAt?: string | null;
+    clientPublishedBy?: string | null;
   } | null;
   certificates?: Array<{ certNo: string }>;
 };
@@ -79,6 +80,7 @@ describe('redactSubmissionForActor', () => {
       form6No: 'F6/1',
       reviewStatus: 'approved',
       clientPublishedAt: '2026-09-01T00:00:00.000Z',
+      clientPublishedBy: null,
     });
     expect(redacted.invoices[0].certificates).toEqual([{ certNo: 'COD-1' }]);
   });
@@ -189,5 +191,27 @@ describe('redactSubmissionForActor', () => {
     expect(out.acknowledgedBy).toBe('suresh@urbeno.in');
     expect(out.lifecycleEvents?.[0].summary).toBe('Acknowledged by Suresh');
     expect(out.lifecycleEvents?.[0].actorEmail).toBe('suresh@urbeno.in');
+  });
+
+  it('strips clientPublishedBy for clients', async () => {
+    const sub = {
+      id: 'REQ-00090',
+      invoices: [
+        {
+          invoiceNo: 'INV-1',
+          mrn: null,
+          recycling: {
+            form6No: 'F6-1',
+            reviewStatus: 'approved',
+            clientPublishedAt: '2026-09-01T00:00:00.000Z',
+            clientPublishedBy: 'admin@urbeno.in',
+          },
+          certificates: [{ certNo: 'COD-1' }],
+        },
+      ] satisfies Inv[],
+    };
+    const redacted = await redactSubmissionForActor(sub, client);
+    expect(redacted.invoices[0].recycling?.clientPublishedBy).toBeNull();
+    expect(redacted.invoices[0].recycling?.form6No).toBe('F6-1');
   });
 });

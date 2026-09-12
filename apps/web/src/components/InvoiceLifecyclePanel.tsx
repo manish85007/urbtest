@@ -5,6 +5,10 @@ import {
   invoiceDue,
   paymentTermsLabel,
   settledPaise,
+  actorMayCloseInvoice,
+  closeChecklist,
+  isClientPortalRole,
+  type CloseChecklistItem,
   type PayStatusKey,
 } from '@urb-tectrack/shared';
 import {
@@ -51,6 +55,12 @@ interface InvoiceLifecyclePanelProps {
   onDeleteInvoice?: () => void;
   canDeleteInvoice?: boolean;
   section?: InvoicePanelSection;
+  /** Request identity used to explain why Review & Close is blocked. */
+  closeContext?: {
+    createdBy: string;
+    createdByRole?: string | null;
+    onBehalfOf?: string | null;
+  };
 }
 
 function payCls(key: PayStatusKey): string {
@@ -68,6 +78,95 @@ function asPaise(v: string | number | bigint | undefined): bigint {
   }
 }
 
+function daysSinceFirstCertificate(certs: Array<{ uploadedAt?: string | null; certDate?: string }>): number {
+  const stamps = certs
+    .map((c) => c.uploadedAt || c.certDate)
+    .filter((d): d is string => !!d)
+    .map((d) => new Date(d).getTime())
+    .filter((t) => !Number.isNaN(t));
+  if (!stamps.length) return 0;
+  return (Date.now() - Math.min(...stamps)) / 86400000;
+}
+
+function requestRaisedByClient(ctx?: {
+  createdBy: string;
+  createdByRole?: string | null;
+}): boolean {
+  if (!ctx?.createdBy) return false;
+  if (ctx.createdByRole) return ctx.createdByRole === 'client';
+  return !/@urbeno\.in$/i.test(ctx.createdBy);
+}
+
+function CloseReadiness({
+  invoice,
+  user,
+  isPaid,
+  closeContext,
+  onClose,
+}: {
+  invoice: InvoiceDetail;
+  user: SessionUser;
+  isPaid: boolean;
+  closeContext?: InvoiceLifecyclePanelProps['closeContext'];
+  onClose: () => void;
+}) {
+  const audience: 'client' | 'staff' = isClientPortalRole(user.role) ? 'client' : 'staff';
+  const input = {
+    hasCod: invoice.certificates.length > 0,
+    certified: !!invoice.recycling?.clientPublishedAt,
+    paid: isPaid,
+    audience,
+    actorRole: user.role,
+    actorEmail: user.email,
+    onBehalfOf: closeContext?.onBehalfOf,
+    createdBy: closeContext?.createdBy ?? '',
+    raisedByClient: requestRaisedByClient(closeContext),
+    daysSinceFirstCertificate: daysSinceFirstCertificate(invoice.certificates),
+  };
+  const items = closeChecklist(input);
+  const canClose = user.role === 'client' && actorMayCloseInvoice({ ...input, audience: 'client' });
+  const waiting = items.filter((item) => !item.ok);
+
+  return (
+    <div className="card" style={{ marginBottom: '.6rem' }}>
+      <div className="card-hd">
+        <div className="card-ttl">Review &amp; Close — {invoice.invoiceNo}</div>
+        <div className="spacer" />
+        {canClose ? (
+          <button type="button" className="btn bp bsm" onClick={onClose}>
+            Review &amp; Close
+          </button>
+        ) : null}
+      </div>
+      <p className="dim" style={{ margin: '0 0 .55rem', fontSize: '.85rem' }}>
+        {canClose
+          ? 'Confirm you have received the Certificate of Destruction, then acknowledge closure. Downloads are in Compliance Documents above.'
+          : audience === 'staff'
+            ? waiting.length
+              ? 'The client cannot close this invoice yet.'
+              : 'The client requestor can close this invoice from their portal.'
+            : 'You cannot close this invoice yet.'}
+      </p>
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: '.35rem' }}>
+        {items.map((item) => (
+          <CloseCheckRow key={item.id} item={item} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CloseCheckRow({ item }: { item: CloseChecklistItem }) {
+  return (
+    <li style={{ display: 'flex', gap: '.45rem', alignItems: 'flex-start', fontSize: '.84rem' }}>
+      <span className={item.ok ? 'ok-msg sm' : 'badge bg-am'} style={{ flexShrink: 0 }}>
+        {item.ok ? 'Done' : 'Waiting'}
+      </span>
+      <span>{item.text}</span>
+    </li>
+  );
+}
+
 export function InvoiceLifecyclePanel({
   invoice,
   vehicles,
@@ -80,6 +179,7 @@ export function InvoiceLifecyclePanel({
   onDeleteInvoice,
   canDeleteInvoice = true,
   section = 'invoice-mrn',
+  closeContext,
 }: InvoiceLifecyclePanelProps) {
   const isStaff = isStaffUser(user);
   const isAdmin = user.role === 'admin';
@@ -90,7 +190,6 @@ export function InvoiceLifecyclePanel({
     manageInvoices: userCan(user, 'manageInvoices'),
     uploadCertificate: userCan(user, 'uploadCertificate'),
   };
-  const isClient = userCan(user, 'closeAsClient');
   const canBackdate = userCan(user, 'backdateRequests');
   const paymentModes = useLookups('paymentMode');
   const taxRates = useLookups('taxRate');
@@ -520,7 +619,7 @@ export function InvoiceLifecyclePanel({
                 {form6Approved && invoice.certificates.length > 0 && compliancePublished ? (
                   <div className="note-box" style={{ marginBottom: '.65rem' }}>
                     Published to client portal
-                    {invoice.recycling.clientPublishedBy
+                    {!isClientPortalRole(user.role) && invoice.recycling.clientPublishedBy
                       ? ` by ${invoice.recycling.clientPublishedBy}`
                       : ''}
                     {invoice.recycling.clientPublishedAt
@@ -608,47 +707,14 @@ export function InvoiceLifecyclePanel({
       {section === 'close' ? (
         invoice.closedAt ? (
           <p className="ok-msg sm">Closed {invoice.closedAt.slice(0, 10)}</p>
-        ) : !invoice.certificates.length || !invoice.recycling?.clientPublishedAt ? (
-          <div className="card" style={{ marginBottom: '.6rem' }}>
-            <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
-            <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
-              {!invoice.certificates.length
-                ? 'Upload the Certificate of Destruction before this invoice can be closed.'
-                : 'Super Admin must certify Form 6 & CoD for the client portal before this invoice can be closed.'}
-            </p>
-          </div>
-        ) : (isClient || isAdmin) && isPaid ? (
-          <div className="card" style={{ marginBottom: '.6rem' }}>
-            <div className="card-hd">
-              <div className="card-ttl">🎉 Review & Close — {invoice.invoiceNo}</div>
-              <div className="spacer" />
-              {isAdmin ? (
-                <span title="Review & Close is a client action — the client must acknowledge receipt.">
-                  <button type="button" className="btn bs bsm" disabled style={{ opacity: 0.45, cursor: 'not-allowed' }}>
-                    Review & Close
-                  </button>
-                </span>
-              ) : (
-                <button type="button" className="btn bp bsm" onClick={() => setPanel('close')}>
-                  Review & Close
-                </button>
-              )}
-            </div>
-            <div className="dim" style={{ fontSize: '.83rem', marginBottom: '.45rem' }}>
-              {isAdmin
-                ? 'This invoice is ready to close. The client must sign off via their portal.'
-                : 'Confirm you have received the Certificate of Destruction, then acknowledge closure. Downloads are in Compliance Documents above.'}
-            </div>
-          </div>
         ) : (
-          <div className="card" style={{ marginBottom: '.6rem' }}>
-            <div className="card-ttl">Invoice {invoice.invoiceNo}</div>
-            <p className="dim" style={{ margin: '.35rem 0 0', fontSize: '.85rem' }}>
-              The certificate is on file. Closure waits until this invoice is paid — payment can be recorded
-              any time under the client’s terms and does not block earlier steps. Download from Compliance
-              Documents above.
-            </p>
-          </div>
+          <CloseReadiness
+            invoice={invoice}
+            user={user}
+            isPaid={isPaid}
+            closeContext={closeContext}
+            onClose={() => setPanel('close')}
+          />
         )
       ) : null}
 

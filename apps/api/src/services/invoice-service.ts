@@ -8,11 +8,12 @@ import {
   recoveryFor,
   rupeesToPaise,
   unpaidCloseMessage,
+  documentCloseBlocker,
+  requestorCloseBlocker,
   formatMrnNumber,
   formatForm6Number,
   getFY,
   hasPermission,
-  isClientMutatorRole,
   lifecycleDateError,
   type MaterialGroupCode,
 } from '@urb-tectrack/shared';
@@ -1451,19 +1452,24 @@ export async function closeInvoice(
   const stage = deriveInvoiceStage(invoice);
 
   if (invoice.closedAt) throw new AppError('This invoice is already closed.');
-  if (!invoice.certificates.length) {
+
+  const paid = settledPaise(invoice.payments);
+  const status = getPayStatus(invoice.totalPaise, paid);
+  const documentBlocker = documentCloseBlocker({
+    hasCod: invoice.certificates.length > 0,
+    certified: !!invoice.recycling?.clientPublishedAt,
+    paid: status.key === 'paid',
+  });
+  if (documentBlocker === 'no_cod') {
     throw new AppError('No Certificate of Destruction has been uploaded yet.');
   }
-  if (!invoice.recycling?.clientPublishedAt) {
+  if (documentBlocker === 'not_certified') {
     throw new AppError('Super Admin must certify Form 6 & CoD before this invoice can be closed.');
   }
   if (stage < 8) {
     throw new AppError('Upload a certificate before closing this invoice.');
   }
-
-  const paid = settledPaise(invoice.payments);
-  const status = getPayStatus(invoice.totalPaise, paid);
-  if (status.key !== 'paid') {
+  if (documentBlocker === 'unpaid') {
     throw new AppError(unpaidCloseMessage(invoice.invoiceNo, status.duePaise, invoice.totalPaise));
   }
 
@@ -1485,44 +1491,46 @@ export async function closeInvoice(
       const conflicts = sodCheck('force-close', { invCreatedBy: invoice.createdBy }, actor.email);
       await logSoD(actor, 'force-close', conflicts, invoice.invoiceNo);
     }
-  } else if (isClientMutatorRole(actor.role)) {
+  } else {
+    const roleBlock = requestorCloseBlocker({
+      actorRole: actor.role,
+      actorEmail: actor.email,
+      onBehalfOf: invoice.submission.onBehalfOf,
+      createdBy: invoice.submission.createdBy,
+      raisedByClient: false,
+      daysSinceFirstCertificate: daysSinceCert,
+    });
+    if (roleBlock === 'not_client') {
+      throw new AppError('Only the client requestor may close this invoice.', 403);
+    }
     if (actor.clientId !== invoice.submission.clientId) {
       throw new AppError('You do not have permission to close this invoice.', 403);
     }
-    // Effective requestor:
-    // - onBehalfOf designates the client who may close immediately (admin-raised or reassigned).
-    // - Otherwise, if createdBy is a client user, that creator closes (peers wait 30 days).
-    // - Staff-raised with no onBehalfOf: client close is blocked until Super Admin assigns a requestor
-    //   (60-day auto/force-close remains the fallback).
-    const effectiveRequestor = invoice.submission.onBehalfOf ?? null;
-    if (effectiveRequestor) {
-      const isRequestor = actor.email.toLowerCase() === effectiveRequestor.toLowerCase();
-      if (!isRequestor && daysSinceCert < 30) {
-        throw new AppError(
-          'Only the assigned requestor can close within 30 days of certificate upload, or any client user after 30 days.',
-        );
-      }
-    } else {
-      const creatorUser = await prisma.user.findUnique({
-        where: { email: invoice.submission.createdBy },
-        select: { role: true },
-      });
-      const raisedByClient = creatorUser?.role === 'client';
-      if (raisedByClient) {
-        const isCreator = actor.email === invoice.submission.createdBy;
-        if (!isCreator && daysSinceCert < 30) {
-          throw new AppError(
-            'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
-          );
-        }
-      } else {
-        throw new AppError(
-          'A client requestor has not been assigned yet. Ask Super Admin to assign a requestor so this invoice can be closed, or wait for the automatic close 60 days after the first certificate.',
-        );
-      }
+    const creator = await prisma.user.findFirst({
+      where: { email: { equals: invoice.submission.createdBy, mode: 'insensitive' } },
+      select: { role: true },
+    });
+    const requestorBlocker = requestorCloseBlocker({
+      actorRole: actor.role,
+      actorEmail: actor.email,
+      onBehalfOf: invoice.submission.onBehalfOf,
+      createdBy: invoice.submission.createdBy,
+      raisedByClient: creator?.role === 'client',
+      daysSinceFirstCertificate: daysSinceCert,
+    });
+    if (requestorBlocker === 'no_requestor') {
+      throw new AppError(
+        'A client requestor has not been assigned yet. Ask Super Admin to assign a requestor so this invoice can be closed, or wait for the automatic close 60 days after the first certificate.',
+      );
     }
-  } else {
-    throw new AppError('Only the client requestor may close this invoice.', 403);
+    if (requestorBlocker === 'peer_wait') {
+      const assigned = !!invoice.submission.onBehalfOf?.trim();
+      throw new AppError(
+        assigned
+          ? 'Only the assigned requestor can close within 30 days of certificate upload, or any client user after 30 days.'
+          : 'Only the requestor can close within 30 days of certificate upload, or any client user after 30 days.',
+      );
+    }
   }
 
   const closed = await prisma.invoice.update({

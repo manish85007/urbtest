@@ -491,6 +491,7 @@ export interface InvoiceDetail {
     id?: string;
     certNo: string;
     certDate?: string;
+    uploadedAt?: string | null;
     department?: string | null;
     note?: string | null;
     fileId?: string;
@@ -523,6 +524,8 @@ export interface SubmissionDetail {
   rejectBy?: string | null;
   lifecycleEvents?: SubmissionLifecycleEvent[];
   createdBy: string;
+  /** Role of createdBy, when the account still exists. Used for close eligibility. */
+  createdByRole?: string | null;
   onBehalfOf?: string | null;
   createdAt?: string;
   acknowledgedAt: string | null;
