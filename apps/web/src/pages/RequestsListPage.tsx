@@ -206,7 +206,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                   <th scope="col">Request</th>
                   {isStaff ? <th scope="col">Client</th> : null}
                   <th scope="col">Site</th>
-                  <th scope="col">Stage</th>
+                  <th scope="col">Status</th>
                   <th scope="col">Invoices</th>
                   <th scope="col">Net kg</th>
                   <th scope="col">Pick-up date</th>
@@ -235,7 +235,7 @@ export function RequestsListPage({ user }: RequestsListPageProps) {
                           Pending with Requestor
                         </span>
                       ) : (
-                        <StageBadge stage={r.stage} />
+                        <StageBadge stage={r.stage} invoiceCount={r.invoiceCount} returned={r.returned} />
                       )}
                     </td>
                     <td>

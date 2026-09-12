@@ -16,7 +16,9 @@ import {
   periodLabel,
   recyclingSla,
   sequestered,
-  stageLabel,
+  requestStatusLabel,
+  workQueueForStage,
+  type WorkQueueKey,
   sumPaise,
   treesEarned,
   fiscalYearBounds,
@@ -27,7 +29,12 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { clientScopeFilter, factoryInScope, hasFeature, isStaff } from '../lib/auth-context.js';
 import { prisma } from '../lib/prisma.js';
 import { submissionInclude, type SubmissionFull } from '../lib/db-helpers.js';
-import { deriveSubmissionStage, recyclingApproved, recyclingClientPublished } from '../lib/stage-mapper.js';
+import {
+  deriveInvoiceStage,
+  deriveSubmissionStage,
+  recyclingApproved,
+  recyclingClientPublished,
+} from '../lib/stage-mapper.js';
 import { AppError } from '../lib/errors.js';
 import { requireAdmin } from '../lib/access.js';
 import { sendTransactionalEmail } from './email.js';
@@ -104,13 +111,42 @@ async function staffCapacitySummary(actor: SessionUser) {
   };
 }
 
+function openInvoicesOf(s: SubmissionFull) {
+  return s.invoices
+    .map((inv) => ({ inv, stage: deriveInvoiceStage(inv) }))
+    .filter((row) => row.stage < 9)
+    .sort((a, b) => a.stage - b.stage || a.inv.invoiceNo.localeCompare(b.inv.invoiceNo));
+}
+
+function requestWork(s: SubmissionFull) {
+  const stage = deriveSubmissionStage(s);
+  const open = openInvoicesOf(s);
+  const blocking = open[0];
+  const weighed = s.vehicles.length > 0 && s.vehicles.every((v) => !!v.weighment);
+  return workQueueForStage({
+    stage,
+    returned: stage === 1 && !!s.rejectNote,
+    blockingInvoiceStage: blocking?.stage ?? null,
+    codUploaded: blocking ? blocking.inv.certificates.length > 0 : undefined,
+    allVehiclesWeighed: weighed,
+    loadingCompleted: !!s.loadingCompletedAt,
+  });
+}
+
 function mapActiveRequest(s: SubmissionFull) {
+  const stage = deriveSubmissionStage(s);
   return {
     id: s.id,
     clientName: s.client.name,
     siteName: displayLabel(s.site.name),
     requestDate: s.requestDate.toISOString().slice(0, 10),
-    stage: deriveSubmissionStage(s),
+    stage,
+    statusLabel:
+      requestWork(s)?.statusLabel ??
+      requestStatusLabel(stage, {
+        returned: !!s.rejectNote,
+        invoiceCount: s.invoices.length,
+      }),
     invoices: s.invoices.map((inv) => ({
       invoiceNo: inv.invoiceNo,
       stage: invoiceStage(inv),
@@ -118,6 +154,28 @@ function mapActiveRequest(s: SubmissionFull) {
     netKg: submissionNetKg(s),
     approxWeight: Number(s.approxWeight),
     ref: s.ref,
+  };
+}
+
+type QueueRow = {
+  submissionId: string;
+  invoiceId: string;
+  invoiceNo: string;
+  clientName: string;
+  statusLabel: string;
+};
+
+function emptyQueues(): Record<WorkQueueKey, QueueRow[]> {
+  return {
+    awaitingAck: [],
+    withRequestor: [],
+    assignVehicle: [],
+    weighment: [],
+    raiseInvoice: [],
+    awaitingMrn: [],
+    awaitingRecycling: [],
+    awaitingCod: [],
+    awaitingClose: [],
   };
 }
 
@@ -219,24 +277,29 @@ export async function getStaffDashboard(actor: SessionUser) {
   }
   slaAtRisk.sort((a, b) => b.daysUsed - a.daysUsed);
 
-  const queueItem = (inv: InvoiceRow) => ({
-    submissionId: inv.submissionId,
-    invoiceId: inv.id,
-    invoiceNo: inv.invoiceNo,
-    clientName: inv.submission.client.name,
-  });
-
-  const visibleInv = openInvoices.filter((inv) => factoryCanSee(actor, inv));
-
-  const queues = {
-    awaitingMrn: visibleInv.filter((inv) => invoiceStage(inv) === 5).map(queueItem),
-    awaitingRecycling: visibleInv.filter((inv) => invoiceStage(inv) === 6).map(queueItem),
-    awaitingCod:
-      actor.role === 'admin'
-        ? openInvoices.filter((inv) => invoiceStage(inv) === 7).map(queueItem)
-        : [],
-    awaitingClose: openInvoices.filter((inv) => invoiceStage(inv) === 8).map(queueItem),
-  };
+  const queues = emptyQueues();
+  const queuedSubs = [...submissions].sort(
+    (a, b) => a.requestDate.getTime() - b.requestDate.getTime() || a.id.localeCompare(b.id),
+  );
+  for (const s of queuedSubs) {
+    const open = openInvoicesOf(s);
+    const blocking = open[0];
+    if (actor.role === 'factory') {
+      if (!blocking || (blocking.stage !== 5 && blocking.stage !== 6)) continue;
+      if (blocking.inv.mrn && !factoryInScope(actor, blocking.inv.mrn.factoryId)) continue;
+    }
+    const queued = requestWork(s);
+    if (!queued) continue;
+    const extra =
+      open.length > 1 ? ` · +${open.length - 1} other invoice${open.length > 2 ? 's' : ''}` : '';
+    queues[queued.key].push({
+      submissionId: s.id,
+      invoiceId: blocking?.inv.id ?? '',
+      invoiceNo: blocking?.inv.invoiceNo ?? '—',
+      clientName: s.client.name,
+      statusLabel: `${queued.statusLabel}${extra}`,
+    });
+  }
 
   const pendingPayments = openInvoices.filter((inv) => {
     const paid = settledPaise(inv.payments);
@@ -859,7 +922,10 @@ export async function getRegisterReport(
         displayLabel(s.site.name),
         displayPo(s.ref),
         fmtDate(s.requestDate),
-        `${stage} · ${stageLabel(stage)}`,
+        `${stage} · ${requestStatusLabel(stage, {
+          returned: stage === 1 && !!s.rejectNote,
+          invoiceCount: s.invoices.length,
+        })}`,
         s.vehicles.length,
         s.invoices.length,
         fmtKg(Number(s.approxWeight)),
@@ -933,7 +999,10 @@ export async function getRegisterReport(
           sub.site.name,
           sub.ref || '',
           fmtDate(sub.requestDate),
-          `${stage} · ${stageLabel(stage)}`,
+          `${stage} · ${requestStatusLabel(stage, {
+            returned: stage === 1 && !!sub.rejectNote,
+            invoiceCount: sub.invoices.length,
+          })}`,
           inv.invoiceNo,
           fmtDate(inv.invoiceDate),
           inv.ewayBillNo || '',

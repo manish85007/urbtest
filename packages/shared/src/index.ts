@@ -27,8 +27,8 @@ export const STAGES = [
   { n: 4, k: 'load', l: 'Load & Weigh', ic: '⚖️', by: 'Admin', d: 'Per-vehicle weighment + photos' },
   { n: 5, k: 'bill', l: 'Billing', ic: '🧾', by: 'Admin', d: 'Invoices + e-way bills raised' },
   { n: 6, k: 'mrn', l: 'MRN', ic: '📋', by: 'Factory', d: 'Goods received at factory' },
-  { n: 7, k: 'recy', l: 'Recycling', ic: '♻️', by: 'Factory', d: 'Processed + Form 6 issued' },
-  { n: 8, k: 'cod', l: 'CoD Upload', ic: '🏅', by: 'Admin', d: 'Certificate uploaded + emailed' },
+  { n: 7, k: 'recy', l: 'Form 6 & CoD', ic: '♻️', by: 'Factory / Admin', d: 'Form 6 issued; CoD uploaded and certified' },
+  { n: 8, k: 'cod', l: 'Awaiting close', ic: '🏅', by: 'Client', d: 'Published to the client; waiting for requestor close' },
   { n: 9, k: 'done', l: 'Closed', ic: '🎉', by: 'Client', d: 'Requestor acknowledged closure' },
 ] as const;
 
@@ -63,7 +63,7 @@ export const VIEW_PHASES = [
     l: 'Recycling & Compliance',
     ic: '♻️',
     by: 'Factory / Admin',
-    d: 'Issue Form 6, then upload the Certificate of Destruction',
+    d: 'Issue Form 6, certify the Certificate of Destruction, then the requestor closes',
   },
   {
     n: 5,

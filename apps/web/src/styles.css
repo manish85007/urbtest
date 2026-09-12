@@ -1330,10 +1330,10 @@ button.admin-chart-btn:focus-visible {
   gap: .65rem;
 }
 .admin-queue-card { animation: dashFadeIn .45s ease-out both; }
-.admin-queue-list { display: flex; flex-direction: column; gap: .35rem; }
+.admin-queue-list { display: flex; flex-direction: column; gap: .35rem; max-height: 22rem; overflow: auto; }
 .admin-queue-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: .5rem;
   width: 100%;

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatINR } from '@urb-tectrack/shared';
-import { type SessionUser, type StaffDashboardReport } from '../../api';
+import { type QueueItem, type SessionUser, type StaffDashboardReport } from '../../api';
 import { BarChart, CapacityRing, DonutChart } from '../../components/charts';
 import { StageBadge } from '../../components/StageProgress';
 import { displayLabel, fmtDate, kg, num, titleCaseName } from '../../lib/format';
@@ -10,6 +10,30 @@ import { dashboardTitle } from '../../lib/roles';
 import { userCan } from '../../lib/permissions';
 
 type ActionPanel = 'ack' | 'overdue' | 'sla' | 'queues' | 'active';
+
+const WORK_QUEUES: Array<{
+  key: keyof StaffDashboardReport['queues'];
+  title: string;
+  chart: string;
+  act: string;
+  cls: string;
+  color: string;
+  factory: boolean;
+}> = [
+  { key: 'awaitingAck', title: '⏳ Awaiting acknowledgement', chart: 'Acknowledge', act: 'Acknowledge', cls: 'bg-am', color: '#f59e0b', factory: false },
+  { key: 'withRequestor', title: '↩️ With requestor', chart: 'Returned', act: 'Waiting', cls: 'bg-gy', color: '#94a3b8', factory: false },
+  { key: 'assignVehicle', title: '🚚 Assign vehicle', chart: 'Vehicle', act: 'Assign', cls: 'bg-am', color: '#fb923c', factory: false },
+  { key: 'weighment', title: '⚖️ Weigh & loading', chart: 'Weigh', act: 'Weigh', cls: 'bg-am', color: '#eab308', factory: false },
+  { key: 'raiseInvoice', title: '🧾 Ready to invoice', chart: 'Invoice', act: 'Invoice', cls: 'bg-bl', color: '#0ea5e9', factory: false },
+  { key: 'awaitingMrn', title: '📋 Awaiting MRN', chart: 'MRN', act: 'Receive', cls: 'bg-am', color: '#d97706', factory: true },
+  { key: 'awaitingRecycling', title: '♻️ Awaiting recycling', chart: 'Recycling', act: 'Process', cls: 'bg-bl', color: '#3b82f6', factory: true },
+  { key: 'awaitingCod', title: '🏅 CoD & certify', chart: 'CoD', act: 'Certify', cls: 'bg-pu', color: '#a855f7', factory: false },
+  { key: 'awaitingClose', title: '🎉 Awaiting client close', chart: 'Close', act: 'With client', cls: 'bg-g', color: '#22c55e', factory: false },
+];
+
+function queueItems(report: StaffDashboardReport, key: keyof StaffDashboardReport['queues']): QueueItem[] {
+  return report.queues[key] ?? [];
+}
 
 interface AdminDashboardProps {
   user: SessionUser;
@@ -46,25 +70,19 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
   const fyKg = useAnimatedNumber(Math.round(report.stats.fyNetKg));
   const pendingPay = useAnimatedNumber(report.stats.pendingPayments);
 
-  const activeOther = Math.max(0, report.stats.openRequests - report.stats.newRequests);
-  const closedCount = Math.max(0, report.stats.totalRequests - report.stats.openRequests);
-  const reqSlices = [
-    { value: report.stats.newRequests, color: '#f59e0b', label: 'Awaiting ack' },
-    { value: activeOther, color: '#3b82f6', label: 'In progress' },
-    { value: closedCount, color: '#22c55e', label: 'Closed / other' },
-  ].filter((s) => s.value > 0);
-
-  const queueBars = [
-    { label: 'Awaiting MRN', value: report.queues.awaitingMrn.length, color: '#f59e0b' },
-    { label: 'Awaiting Recycling', value: report.queues.awaitingRecycling.length, color: '#3b82f6' },
-    ...(isAdminVariant
-      ? [
-          { label: 'Awaiting CoD / Publish', value: report.queues.awaitingCod.length, color: '#a855f7' },
-          { label: 'Awaiting Client Close', value: report.queues.awaitingClose.length, color: '#22c55e' },
-        ]
-      : []),
-  ];
+  const visibleQueues = WORK_QUEUES.filter((q) => isAdminVariant || q.factory);
+  const queueBars = visibleQueues
+    .map((q) => ({ label: q.chart, value: queueItems(report, q.key).length, color: q.color }))
+    .filter((b) => b.value > 0);
+  const queueTotal = queueBars.reduce((sum, b) => sum + b.value, 0);
   const queueMax = Math.max(...queueBars.map((b) => b.value), 1);
+  const closedCount = Math.max(0, report.stats.totalRequests - report.stats.openRequests);
+  const unqueued = Math.max(0, report.stats.openRequests - queueTotal);
+  const reqSlices = [
+    ...queueBars.map((b) => ({ value: b.value, color: b.color, label: b.label })),
+    ...(unqueued ? [{ value: unqueued, color: '#94a3b8', label: 'Other open' }] : []),
+    { value: closedCount, color: '#475569', label: 'Closed' },
+  ].filter((s) => s.value > 0);
 
   const panels: Array<{ id: ActionPanel; label: string; count: number; alert?: boolean }> = [
     { id: 'ack', label: 'Awaiting ack', count: report.newRequests.length, alert: report.newRequests.length > 0 },
@@ -73,10 +91,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
     {
       id: 'queues',
       label: 'Work queues',
-      count:
-        report.queues.awaitingMrn.length +
-        report.queues.awaitingRecycling.length +
-        (isAdminVariant ? report.queues.awaitingCod.length + report.queues.awaitingClose.length : 0),
+      count: queueTotal,
     },
     { id: 'active', label: 'Active requests', count: report.activeRequests.length },
   ];
@@ -176,7 +191,9 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                 </div>
               ))}
               <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
-                Tap to view all requests →
+                {report.stats.openRequests} open by next step
+                {closedCount ? ` · ${closedCount} closed` : ''}
+                {' '}· tap to view →
               </div>
             </div>
           </div>
@@ -188,9 +205,14 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
           onClick={openQueuesPanel}
         >
           <h3>Work queues</h3>
-          <BarChart bars={queueBars} maxVal={queueMax} />
+          {queueBars.length ? <BarChart bars={queueBars} maxVal={queueMax} /> : (
+            <div className="dim" style={{ fontSize: '.85rem' }}>No open work</div>
+          )}
           <div className="dim" style={{ fontSize: '.75rem', marginTop: '.5rem', textAlign: 'left' }}>
-            Tap to open work queues →
+            {isAdminVariant
+              ? `${queueTotal} of ${report.stats.openRequests} open requests`
+              : `${queueTotal} factory ${queueTotal === 1 ? 'request' : 'requests'}`}
+            {' '}· tap to open →
           </div>
         </button>
 
@@ -313,13 +335,24 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
 
         {panel === 'queues' ? (
           <div className="admin-queue-grid">
-            <AdminQueueCard title="📋 Awaiting MRN" items={report.queues.awaitingMrn} act="Receive" cls="bg-am" />
-            <AdminQueueCard title="♻️ Awaiting Recycling" items={report.queues.awaitingRecycling} act="Process" cls="bg-bl" />
-            {isAdminVariant ? (
-              <>
-                <AdminQueueCard title="🏅 Awaiting CoD / Publish" items={report.queues.awaitingCod} act="Certify" cls="bg-pu" />
-                <AdminQueueCard title="🎉 Awaiting Client Close" items={report.queues.awaitingClose} act="With client" cls="bg-g" />
-              </>
+            <div className="dim" style={{ fontSize: '.78rem', gridColumn: '1 / -1' }}>
+              Every open request is listed once, under the step that is blocking it.
+            </div>
+            {visibleQueues
+              .filter((q) => queueItems(report, q.key).length > 0)
+              .map((q) => (
+                <AdminQueueCard
+                  key={q.key}
+                  title={q.title}
+                  items={queueItems(report, q.key)}
+                  act={q.act}
+                  cls={q.cls}
+                />
+              ))}
+            {queueTotal === 0 ? (
+              <div className="card admin-queue-card">
+                <div className="dim" style={{ fontSize: '.85rem' }}>No open requests in the work queues.</div>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -338,7 +371,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
               </div>
             ) : (
               <AdminTable
-                rows={report.activeRequests.slice(0, 12).map((s) => ({
+                rows={report.activeRequests.slice(0, 20).map((s) => ({
                   key: s.id,
                   onClick: () => nav(`/requests/${s.id}`),
                   cells: [
@@ -350,7 +383,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                       {titleCaseName(s.clientName)}
                       <div className="dim" style={{ fontSize: '.72rem' }}>{displayLabel(s.siteName)}</div>
                     </>,
-                    <StageBadge stage={s.stage} />,
+                    <StageBadge stage={s.stage} label={s.statusLabel} invoiceCount={s.invoices.length} />,
                     <>
                       {s.invoices.length
                         ? s.invoices.map((inv) => (
@@ -363,7 +396,7 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
                     <span className="mono">{kg(s.netKg > 0 ? s.netKg : s.approxWeight)}</span>,
                   ],
                 }))}
-                headers={['Request', 'Client', 'Stage', 'Invoices', 'Net kg']}
+                headers={['Request', 'Client', 'Status', 'Invoices', 'Net kg']}
               />
             )}
           </div>
@@ -415,7 +448,7 @@ function AdminQueueCard({
   cls,
 }: {
   title: string;
-  items: StaffDashboardReport['queues']['awaitingMrn'];
+  items: QueueItem[];
   act: string;
   cls: string;
 }) {
@@ -430,24 +463,25 @@ function AdminQueueCard({
         <div className="dim" style={{ fontSize: '.82rem', padding: '.3rem 0' }}>Nothing pending</div>
       ) : (
         <div className="admin-queue-list">
-          {items.slice(0, 5).map((item, i) => (
+          {items.map((item, i) => (
             <button
-              key={item.invoiceId}
+              key={item.submissionId}
               type="button"
               className="admin-queue-item"
               style={{ animationDelay: `${i * 0.05}s` }}
               onClick={() => nav(`/requests/${item.submissionId}`)}
             >
               <span>
-                <b>{item.invoiceNo}</b>
-                <span className="dim" style={{ fontSize: '.72rem', marginLeft: '.35rem' }}>
-                  {item.submissionId} · {titleCaseName(item.clientName)}
+                <b>{item.submissionId}</b>
+                <span className="dim" style={{ display: 'block', fontSize: '.72rem' }}>
+                  {item.invoiceNo && item.invoiceNo !== '—' ? `${item.invoiceNo} · ` : ''}
+                  {item.statusLabel ? `${item.statusLabel} · ` : ''}
+                  {titleCaseName(item.clientName)}
                 </span>
               </span>
               <span className="badge bg-gy">{act}</span>
             </button>
           ))}
-          {items.length > 5 ? <div className="dim" style={{ fontSize: '.72rem' }}>+{items.length - 5} more</div> : null}
         </div>
       )}
     </div>

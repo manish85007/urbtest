@@ -183,7 +183,7 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
             <h1 className="h1">{sub.id}</h1>
-            <StageBadge stage={stage} />
+            <StageBadge stage={stage} invoiceCount={sub.invoices.length} returned={!!sub.rejectNote} />
             {sub.rejectNote && stage === 1 ? (
               <span className="badge bg-am">Pending with Requestor</span>
             ) : null}

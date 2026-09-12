@@ -599,6 +599,7 @@ export interface QueueItem {
   invoiceId: string;
   invoiceNo: string;
   clientName: string;
+  statusLabel?: string;
 }
 
 export interface StaffDashboardReport {
@@ -628,6 +629,7 @@ export interface StaffDashboardReport {
     siteName: string;
     requestDate: string;
     stage: number;
+    statusLabel?: string;
     invoices: Array<{ invoiceNo: string; stage: number }>;
     netKg: number;
     approxWeight: number;
@@ -653,6 +655,11 @@ export interface StaffDashboardReport {
     stateLabel: string;
   }>;
   queues: {
+    awaitingAck: QueueItem[];
+    withRequestor: QueueItem[];
+    assignVehicle: QueueItem[];
+    weighment: QueueItem[];
+    raiseInvoice: QueueItem[];
     awaitingMrn: QueueItem[];
     awaitingRecycling: QueueItem[];
     awaitingCod: QueueItem[];

@@ -1,4 +1,4 @@
-import { VIEW_PHASES, viewPhaseForStage, viewPhaseOf } from '@urb-tectrack/shared';
+import { VIEW_PHASES, requestStatusLabel, viewPhaseForStage, viewPhaseOf } from '@urb-tectrack/shared';
 
 interface StageProgressProps {
   current: number;
@@ -23,12 +23,23 @@ export function StageProgress({ current }: StageProgressProps) {
   );
 }
 
-export function StageBadge({ stage }: { stage: number }) {
+export function StageBadge({
+  stage,
+  label,
+  invoiceCount,
+  returned,
+}: {
+  stage: number;
+  label?: string;
+  invoiceCount?: number;
+  returned?: boolean;
+}) {
   const phase = viewPhaseOf(stage);
+  const text = label ?? requestStatusLabel(stage, { invoiceCount, returned });
   const cls = phase.n >= 5 ? 'bg-g' : phase.n >= 3 ? 'bg-bl' : phase.n >= 2 ? 'bg-am' : 'bg-gy';
   return (
-    <span className={`badge ${cls}`}>
-      {phase.ic} {phase.n}. {phase.l}
+    <span className={`badge ${cls}`} title={`${phase.n}. ${phase.l}`}>
+      {phase.ic} {text}
     </span>
   );
 }

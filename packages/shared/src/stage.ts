@@ -49,13 +49,98 @@ export function stageLabel(stage: number): string {
     2: 'Acknowledge',
     3: 'Assign Vehicle',
     4: 'Load & Weigh',
-    5: 'Billing',
-    6: 'MRN',
-    7: 'Recycling',
-    8: 'CoD Upload',
+    5: 'Awaiting MRN',
+    6: 'Awaiting recycling',
+    7: 'Form 6 & CoD',
+    8: 'Awaiting close',
     9: 'Closed',
   };
   return labels[stage] ?? 'Unknown';
+}
+
+/** Staff work-queue bucket for an open request. Closed requests return null. */
+export type WorkQueueKey =
+  | 'awaitingAck'
+  | 'withRequestor'
+  | 'assignVehicle'
+  | 'weighment'
+  | 'raiseInvoice'
+  | 'awaitingMrn'
+  | 'awaitingRecycling'
+  | 'awaitingCod'
+  | 'awaitingClose';
+
+export function workQueueForStage(input: {
+  stage: number;
+  returned?: boolean;
+  /** Least-progressed open invoice stage. Omit when the request has no open invoice. */
+  blockingInvoiceStage?: number | null;
+  /** Certificate file exists on the blocking invoice. Omit when unknown. */
+  codUploaded?: boolean;
+  allVehiclesWeighed?: boolean;
+  loadingCompleted?: boolean;
+}): { key: WorkQueueKey; statusLabel: string } | null {
+  if (input.stage >= 9) return null;
+  if (input.stage <= 2) {
+    return input.returned
+      ? { key: 'withRequestor', statusLabel: 'Returned to requestor' }
+      : { key: 'awaitingAck', statusLabel: 'Awaiting acknowledgement' };
+  }
+  if (input.stage === 3) return { key: 'assignVehicle', statusLabel: 'Assign vehicle' };
+  if (input.stage === 4) {
+    return {
+      key: 'weighment',
+      statusLabel:
+        input.allVehiclesWeighed && !input.loadingCompleted ? 'Complete loading' : 'Weigh vehicles',
+    };
+  }
+
+  const blocking = input.blockingInvoiceStage;
+  if (blocking == null || blocking >= 9) {
+    return { key: 'raiseInvoice', statusLabel: 'Ready to invoice' };
+  }
+  if (blocking <= 5) return { key: 'awaitingMrn', statusLabel: 'Awaiting MRN' };
+  if (blocking === 6) return { key: 'awaitingRecycling', statusLabel: 'Awaiting recycling' };
+  if (blocking === 7) {
+    const statusLabel =
+      input.codUploaded === true
+        ? 'Certify & publish CoD'
+        : input.codUploaded === false
+          ? 'Upload CoD'
+          : 'Form 6 & CoD';
+    return { key: 'awaitingCod', statusLabel };
+  }
+  return { key: 'awaitingClose', statusLabel: 'Awaiting client close' };
+}
+
+/** Next-step label for a request. Prefers the work-queue wording over the collapsed phase name. */
+export function requestStatusLabel(
+  stage: number,
+  opts?: {
+    returned?: boolean;
+    invoiceCount?: number;
+    blockingInvoiceStage?: number | null;
+    codUploaded?: boolean;
+    allVehiclesWeighed?: boolean;
+    loadingCompleted?: boolean;
+  },
+): string {
+  const queued = workQueueForStage({
+    stage,
+    returned: opts?.returned,
+    blockingInvoiceStage:
+      opts?.blockingInvoiceStage !== undefined
+        ? opts.blockingInvoiceStage
+        : opts?.invoiceCount === 0
+          ? null
+          : stage >= 5
+            ? stage
+            : null,
+    codUploaded: opts?.codUploaded,
+    allVehiclesWeighed: opts?.allVehiclesWeighed,
+    loadingCompleted: opts?.loadingCompleted,
+  });
+  return queued?.statusLabel ?? stageLabel(stage);
 }
 
 /** Request-page grouping: nine derived stages shown as five user-facing phases. */
