@@ -89,23 +89,22 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       };
       setError(e.message || 'Sign in failed');
       if (!needMfa && !needEmailOtp) refreshCaptcha();
-      if (e.mfaRequired || /six-digit|authenticator|emailed you/i.test(e.message)) {
+
+      // Only the API flags decide which OTP step to show — never infer both from message text.
+      if (e.mfaRequired) {
         setNeedMfa(true);
-        if (e.mfaMethod === 'email' || /emailed you/i.test(e.message)) {
-          setMfaMethod('email');
-          if (e.demoCode) setMfaDemo(e.demoCode);
-        } else {
-          setMfaMethod(e.mfaMethod === 'totp' ? 'totp' : 'totp');
-        }
-      }
-      if (e.emailOtpRequired || /emailed you|email verification|90 days/i.test(e.message)) {
-        if (!e.mfaRequired) {
-          setNeedEmailOtp(true);
-          if (e.demoCode) setEmailOtpDemo(e.demoCode);
-        } else if (e.mfaMethod !== 'email') {
-          setNeedEmailOtp(true);
-          if (e.demoCode) setEmailOtpDemo(e.demoCode);
-        }
+        setNeedEmailOtp(false);
+        setEmailOtp('');
+        setEmailOtpDemo(null);
+        setMfaMethod(e.mfaMethod === 'email' ? 'email' : 'totp');
+        if (e.mfaMethod === 'email' && e.demoCode) setMfaDemo(e.demoCode);
+      } else if (e.emailOtpRequired) {
+        setNeedEmailOtp(true);
+        setNeedMfa(false);
+        setMfaCode('');
+        setMfaDemo(null);
+        setMfaMethod(null);
+        if (e.demoCode) setEmailOtpDemo(e.demoCode);
       }
     } finally {
       setBusy(false);

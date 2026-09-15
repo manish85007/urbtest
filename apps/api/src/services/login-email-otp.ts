@@ -29,6 +29,22 @@ export function emailOtpDue(emailVerifiedAt: Date | null | undefined): boolean {
   return ageMs >= EMAIL_VERIFY_DAYS * 24 * 60 * 60 * 1000;
 }
 
+/**
+ * Whether sign-in should collect a separate mailbox OTP.
+ * Skip when email MFA already proved the mailbox, or the user must change a
+ * temporary/expired password first (welcome mail already delivered credentials).
+ */
+export function shouldRequireLoginEmailOtp(opts: {
+  emailVerifiedAt: Date | null | undefined;
+  mustReset?: boolean;
+  passwordExpired?: boolean;
+  emailMfaVerifiedThisLogin?: boolean;
+}): boolean {
+  if (opts.emailMfaVerifiedThisLogin) return false;
+  if (opts.mustReset || opts.passwordExpired) return false;
+  return emailOtpDue(opts.emailVerifiedAt);
+}
+
 type OtpKind = 'login' | 'mfa';
 
 async function issueEmailOtp(

@@ -22,9 +22,9 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { enrichSessionUser } from '../lib/auth-context.js';
 import type { EmailNotifyMode } from './email-preferences.js';
 import {
-  emailOtpDue,
   issueLoginEmailOtp,
   issueMfaEmailOtp,
+  shouldRequireLoginEmailOtp,
   verifyLoginEmailOtp,
   verifyMfaEmailOtp,
 } from './login-email-otp.js';
@@ -240,6 +240,8 @@ export async function signIn(
 
   const mfaMethod: MfaMethod | null =
     user.mfaMethod === 'email' ? 'email' : user.mfaSecret ? 'totp' : null;
+  let emailVerifiedThisLogin = false;
+  let emailMfaVerifiedThisLogin = false;
 
   if (mfaMethod === 'totp' && user.mfaSecret) {
     if (!mfaCode?.trim()) {
@@ -275,10 +277,20 @@ export async function signIn(
       });
     }
     await recordSecurityEvent('mfa.verified', user.email, { method: 'email' }, 'info', userAgent);
+    // Email MFA already proves the mailbox — do not ask for a second email OTP.
+    emailMfaVerifiedThisLogin = true;
+    emailVerifiedThisLogin = true;
   }
 
-  // Periodic email OTP — confirms the mailbox still works and the user remains reachable.
-  const needsEmailOtp = emailOtpDue(user.emailVerifiedAt);
+  // Periodic mailbox check. Skip when the user must change a temporary password first
+  // (welcome email already delivered the temp password), or when email MFA just ran.
+  const mustChangeFirst = user.mustReset || pwExpired(user.passwordSetAt);
+  const needsEmailOtp = shouldRequireLoginEmailOtp({
+    emailVerifiedAt: user.emailVerifiedAt,
+    mustReset: user.mustReset,
+    passwordExpired: pwExpired(user.passwordSetAt),
+    emailMfaVerifiedThisLogin,
+  });
   if (needsEmailOtp) {
     if (!emailOtp?.trim()) {
       const issued = await issueLoginEmailOtp(user.email, user.name);
@@ -296,6 +308,11 @@ export async function signIn(
       });
     }
     await recordSecurityEvent('auth.email_otp.verified', user.email, {}, 'info', userAgent);
+    emailVerifiedThisLogin = true;
+  } else if (mustChangeFirst && !user.emailVerifiedAt) {
+    // Temp-password first login: treat the welcome mail as mailbox proof so the next
+    // sign-in does not suddenly demand a second OTP after the password change.
+    emailVerifiedThisLogin = true;
   }
 
   const token = crypto.randomUUID();
@@ -309,7 +326,7 @@ export async function signIn(
         failedLoginCount: 0,
         lockedUntil: null,
         lastLoginAt: new Date(),
-        ...(needsEmailOtp ? { emailVerifiedAt: new Date() } : {}),
+        ...(emailVerifiedThisLogin ? { emailVerifiedAt: new Date() } : {}),
       },
     }),
     prisma.session.create({ data: { userId: user.id, token, expiresAt } }),
