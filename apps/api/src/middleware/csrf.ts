@@ -44,8 +44,14 @@ export function registerCsrfProtection(app: FastifyInstance) {
 
     // Extra Origin/Referer check when present (browser navigation / fetch).
     const origin = request.headers.origin;
-    const allowed = (process.env.CORS_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    if (origin && allowed.length && !allowed.includes(origin)) {
+    const allowed = [
+      ...(process.env.CORS_ORIGIN ?? '').split(','),
+      process.env.PORTAL_URL ?? '',
+    ]
+      .map((s) => s.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
+    const uniqueAllowed = [...new Set(allowed)];
+    if (origin && uniqueAllowed.length && !uniqueAllowed.includes(origin)) {
       throw new AppError('Cross-origin request blocked.', 403);
     }
   });

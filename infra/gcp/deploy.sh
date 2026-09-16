@@ -164,12 +164,17 @@ gcloud run deploy "${SERVICE}" \
   --quiet
 
 URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT}" --format='value(status.url)')"
+# Always pin the public portal host. Pointing CORS at the ephemeral run.app URL
+# blocks Super Admin actions from https://uat.urbeno.in (CSRF Origin check).
+PORTAL_URL="${GCP_PORTAL_URL:-https://uat.urbeno.in}"
 gcloud run services update "${SERVICE}" \
   --region "${REGION}" \
   --project "${PROJECT}" \
-  --update-env-vars "PORTAL_URL=${URL},CORS_ORIGIN=${URL}" \
+  --update-env-vars "PORTAL_URL=${PORTAL_URL},CORS_ORIGIN=${PORTAL_URL}" \
   --quiet
 
 echo
-echo "UAT URL  ${URL}"
+echo "UAT URL  ${PORTAL_URL}"
+echo "Run URL  ${URL}"
+echo "CORS     ${PORTAL_URL}"
 echo "Login    admin@urbeno.in / demo"

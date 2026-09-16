@@ -159,6 +159,10 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
       return (w.slipPhotoIds?.length ?? 0) > 0 && (w.pickupPhotoIds?.length ?? 0) > 0;
     });
   const loadingComplete = !!sub.loadingCompletedAt;
+  const billedKg = sub.invoices.reduce((s, inv) => s + Number(inv.billingWeight ?? 0), 0);
+  const unbilledKg = Math.round((netKg - billedKg) * 1000) / 1000;
+  const canAddInvoice =
+    canManageInvoices && loadingComplete && !sub.closedAt && (sub.invoices.length === 0 || unbilledKg > 0.001);
   const hasMrn = sub.invoices.some((i) => invoiceHasGoodsReceipt(i));
   const hasCod = sub.invoices.some((i) => i.certificates.length > 0);
   const phase2Locked = !sub.acknowledgedAt;
@@ -236,9 +240,9 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
             ✅ Acknowledge loading complete
           </button>
         ) : null}
-        {canManageInvoices && phase === 3 && loadingComplete ? (
+        {canAddInvoice ? (
           <button type="button" className="btn bp" onClick={() => setStep({ kind: 'invoice' })}>
-            {sub.invoices.length ? '🧾 Add Invoice' : '🧾 Raise Invoice'}
+            {sub.invoices.length ? `🧾 Add Invoice (${num(unbilledKg)} kg left)` : '🧾 Raise Invoice'}
           </button>
         ) : null}
       </div>
@@ -386,7 +390,28 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
           >
             {sub.invoices.length ? (
               <>
-                {sub.invoices.length > 1 ? (
+                {unbilledKg > 0.001 ? (
+                  <div
+                    className="card"
+                    style={{ background: 'var(--am2)', borderColor: '#fcd34d', marginBottom: '.55rem' }}
+                  >
+                    <div className="card-ttl" style={{ color: 'var(--am)' }}>
+                      Unbilled weighment remaining
+                    </div>
+                    <p style={{ fontSize: '.85rem', margin: '.25rem 0 .55rem' }}>
+                      Total weighment is <b className="mono">{num(netKg)} kg</b>; invoices cover{' '}
+                      <b className="mono">{num(billedKg)} kg</b>. Raise another invoice for the balance of{' '}
+                      <b className="mono">{num(unbilledKg)} kg</b>. You can split one vehicle&apos;s weighment across
+                      invoices — a separate partial weighment record is not required.
+                    </p>
+                    {canAddInvoice ? (
+                      <button type="button" className="btn bp bsm" onClick={() => setStep({ kind: 'invoice' })}>
+                        🧾 Add Invoice for {num(unbilledKg)} kg
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {sub.invoices.length > 1 || unbilledKg > 0.001 ? (
                   <div className="tw" style={{ marginBottom: '.5rem' }}>
                     <table>
                       <thead>
@@ -428,6 +453,17 @@ export function SubmissionDetailPage({ user }: { user: SessionUser }) {
                             </tr>
                           );
                         })}
+                        {unbilledKg > 0.001 ? (
+                          <tr>
+                            <td className="dim">Unbilled balance</td>
+                            <td className="mono" style={{ color: 'var(--am)', fontWeight: 700 }}>
+                              {num(unbilledKg)} kg
+                            </td>
+                            <td colSpan={2} className="dim">
+                              Add another invoice
+                            </td>
+                          </tr>
+                        ) : null}
                       </tbody>
                     </table>
                   </div>
@@ -2506,9 +2542,15 @@ function InvoiceForm({
   const [vehIds, setVehIds] = useState<string[]>(() =>
     invoice?.vehicleIds?.length ? invoice.vehicleIds : vehicles.map((v) => v.id),
   );
-  const [billingWeight, setBillingWeight] = useState(
-    invoice?.billingWeight != null && invoice.billingWeight !== '' ? String(Number(invoice.billingWeight)) : '',
-  );
+  const [billingWeight, setBillingWeight] = useState(() => {
+    if (invoice?.billingWeight != null && invoice.billingWeight !== '') {
+      return String(Number(invoice.billingWeight));
+    }
+    const total = vehicles.reduce((s, v) => s + Number(v.weighment?.netKg ?? 0), 0);
+    const billed = invoices.reduce((s, inv) => s + Number(inv.billingWeight ?? 0), 0);
+    const left = Math.round((total - billed) * 1000) / 1000;
+    return left > 0 ? String(left) : '';
+  });
   const [invoiceFileIds, setInvoiceFileIds] = useState<string[]>(() => invoicePdfIds(invoice));
   const [ewayFileIdList, setEwayFileIdList] = useState<string[]>(() => ewayPdfIds(invoice));
   const [error, setError] = useState('');
@@ -2775,8 +2817,8 @@ function InvoiceForm({
       <div className="fg">
         <label>Vehicles covered by this invoice *</label>
         <p className="hint" style={{ textAlign: 'left', margin: '0 0 .3rem' }}>
-          Vehicle selection does not change billing weight. Weight is checked against the total weighment of all
-          vehicles.
+          Select which vehicles this invoice covers for MRN / Form 6. Billing weight is checked against the total
+          weighment of all vehicles — you may bill part of one vehicle on this invoice and the rest on another.
         </p>
         <div
           style={{
