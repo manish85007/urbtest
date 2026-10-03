@@ -298,52 +298,87 @@ export async function processEmailQueue(limit = 20) {
   let sent = 0;
   let failed = 0;
 
-  const backoffMs = [30_000, 5 * 60_000, 30 * 60_000];
-
   for (const email of pending) {
-    try {
-      await deliverEmail({
-        to: email.to,
-        subject: email.subject,
-        body: email.body,
-      });
-      await prisma.emailOutbox.update({
-        where: { id: email.id },
-        data: {
-          status: 'sent',
-          sentAt: new Date(),
-          attempts: { increment: 1 },
-          error: null,
-          nextRetryAt: null,
-        },
-      });
-      await auditLog({
-        actorEmail: 'system',
-        action: 'email.sent',
-        entity: 'email',
-        entityId: email.id,
-        details: { templateKey: email.templateKey, to: email.to, subject: email.subject },
-      });
-      sent++;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Send failed';
-      const nextAttempts = email.attempts + 1;
-      const canRetry = nextAttempts < 3;
-      const delay = backoffMs[Math.min(nextAttempts - 1, backoffMs.length - 1)] ?? 30 * 60_000;
-      await prisma.emailOutbox.update({
-        where: { id: email.id },
-        data: {
-          status: canRetry ? 'queued' : 'failed',
-          error: message,
-          attempts: { increment: 1 },
-          nextRetryAt: canRetry ? new Date(Date.now() + delay) : null,
-        },
-      });
-      failed++;
-    }
+    const result = await deliverOutboxRecord(email);
+    if (result.ok) sent++;
+    else failed++;
   }
 
   return { sent, failed, processed: pending.length };
+}
+
+const RETRY_BACKOFF_MS = [30_000, 5 * 60_000, 30 * 60_000];
+
+type OutboxRecord = {
+  id: string;
+  templateKey: string;
+  to: string[];
+  subject: string;
+  body: string;
+  attempts: number;
+};
+
+async function deliverOutboxRecord(email: OutboxRecord): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await deliverEmail({ to: email.to, subject: email.subject, body: email.body });
+    await prisma.emailOutbox.update({
+      where: { id: email.id },
+      data: {
+        status: 'sent',
+        sentAt: new Date(),
+        attempts: { increment: 1 },
+        error: null,
+        nextRetryAt: null,
+      },
+    });
+    await auditLog({
+      actorEmail: 'system',
+      action: 'email.sent',
+      entity: 'email',
+      entityId: email.id,
+      details: { templateKey: email.templateKey, to: email.to, subject: email.subject },
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Send failed';
+    const nextAttempts = email.attempts + 1;
+    const canRetry = nextAttempts < 3;
+    const delay =
+      RETRY_BACKOFF_MS[Math.min(nextAttempts - 1, RETRY_BACKOFF_MS.length - 1)] ?? 30 * 60_000;
+    await prisma.emailOutbox.update({
+      where: { id: email.id },
+      data: {
+        status: canRetry ? 'queued' : 'failed',
+        error: message,
+        attempts: { increment: 1 },
+        nextRetryAt: canRetry ? new Date(Date.now() + delay) : null,
+      },
+    });
+    console.error(
+      JSON.stringify({
+        severity: 'ERROR',
+        message: `Email delivery failed (${email.templateKey})`,
+        outboxId: email.id,
+        templateKey: email.templateKey,
+        attempt: nextAttempts,
+        error: message,
+      }),
+    );
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Deliver one queued email right now (sign-in / reset codes) instead of waiting
+ * behind older queue items. Failed sends stay queued for normal retries.
+ */
+export async function deliverQueuedEmailNow(
+  outboxId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const email = await prisma.emailOutbox.findUnique({ where: { id: outboxId } });
+  if (!email) return { ok: false, error: 'Email not found in outbox.' };
+  if (email.status === 'sent') return { ok: true };
+  return deliverOutboxRecord(email);
 }
 
 export async function listEmailOutbox(limit = 50) {

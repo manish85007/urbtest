@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
 import { applyPassword } from './auth.js';
 import { recordSecurityEvent } from './security-log.js';
-import { processEmailQueue, sendTransactionalEmail } from './email.js';
+import { deliverQueuedEmailNow, sendTransactionalEmail } from './email.js';
 
 const RESET_MINS = Number(process.env.RESET_CODE_MINS ?? 15);
 
@@ -34,13 +34,13 @@ export async function requestPasswordReset(emailRaw: string): Promise<{ sent: tr
         expiresAt: new Date(Date.now() + RESET_MINS * 60 * 1000),
       },
     });
-    await sendTransactionalEmail('password_reset', [email], {
+    const queued = await sendTransactionalEmail('password_reset', [email], {
       user_name: user.name,
       code,
       expiry_minutes: RESET_MINS,
       support_email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
     });
-    await processEmailQueue(5).catch(() => undefined);
+    if (queued) await deliverQueuedEmailNow(queued.id).catch(() => undefined);
     await auditLog({ actorEmail: email, action: 'auth.reset.request', entity: 'user', entityId: email });
     await recordSecurityEvent('auth.reset.requested', email, {});
     return { sent: true, ...(allowDemoCode() ? { demoCode: code } : {}) };

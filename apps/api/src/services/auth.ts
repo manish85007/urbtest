@@ -22,6 +22,7 @@ import type { SessionUser } from '../lib/auth-context.js';
 import { enrichSessionUser } from '../lib/auth-context.js';
 import type { EmailNotifyMode } from './email-preferences.js';
 import {
+  EMAIL_OTP_DELIVERY_FAILED_MESSAGE,
   issueLoginEmailOtp,
   issueMfaEmailOtp,
   shouldRequireLoginEmailOtp,
@@ -261,6 +262,7 @@ export async function signIn(
   } else if (mfaMethod === 'email') {
     if (!mfaCode?.trim()) {
       const issued = await issueMfaEmailOtp(user.email, user.name);
+      if (!issued.delivered && !issued.demoCode) throw new AuthError(EMAIL_OTP_DELIVERY_FAILED_MESSAGE);
       throw new AuthError('Enter the six-digit code we just emailed you.', {
         mfaRequired: true,
         mfaMethod: 'email',
@@ -294,6 +296,7 @@ export async function signIn(
   if (needsEmailOtp) {
     if (!emailOtp?.trim()) {
       const issued = await issueLoginEmailOtp(user.email, user.name);
+      if (!issued.delivered && !issued.demoCode) throw new AuthError(EMAIL_OTP_DELIVERY_FAILED_MESSAGE);
       throw new AuthError(
         'Enter the 6-digit code we just emailed you. This check runs every 90 days to confirm your work email still works.',
         { emailOtpRequired: true, demoCode: issued.demoCode },
@@ -421,6 +424,7 @@ export async function updateEmailNotifyMode(actor: SessionUser, mode: EmailNotif
 export async function startMfaEnrol(actor: SessionUser, method: MfaMethod = 'totp') {
   if (method === 'email') {
     const issued = await issueMfaEmailOtp(actor.email, actor.name);
+    if (!issued.delivered && !issued.demoCode) throw new AppError(EMAIL_OTP_DELIVERY_FAILED_MESSAGE, 503);
     return {
       method: 'email' as const,
       required: mfaRequired(actor.role),

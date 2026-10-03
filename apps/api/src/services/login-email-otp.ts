@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
-import { processEmailQueue, sendTransactionalEmail } from './email.js';
+import { deliverQueuedEmailNow, sendTransactionalEmail } from './email.js';
 import { recordSecurityEvent } from './security-log.js';
 
 const OTP_MINS = Number(process.env.LOGIN_EMAIL_OTP_MINS ?? 15);
@@ -47,11 +47,12 @@ export function shouldRequireLoginEmailOtp(opts: {
 
 type OtpKind = 'login' | 'mfa';
 
-async function issueEmailOtp(
-  emailRaw: string,
-  userName: string,
-  kind: OtpKind,
-): Promise<{ demoCode?: string | null }> {
+export interface IssuedEmailOtp {
+  delivered: boolean;
+  demoCode?: string | null;
+}
+
+async function issueEmailOtp(emailRaw: string, userName: string, kind: OtpKind): Promise<IssuedEmailOtp> {
   const email = emailRaw.trim().toLowerCase();
   const code = sixDigitCode();
   const codeHash = await bcrypt.hash(code, 10);
@@ -69,43 +70,59 @@ async function issueEmailOtp(
   });
 
   const template = kind === 'mfa' ? 'mfa_email_otp' : 'login_email_otp';
-  await sendTransactionalEmail(template, [email], {
+  const queued = await sendTransactionalEmail(template, [email], {
     user_name: userName,
     code,
     expiry_minutes: OTP_MINS,
     days: EMAIL_VERIFY_DAYS,
     support_email: process.env.URBENO_EMAIL ?? 'info@urbeno.in',
   });
-  await processEmailQueue(5).catch(() => undefined);
+  const delivery = queued
+    ? await deliverQueuedEmailNow(queued.id).catch((err: unknown) => ({
+        ok: false as const,
+        error: err instanceof Error ? err.message : 'Send failed',
+      }))
+    : { ok: false as const, error: `Email template "${template}" is missing or has no recipients.` };
 
   await auditLog({
     actorEmail: email,
     action: kind === 'mfa' ? 'auth.mfa_email_otp.request' : 'auth.email_otp.request',
     entity: 'user',
     entityId: email,
+    details: delivery.ok ? undefined : { deliveryError: delivery.error },
   });
   await recordSecurityEvent(
-    kind === 'mfa' ? 'auth.mfa_email_otp.sent' : 'auth.email_otp.sent',
+    delivery.ok
+      ? kind === 'mfa'
+        ? 'auth.mfa_email_otp.sent'
+        : 'auth.email_otp.sent'
+      : 'auth.email_otp.delivery_failed',
     email,
-    kind === 'mfa' ? {} : { days: EMAIL_VERIFY_DAYS },
+    delivery.ok
+      ? kind === 'mfa'
+        ? {}
+        : { days: EMAIL_VERIFY_DAYS }
+      : { kind, error: delivery.error.slice(0, 300) },
+    delivery.ok ? 'info' : 'high',
   );
 
-  return allowDemoCode() ? { demoCode: code } : {};
+  return {
+    delivered: delivery.ok,
+    ...(allowDemoCode() ? { demoCode: code } : {}),
+  };
 }
 
+/** Shown when the sign-in code email could not be delivered (SMTP down / credentials revoked). */
+export const EMAIL_OTP_DELIVERY_FAILED_MESSAGE =
+  'We could not email your sign-in code right now. Please try again in a few minutes. If this keeps happening, contact your Urbeno administrator.';
+
 /** Issue a login email OTP (90-day mailbox check). */
-export async function issueLoginEmailOtp(
-  emailRaw: string,
-  userName: string,
-): Promise<{ demoCode?: string | null }> {
+export async function issueLoginEmailOtp(emailRaw: string, userName: string): Promise<IssuedEmailOtp> {
   return issueEmailOtp(emailRaw, userName, 'login');
 }
 
 /** Issue a two-factor email OTP (every sign-in when MFA method is email). */
-export async function issueMfaEmailOtp(
-  emailRaw: string,
-  userName: string,
-): Promise<{ demoCode?: string | null }> {
+export async function issueMfaEmailOtp(emailRaw: string, userName: string): Promise<IssuedEmailOtp> {
   return issueEmailOtp(emailRaw, userName, 'mfa');
 }
 
