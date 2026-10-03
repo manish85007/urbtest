@@ -4,6 +4,7 @@ import { formatINR } from '@urb-tectrack/shared';
 import { type QueueItem, type SessionUser, type StaffDashboardReport } from '../../api';
 import { BarChart, CapacityRing, DonutChart } from '../../components/charts';
 import { StageBadge } from '../../components/StageProgress';
+import { EmailHealthBanner } from '../../components/EmailHealthBanner';
 import { displayLabel, fmtDate, kg, num, titleCaseName } from '../../lib/format';
 import { useAnimatedNumber } from '../../lib/useAnimatedNumber';
 import { dashboardTitle } from '../../lib/roles';
@@ -116,6 +117,8 @@ export function AdminDashboard({ user, report, variant = 'admin' }: AdminDashboa
           </Link>
         ) : null}
       </div>
+
+      {isSuperAdmin && isAdminVariant ? <EmailHealthBanner /> : null}
 
       <div className="admin-quick-grid">
         <Link to="/requests?stage=1" className="admin-quick-tile">

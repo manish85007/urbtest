@@ -1206,7 +1206,23 @@ export const emailsApi = {
   }) => api<unknown>('/settings/email', { method: 'PUT', body: JSON.stringify(body) }),
   testSmtp: (to: string) =>
     api<{ ok: boolean }>('/settings/email/test', { method: 'POST', body: JSON.stringify({ to }) }),
+  emailHealth: () => api<EmailHealthReport>('/settings/email/health'),
+  checkEmailHealth: () => api<EmailHealthReport>('/settings/email/health/check', { method: 'POST' }),
 };
+
+export interface EmailHealthReport {
+  ok: boolean;
+  checkedAt: string;
+  source: 'probe' | 'delivery';
+  error: string | null;
+  failingSince: string | null;
+  lastOkAt: string | null;
+  configured: boolean;
+  queued: number;
+  failedLast24h: number;
+  lastSentAt: string | null;
+  hint: string | null;
+}
 
 export const filesApi = {
   upload: async (file: File, kind: string) => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { mergeTemplate } from '@urb-tectrack/shared';
 import { adminApi, emailsApi } from '../../api';
 import { Modal } from '../../components/Modal';
+import { EmailHealthBanner } from '../../components/EmailHealthBanner';
 
 const SAMPLE_VARS: Record<string, string> = {
   request_id: 'REQ-00042',
@@ -492,6 +493,7 @@ function SmtpSettingsForm({ onChanged }: { onChanged: (msg: string) => void }) {
         to each recipient&apos;s real address. The SMTP password is read from <code>SMTP_PASS</code> (environment /
         Secrets Manager) and is never stored in the database — leave the password field blank when saving.
       </p>
+      <EmailHealthBanner detailed />
       {error ? <p className="error">{error}</p> : null}
       <label style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.7rem' }}>
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

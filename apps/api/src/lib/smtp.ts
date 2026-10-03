@@ -97,16 +97,17 @@ export function normalizeSmtpTls(config: SmtpConfig): SmtpConfig {
   return { ...config, port };
 }
 
-/** Minimal SMTP client (STARTTLS / implicit TLS + AUTH LOGIN). */
-export async function sendSmtp(config: SmtpConfig, message: SmtpMessage): Promise<void> {
-  const normalized = normalizeSmtpTls(config);
+const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS ?? 20_000);
+
+/** Connect, negotiate TLS and authenticate. Caller owns the returned socket. */
+async function openAuthenticatedSession(normalized: SmtpConfig): Promise<net.Socket> {
   const host = normalized.host.trim();
   const port = normalized.port;
   const secure = normalized.secure;
   if (!host) throw new Error('SMTP host is not set.');
-  if (!message.to.length) throw new Error('No recipients.');
 
   let socket: net.Socket = await connectRaw(host, port, secure);
+  socket.setTimeout(SMTP_TIMEOUT_MS, () => socket.destroy(new Error('SMTP server timed out.')));
   try {
     await cmd(socket, 200);
     await cmd(socket, 200, `EHLO urb-tectrack`);
@@ -114,6 +115,7 @@ export async function sendSmtp(config: SmtpConfig, message: SmtpMessage): Promis
     if (!secure && port !== 465) {
       await cmd(socket, 200, 'STARTTLS');
       socket = await upgradeTls(socket, host);
+      socket.setTimeout(SMTP_TIMEOUT_MS, () => socket.destroy(new Error('SMTP server timed out.')));
       await cmd(socket, 200, `EHLO urb-tectrack`);
     }
 
@@ -122,7 +124,32 @@ export async function sendSmtp(config: SmtpConfig, message: SmtpMessage): Promis
       await cmd(socket, 300, b64(normalized.user));
       await cmd(socket, 200, b64(normalized.pass));
     }
+    return socket;
+  } catch (err) {
+    socket.end();
+    socket.destroy();
+    throw err;
+  }
+}
 
+/** Log in to the SMTP server without sending mail — detects revoked credentials early. */
+export async function verifySmtpLogin(config: SmtpConfig): Promise<void> {
+  const socket = await openAuthenticatedSession(normalizeSmtpTls(config));
+  try {
+    await cmd(socket, 200, 'QUIT').catch(() => undefined);
+  } finally {
+    socket.end();
+    socket.destroy();
+  }
+}
+
+/** Minimal SMTP client (STARTTLS / implicit TLS + AUTH LOGIN). */
+export async function sendSmtp(config: SmtpConfig, message: SmtpMessage): Promise<void> {
+  const normalized = normalizeSmtpTls(config);
+  if (!message.to.length) throw new Error('No recipients.');
+
+  const socket = await openAuthenticatedSession(normalized);
+  try {
     const from = normalized.fromEmail.trim();
     await cmd(socket, 200, `MAIL FROM:<${from}>`);
     for (const rcpt of message.to) {

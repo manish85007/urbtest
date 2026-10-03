@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { processEmailQueue } from '../services/email.js';
+import { runEmailHealthCheck } from '../services/email-health.js';
 import { runRemindersIfDue } from '../services/reminders.js';
 import { runAutoCloseInvoices } from '../services/auto-close.js';
 import { purgeExpiredSessions } from '../services/legal.js';
@@ -7,6 +8,7 @@ import { purgeExpiredSessions } from '../services/legal.js';
 const EMAIL_POLL_MS = Number(process.env.EMAIL_POLL_MS ?? 30_000);
 const REMINDER_CHECK_MS = Number(process.env.REMINDER_CHECK_MS ?? 3_600_000);
 const SESSION_CLEANUP_MS = Number(process.env.SESSION_CLEANUP_MS ?? 3_600_000);
+const EMAIL_HEALTH_MS = Number(process.env.EMAIL_HEALTH_MS ?? 3_600_000);
 
 export function startScheduler(app: FastifyInstance) {
   // Prefer Cloud Scheduler → POST /internal/jobs/* when ENABLE_JOBS=false.
@@ -43,19 +45,26 @@ export function startScheduler(app: FastifyInstance) {
       .catch((err) => app.log.error({ err }, 'Session cleanup failed'));
   };
 
+  const runEmailHealth = () => {
+    runEmailHealthCheck().catch((err) => app.log.error({ err }, 'Email health check failed to run'));
+  };
+
   runQueue();
   runDailyReminders();
   runSessionCleanup();
+  runEmailHealth();
 
   const emailTimer = setInterval(runQueue, EMAIL_POLL_MS);
   const reminderTimer = setInterval(runDailyReminders, REMINDER_CHECK_MS);
   const sessionTimer = setInterval(runSessionCleanup, SESSION_CLEANUP_MS);
+  const healthTimer = setInterval(runEmailHealth, EMAIL_HEALTH_MS);
 
   app.addHook('onClose', async () => {
     clearInterval(emailTimer);
     clearInterval(reminderTimer);
     clearInterval(sessionTimer);
+    clearInterval(healthTimer);
   });
 
-  app.log.info('Background jobs started (email queue + reminders + session cleanup)');
+  app.log.info('Background jobs started (email queue + reminders + session cleanup + SMTP health)');
 }

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import { attachSession, requireAdmin, requireAuth } from '../middleware/session.js';
 import { listEmailOutbox } from '../services/email.js';
+import { getEmailHealth, recordEmailHealth, runEmailHealthCheck } from '../services/email-health.js';
 import {
   createEmailTemplate,
   listEmailTemplates,
@@ -96,11 +97,24 @@ export async function emailsRoutes(app: FastifyInstance) {
   app.post('/settings/email/test', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       const body = z.object({ to: z.string().email() }).parse(request.body);
-      await sendTestEmail(body.to);
+      try {
+        await sendTestEmail(body.to);
+      } catch (err) {
+        await recordEmailHealth(false, err instanceof Error ? err.message : 'SMTP send failed.', 'delivery');
+        throw err;
+      }
+      await recordEmailHealth(true, null, 'delivery');
       return { ok: true };
     } catch (err) {
       return handleErr(err, reply);
     }
+  });
+
+  app.get('/settings/email/health', { preHandler: requireAdmin }, async () => getEmailHealth());
+
+  app.post('/settings/email/health/check', { preHandler: requireAdmin }, async () => {
+    await runEmailHealthCheck();
+    return getEmailHealth();
   });
 
   app.get('/settings/company', { preHandler: requireAuth }, async () => getCompanyProfile());

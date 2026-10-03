@@ -3,6 +3,7 @@ import { mergeTemplate } from '@urb-tectrack/shared';
 import { prisma } from '../lib/prisma.js';
 import { auditLog } from './audit.js';
 import { deliverEmail } from './email-provider.js';
+import { recordEmailHealth } from './email-health.js';
 import {
   ALWAYS_SEND_EMAIL_TEMPLATES,
   allowsClientEmail,
@@ -338,6 +339,7 @@ async function deliverOutboxRecord(email: OutboxRecord): Promise<{ ok: true } | 
       entityId: email.id,
       details: { templateKey: email.templateKey, to: email.to, subject: email.subject },
     });
+    await recordEmailHealth(true, null, 'delivery').catch(() => undefined);
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Send failed';
@@ -364,6 +366,7 @@ async function deliverOutboxRecord(email: OutboxRecord): Promise<{ ok: true } | 
         error: message,
       }),
     );
+    await recordEmailHealth(false, message, 'delivery').catch(() => undefined);
     return { ok: false, error: message };
   }
 }
